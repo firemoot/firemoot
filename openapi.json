@@ -972,6 +972,114 @@
           }
         }
       }
+    },
+    "/v1/webhooks" : {
+      "get" : {
+        "summary" : "List webhook endpoints",
+        "operationId" : "getV1Webhooks",
+        "responses" : {
+          "200" : {
+            "description" : "",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/WebhookEndpoint"
+                  }
+                }
+              }
+            }
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "summary" : "Register a webhook endpoint (returns the signing secret once)",
+        "operationId" : "postV1Webhooks",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateWebhookRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WebhookCreated"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid value for: body",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhooks/{id}" : {
+      "delete" : {
+        "summary" : "Delete a webhook endpoint",
+        "operationId" : "deleteV1WebhooksId",
+        "parameters" : [
+          {
+            "name" : "id",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "204" : {
+            "description" : ""
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components" : {
@@ -1150,6 +1258,24 @@
           },
           "custom" : {
             
+          }
+        }
+      },
+      "CreateWebhookRequest" : {
+        "title" : "CreateWebhookRequest",
+        "type" : "object",
+        "required" : [
+          "url"
+        ],
+        "properties" : {
+          "url" : {
+            "type" : "string"
+          },
+          "secret" : {
+            "type" : "string"
+          },
+          "enabled" : {
+            "type" : "boolean"
           }
         }
       },
@@ -1483,6 +1609,55 @@
             "format" : "date-time"
           },
           "deletedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "WebhookCreated" : {
+        "title" : "WebhookCreated",
+        "type" : "object",
+        "required" : [
+          "id",
+          "url",
+          "secret",
+          "enabled"
+        ],
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "url" : {
+            "type" : "string"
+          },
+          "secret" : {
+            "type" : "string"
+          },
+          "enabled" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "WebhookEndpoint" : {
+        "title" : "WebhookEndpoint",
+        "type" : "object",
+        "required" : [
+          "id",
+          "url",
+          "enabled",
+          "createdAt"
+        ],
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "url" : {
+            "type" : "string"
+          },
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "createdAt" : {
             "type" : "string",
             "format" : "date-time"
           }

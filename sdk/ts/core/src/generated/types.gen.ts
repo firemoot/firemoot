@@ -78,6 +78,15 @@ export type CreateChannelRequest = {
 };
 
 /**
+ * CreateWebhookRequest
+ */
+export type CreateWebhookRequest = {
+    url: string;
+    secret?: string;
+    enabled?: boolean;
+};
+
+/**
  * EditMessageRequest
  */
 export type EditMessageRequest = {
@@ -223,6 +232,26 @@ export type User = {
     updatedAt: string;
     lastActiveAt?: string;
     deletedAt?: string;
+};
+
+/**
+ * WebhookCreated
+ */
+export type WebhookCreated = {
+    id: string;
+    url: string;
+    secret: string;
+    enabled: boolean;
+};
+
+/**
+ * WebhookEndpoint
+ */
+export type WebhookEndpoint = {
+    id: string;
+    url: string;
+    enabled: boolean;
+    createdAt: string;
 };
 
 export type PostV1UsersData = {
@@ -647,3 +676,66 @@ export type PostV1SearchResponses = {
 };
 
 export type PostV1SearchResponse = PostV1SearchResponses[keyof PostV1SearchResponses];
+
+export type GetV1WebhooksData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/v1/webhooks';
+};
+
+export type GetV1WebhooksErrors = {
+    default: Problem;
+};
+
+export type GetV1WebhooksError = GetV1WebhooksErrors[keyof GetV1WebhooksErrors];
+
+export type GetV1WebhooksResponses = {
+    200: Array<WebhookEndpoint>;
+};
+
+export type GetV1WebhooksResponse = GetV1WebhooksResponses[keyof GetV1WebhooksResponses];
+
+export type PostV1WebhooksData = {
+    body: CreateWebhookRequest;
+    path?: never;
+    query?: never;
+    url: '/v1/webhooks';
+};
+
+export type PostV1WebhooksErrors = {
+    /**
+     * Invalid value for: body
+     */
+    400: string;
+    default: Problem;
+};
+
+export type PostV1WebhooksError = PostV1WebhooksErrors[keyof PostV1WebhooksErrors];
+
+export type PostV1WebhooksResponses = {
+    201: WebhookCreated;
+};
+
+export type PostV1WebhooksResponse = PostV1WebhooksResponses[keyof PostV1WebhooksResponses];
+
+export type DeleteV1WebhooksIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/webhooks/{id}';
+};
+
+export type DeleteV1WebhooksIdErrors = {
+    default: Problem;
+};
+
+export type DeleteV1WebhooksIdError = DeleteV1WebhooksIdErrors[keyof DeleteV1WebhooksIdErrors];
+
+export type DeleteV1WebhooksIdResponses = {
+    204: void;
+};
+
+export type DeleteV1WebhooksIdResponse = DeleteV1WebhooksIdResponses[keyof DeleteV1WebhooksIdResponses];

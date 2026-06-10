@@ -152,6 +152,26 @@ object ApiEndpoints:
           "search engine: no stemming, language-aware matching or typo tolerance."
       )
 
+  val createWebhook =
+    base.post
+      .in("webhooks")
+      .in(jsonBody[CreateWebhookRequest])
+      .out(statusCode(StatusCode.Created))
+      .out(jsonBody[WebhookCreated])
+      .summary("Register a webhook endpoint (returns the signing secret once)")
+
+  val listWebhooks =
+    base.get
+      .in("webhooks")
+      .out(jsonBody[List[WebhookEndpoint]])
+      .summary("List webhook endpoints")
+
+  val deleteWebhook =
+    base.delete
+      .in("webhooks" / path[String]("id"))
+      .out(statusCode(StatusCode.NoContent))
+      .summary("Delete a webhook endpoint")
+
   val all: List[AnyEndpoint] = List(
     upsertUser,
     deleteUser,
@@ -170,4 +190,7 @@ object ApiEndpoints:
     queryChannels,
     listMessages,
     searchMessages,
+    createWebhook,
+    listWebhooks,
+    deleteWebhook,
   )

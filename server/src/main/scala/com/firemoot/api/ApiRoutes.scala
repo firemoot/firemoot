@@ -9,6 +9,7 @@ import com.firemoot.service.{
   ReadService,
   SendError,
   UserService,
+  WebhookService,
 }
 import io.circe.Json
 import org.http4s.HttpRoutes
@@ -25,6 +26,7 @@ final class ApiRoutes(
     reactions: ReactionService,
     reads: ReadService,
     queries: QueryService,
+    webhooks: WebhookService,
 ):
 
   private def cid(channelType: String, id: String): String = s"$channelType:$id"
@@ -187,6 +189,20 @@ final class ApiRoutes(
   private val searchMessagesServer =
     ApiEndpoints.searchMessages.serverLogic(req => queries.search(req).map(Right(_)))
 
+  private val createWebhookServer =
+    ApiEndpoints.createWebhook.serverLogic(req => webhooks.register(req).map(Right(_)))
+
+  private val listWebhooksServer =
+    ApiEndpoints.listWebhooks.serverLogic(_ => webhooks.list.map(Right(_)))
+
+  private val deleteWebhookServer =
+    ApiEndpoints.deleteWebhook.serverLogic { id =>
+      webhooks.delete(id).map {
+        case true => Right(())
+        case false => Left(notFound(s"webhook '$id'"))
+      }
+    }
+
   val routes: HttpRoutes[IO] =
     Http4sServerInterpreter[IO]().toRoutes(
       List(
@@ -207,6 +223,9 @@ final class ApiRoutes(
         queryChannelsServer,
         listMessagesServer,
         searchMessagesServer,
+        createWebhookServer,
+        listWebhooksServer,
+        deleteWebhookServer,
       )
     )
 

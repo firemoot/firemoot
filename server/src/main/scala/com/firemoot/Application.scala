@@ -17,6 +17,7 @@ import com.firemoot.service.{
   ReactionService,
   ReadService,
   UserService,
+  WebhookService,
 }
 import com.firemoot.ws.{ConnectionRegistry, EventReplay, WsRoutes}
 import org.http4s.dsl.io.*
@@ -47,6 +48,7 @@ object Application:
       ReactionService(pool, backplane),
       ReadService(pool, backplane),
       QueryService(pool),
+      WebhookService(pool),
     )
     val securedApi = ServerHmacAuth(ApiKeys.fromConfig(cfg))(api.routes)
     val ws =

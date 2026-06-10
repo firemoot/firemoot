@@ -149,3 +149,31 @@ final case class SearchPage(hits: List[SearchHit])
 object SearchPage:
   given Codec[SearchPage] = deriveCodec
   given Schema[SearchPage] = Schema.derived
+
+final case class CreateWebhookRequest(
+    url: String,
+    secret: Option[String],
+    enabled: Option[Boolean],
+)
+
+object CreateWebhookRequest:
+  given Codec[CreateWebhookRequest] = deriveCodec
+  given Schema[CreateWebhookRequest] = Schema.derived
+
+/** The created endpoint, including the signing secret (returned only here). */
+final case class WebhookCreated(id: String, url: String, secret: String, enabled: Boolean)
+
+object WebhookCreated:
+  given Codec[WebhookCreated] = deriveCodec
+  given Schema[WebhookCreated] = Schema.derived
+
+final case class WebhookEndpoint(
+    id: String,
+    url: String,
+    enabled: Boolean,
+    createdAt: OffsetDateTime,
+)
+
+object WebhookEndpoint:
+  given Codec[WebhookEndpoint] = deriveCodec
+  given Schema[WebhookEndpoint] = Schema.derived

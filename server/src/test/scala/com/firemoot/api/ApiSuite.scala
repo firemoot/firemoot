@@ -16,6 +16,7 @@ import com.firemoot.service.{
   ReactionService,
   ReadService,
   UserService,
+  WebhookService,
 }
 import com.firemoot.testkit.Signing
 import io.circe.Encoder
@@ -61,6 +62,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               ReactionService(pool, backplane),
               ReadService(pool, backplane),
               QueryService(pool),
+              WebhookService(pool),
             )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
 
@@ -136,6 +138,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               ReactionService(pool, backplane),
               ReadService(pool, backplane),
               QueryService(pool),
+              WebhookService(pool),
             )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val chPath = "/v1/channels/messaging/room2"
@@ -196,6 +199,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               ReactionService(pool, backplane),
               ReadService(pool, backplane),
               QueryService(pool),
+              WebhookService(pool),
             )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val msgs = "/v1/channels/messaging/room3/messages"
@@ -250,6 +254,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
             ReactionService(pool, backplane),
             ReadService(pool, backplane),
             QueryService(pool),
+            WebhookService(pool),
           )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val msgs = "/v1/channels/messaging/room4/messages"
@@ -304,6 +309,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
             ReactionService(pool, backplane),
             ReadService(pool, backplane),
             QueryService(pool),
+            WebhookService(pool),
           )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
 
@@ -343,6 +349,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
             ReactionService(pool, backplane),
             ReadService(pool, backplane),
             QueryService(pool),
+            WebhookService(pool),
           )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val msgs = "/v1/channels/qt/qroom/messages"

@@ -269,10 +269,19 @@ Ordered so each task ships behind a passing protocol/integration suite.
       `text_search` vector, with an optional cid filter, documented as
       lower-fidelity (no stemming). New tapir endpoints regenerated into
       `@firemoot/core`. 57 green.
-- [ ] **M1.10 Webhooks**: endpoint registry; enqueue persisted events (+`user.flagged`)
-      into `webhook_deliveries`; SKIP LOCKED worker pool; `X-Firemoot-Signature:
-      sha256=HMAC(secret, body)`; 5s timeout; retries 1m/5m/30m/2h → dead-letter
-      status (admin UI surfacing lands in M3).
+- [x] **M1.10 Webhooks**: endpoint registry (`POST`/`GET`/`DELETE /v1/webhooks`,
+      signing secret returned once on create). A backplane subscriber fans each
+      *persisted* channel event (`target` empty, `seq > 0`) into one
+      `webhook_deliveries` row per enabled endpoint (V002 migration). The
+      `WebhookDispatcher` worker reaps abandoned claims, claims a batch
+      `for update skip locked` (flipping to `processing` with a visibility
+      deadline), POSTs each with `X-Firemoot-Signature: sha256=HMAC(secret, body)`
+      (+`X-Firemoot-Event`/`-Delivery`) under a 5s timeout; 2xx -> delivered,
+      anything else schedules the next retry on the 1m/5m/30m/2h backoff and then
+      dead-letters. Tested end-to-end against loopback endpoints: signed fan-out
+      delivery, and retry-then-dead-letter on a failing endpoint. `user.flagged`
+      enqueues for free once moderation publishes it (M1.11). New endpoints
+      regenerated into `@firemoot/core`. 60 green.
 - [ ] **M1.11 Moderation**: message flagging endpoint + queue table, `user.flagged`
       webhook event.
 - [ ] **M1.12 Rate limiting**: token-bucket per API key and per user behind a

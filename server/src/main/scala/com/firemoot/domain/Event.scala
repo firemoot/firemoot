@@ -1,6 +1,7 @@
 package com.firemoot.domain
 
 import io.circe.generic.semiauto.deriveCodec
+import io.circe.syntax.*
 import io.circe.{Codec, Json}
 
 /**
@@ -18,7 +19,10 @@ final case class Event(
     seq: Long,
     data: Json,
     target: Option[String] = None,
-)
+):
+  /** The on-the-wire shape delivered to clients and webhook consumers. */
+  def wire: Json =
+    Json.obj("type" -> `type`.asJson, "cid" -> cid.asJson, "seq" -> seq.asJson, "data" -> data)
 
 object Event:
   given Codec[Event] = deriveCodec

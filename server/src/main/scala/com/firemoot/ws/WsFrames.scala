@@ -23,13 +23,7 @@ object WsFrames:
       "totalUnread" -> totalUnread.asJson,
     )
 
-  def event(e: Event): Json =
-    Json.obj(
-      "type" -> e.`type`.asJson,
-      "cid" -> e.cid.asJson,
-      "seq" -> e.seq.asJson,
-      "data" -> e.data,
-    )
+  def event(e: Event): Json = e.wire
 
   def pong(serverTime: OffsetDateTime): Json =
     Json.obj("type" -> "pong".asJson, "serverTime" -> serverTime.asJson)
