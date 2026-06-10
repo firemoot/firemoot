@@ -82,3 +82,23 @@ object WebhookRepo:
   /** Retries exhausted: the delivery becomes a dead letter. Params: error, id. */
   val markDead: Command[(String, UUID)] =
     sql"update webhook_deliveries set status = 'dead', last_error = $text where id = $uuid".command
+
+  /** The dead-letter queue for the admin dashboard (M3.5). */
+  val deadLetters: Query[Void, (UUID, String, String, Int, String, OffsetDateTime)] =
+    sql"""
+      select id, endpoint_id, coalesce(event ->> 'type', ''), attempts,
+             coalesce(last_error, ''), created_at
+      from webhook_deliveries
+      where status = 'dead'
+      order by created_at desc
+      limit 100
+    """.query(uuid *: text *: text *: int4 *: text *: timestamptz)
+
+  /** Requeues a dead delivery for another run; returns its id if it was dead. */
+  val replayDead: Query[UUID, UUID] =
+    sql"""
+      update webhook_deliveries
+      set status = 'pending', attempts = 0, next_attempt_at = now(), last_error = null
+      where id = $uuid and status = 'dead'
+      returning id
+    """.query(uuid)

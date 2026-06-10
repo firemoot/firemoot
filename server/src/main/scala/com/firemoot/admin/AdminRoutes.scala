@@ -5,6 +5,7 @@ import java.time.ZoneOffset
 
 import cats.effect.IO
 import com.firemoot.metrics.MetricsService
+import com.firemoot.service.WebhookService
 import io.circe.generic.semiauto.deriveCodec
 import io.circe.syntax.*
 import io.circe.{Codec, Json}
@@ -28,6 +29,7 @@ object AdminLoginRequest:
 final class AdminRoutes(
     admin: AdminService,
     metrics: MetricsService,
+    webhooks: WebhookService,
     ccuNow: IO[Int],
     secureCookies: Boolean,
 ):
@@ -68,6 +70,17 @@ final class AdminRoutes(
             }
             Ok(Json.obj("metric" -> metric.asJson, "series" -> series.asJson))
           }
+        }
+      }
+
+    case req @ GET -> Root / "admin" / "webhooks" / "dead-letters" =>
+      withSession(req)(webhooks.deadLetters.flatMap(letters => Ok(letters.asJson)))
+
+    case req @ POST -> Root / "admin" / "webhooks" / "dead-letters" / UUIDVar(id) / "replay" =>
+      withSession(req) {
+        webhooks.replay(id).flatMap {
+          case true => Ok(Json.obj("replayed" -> true.asJson))
+          case false => IO.pure(Response[IO](Status.NotFound))
         }
       }
   }

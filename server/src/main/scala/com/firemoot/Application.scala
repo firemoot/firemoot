@@ -85,6 +85,7 @@ object Application:
       AdminRoutes(
         AdminService(pool, cfg.apiSecret.value),
         metricsService,
+        webhooks,
         registry.count,
         secureCookies = !devDemo,
       ).routes
