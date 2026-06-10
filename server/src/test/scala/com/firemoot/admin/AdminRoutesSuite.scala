@@ -6,6 +6,7 @@ import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import com.firemoot.config.DbConfig
 import com.firemoot.db.{Database, Migrations}
+import com.firemoot.metrics.MetricsService
 import munit.CatsEffectSuite
 import org.http4s.Method.{GET, POST}
 import org.http4s.circe.CirceEntityCodec.*
@@ -33,7 +34,13 @@ class AdminRoutesSuite extends CatsEffectSuite, TestContainerForAll:
       val cfg = dbConfig(pg)
       Migrations.run(cfg) >> Database.pool(cfg).use { pool =>
         val service = AdminService(pool, jwtSecret = "sign")
-        val app = AdminRoutes(service, secureCookies = false).routes.orNotFound
+        val app =
+          AdminRoutes(
+            service,
+            MetricsService(pool),
+            IO.pure(3),
+            secureCookies = false,
+          ).routes.orNotFound
 
         for
           _ <- service.setPassword("open-sesame")
@@ -57,7 +64,21 @@ class AdminRoutesSuite extends CatsEffectSuite, TestContainerForAll:
             Request[IO](GET, uri"/admin/session")
               .addCookie(RequestCookie("firemoot_admin", session.content))
           )
-        yield assertEquals(authed.status, Status.Ok, "the session cookie authenticates")
+          _ = assertEquals(authed.status, Status.Ok, "the session cookie authenticates")
+
+          metricsUnauthed <- app.run(Request[IO](GET, uri"/admin/metrics"))
+          _ = assertEquals(metricsUnauthed.status, Status.Unauthorized, "metrics need a session")
+          metricsRes <- app.run(
+            Request[IO](GET, uri"/admin/metrics")
+              .addCookie(RequestCookie("firemoot_admin", session.content))
+          )
+          _ = assertEquals(metricsRes.status, Status.Ok)
+          body <- metricsRes.as[io.circe.Json]
+        yield assertEquals(
+          body.hcursor.get[Int]("ccuNow").toOption,
+          Some(3),
+          s"live metrics behind the gate: $body",
+        )
       }
     }
   }

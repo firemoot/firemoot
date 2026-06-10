@@ -389,10 +389,14 @@ queries/FTS, webhooks, moderation and rate limiting.
       (double-submit) - the M3.5 admin data routes build on it. Local password only
       in v1 (OIDC is v1.x). Tested: hasher, service (no-default/login/session), and
       the login->cookie->session route flow. 87 green.
-- [ ] **M3.5 Admin SPA**: Vite + TS, baked into binary resources at `/admin`;
-      charts (90-day default window): MAU/DAU/WAU, CCU p95/max + live now,
-      messages/day stacked by type, storage; webhook dead-letter list with replay
-      button (closes the M1.10 loop); API key rotation UI.
+- [~] **M3.5 Admin SPA** (backend data API started): `GET /admin/metrics` (live
+      tiles) and `GET /admin/metrics/daily?metric=&days=` (90-day default series)
+      are wired behind `AdminRoutes.withSession`. **Still to do:** webhook
+      dead-letter list + replay endpoint (closes the M1.10 loop), DB-backed API key
+      rotation (the `api_keys` table exists; `ApiKeys` is config-only today - M1.1
+      deferred DB keys here), and the Vite + TS SPA itself (charts: MAU/DAU/WAU,
+      CCU p95/max + live, messages/day stacked by type, storage) baked into binary
+      resources at `/admin`. Chart lib still to decide (uPlot vs Chart.js).
 - [ ] **M3.6 Soak baseline**: k6 WS scenario (N idle + M msg/s) running nightly;
       record memory and p99 delivery latency thresholds as CI regression gates
       (SPEC §12).

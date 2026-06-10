@@ -6,8 +6,9 @@ import cats.effect.{IO, Resource}
 import cats.syntax.all.*
 import com.firemoot.db.MetricsRepo
 import com.firemoot.db.SessionSyntax.*
-import io.circe.Json
+import io.circe.generic.semiauto.deriveCodec
 import io.circe.syntax.*
+import io.circe.{Codec, Json}
 import skunk.Session
 
 /** A point-in-time snapshot for the dashboard's live tiles (M3). */
@@ -20,6 +21,9 @@ final case class LiveMetrics(
     dbSizeBytes: Long,
     ccuNow: Int,
 )
+
+object LiveMetrics:
+  given Codec[LiveMetrics] = deriveCodec
 
 /**
  * Activity capture, rollup and read-back (SPEC.md §8, M3.1/M3.2). Live tiles are

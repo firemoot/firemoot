@@ -79,9 +79,15 @@ object Application:
     val openApi = HttpRoutes.of[IO] { case GET -> Root / "v1" / "openapi.json" =>
       Ok(api.openApiJson).map(_.withContentType(`Content-Type`(MediaType.application.json)))
     }
-    val metrics = MetricsRoutes(MetricsService(pool), registry.count).routes
+    val metricsService = MetricsService(pool)
+    val metrics = MetricsRoutes(metricsService, registry.count).routes
     val admin =
-      AdminRoutes(AdminService(pool, cfg.apiSecret.value), secureCookies = !devDemo).routes
+      AdminRoutes(
+        AdminService(pool, cfg.apiSecret.value),
+        metricsService,
+        registry.count,
+        secureCookies = !devDemo,
+      ).routes
     val demo = if devDemo then DemoRoutes.routes else HttpRoutes.empty[IO]
 
     // securedApi is last: health, metrics, admin, openapi, demo and ws own their

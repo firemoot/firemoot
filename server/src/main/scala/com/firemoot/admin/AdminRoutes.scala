@@ -1,8 +1,10 @@
 package com.firemoot.admin
 
 import java.security.SecureRandom
+import java.time.ZoneOffset
 
 import cats.effect.IO
+import com.firemoot.metrics.MetricsService
 import io.circe.generic.semiauto.deriveCodec
 import io.circe.syntax.*
 import io.circe.{Codec, Json}
@@ -23,10 +25,18 @@ object AdminLoginRequest:
  * requiring a matching `X-CSRF-Token` on mutating requests (double-submit). The
  * admin data routes (M3.5) build on `withSession`.
  */
-final class AdminRoutes(admin: AdminService, secureCookies: Boolean):
+final class AdminRoutes(
+    admin: AdminService,
+    metrics: MetricsService,
+    ccuNow: IO[Int],
+    secureCookies: Boolean,
+):
 
   private val SessionCookie = "firemoot_admin"
   private val CsrfCookie = "firemoot_csrf"
+
+  private object MetricParam extends QueryParamDecoderMatcher[String]("metric")
+  private object DaysParam extends OptionalQueryParamDecoderMatcher[Int]("days")
 
   val routes: HttpRoutes[IO] = HttpRoutes.of[IO] {
     case req @ POST -> Root / "admin" / "login" =>
@@ -44,6 +54,22 @@ final class AdminRoutes(admin: AdminService, secureCookies: Boolean):
 
     case req @ GET -> Root / "admin" / "session" =>
       withSession(req)(Ok(Json.obj("authenticated" -> true.asJson)))
+
+    case req @ GET -> Root / "admin" / "metrics" =>
+      withSession(req)(ccuNow.flatMap(metrics.live).flatMap(m => Ok(m.asJson)))
+
+    case req @ GET -> Root / "admin" / "metrics" / "daily" :?
+        MetricParam(metric) +& DaysParam(days) =>
+      withSession(req) {
+        IO.realTimeInstant.map(_.atOffset(ZoneOffset.UTC).toLocalDate).flatMap { today =>
+          metrics.dailySeries(metric, today.minusDays(days.getOrElse(90).toLong)).flatMap { rows =>
+            val series = rows.map { (day, labels, value) =>
+              Json.obj("day" -> day.toString.asJson, "labels" -> labels, "value" -> value.asJson)
+            }
+            Ok(Json.obj("metric" -> metric.asJson, "series" -> series.asJson))
+          }
+        }
+      }
   }
 
   /**
