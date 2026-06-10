@@ -103,6 +103,21 @@ object ApiEndpoints:
       .out(statusCode(StatusCode.NoContent))
       .summary("Delete a message (soft)")
 
+  private val messagePath = channelPath / "messages" / path[java.util.UUID]("messageId")
+
+  val addReaction =
+    base.post
+      .in(messagePath / "reactions")
+      .in(jsonBody[AddReactionRequest])
+      .out(jsonBody[ReactionSummary])
+      .summary("Add a reaction to a message")
+
+  val removeReaction =
+    base.delete
+      .in(messagePath / "reactions" / path[String]("reactionType") / path[String]("userId"))
+      .out(jsonBody[ReactionSummary])
+      .summary("Remove a user's reaction from a message")
+
   val all: List[AnyEndpoint] = List(
     upsertUser,
     deleteUser,
@@ -115,4 +130,6 @@ object ApiEndpoints:
     sendMessage,
     editMessage,
     deleteMessage,
+    addReaction,
+    removeReaction,
   )

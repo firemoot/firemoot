@@ -7,7 +7,7 @@ import com.firemoot.auth.{ApiKeys, ServerHmacAuth}
 import com.firemoot.backplane.Backplane
 import com.firemoot.config.ServerConfig
 import com.firemoot.http.{DemoRoutes, HealthRoutes}
-import com.firemoot.service.{ChannelService, MessageService, UserService}
+import com.firemoot.service.{ChannelService, MessageService, ReactionService, UserService}
 import com.firemoot.ws.{ConnectionRegistry, EventReplay, WsRoutes}
 import org.http4s.dsl.io.*
 import org.http4s.headers.`Content-Type`
@@ -30,8 +30,12 @@ object Application:
       devDemo: Boolean = false,
       onUserActive: String => IO[Unit] = _ => IO.unit,
   ): WebSocketBuilder2[IO] => HttpApp[IO] =
-    val api =
-      ApiRoutes(UserService(pool), ChannelService(pool, backplane), MessageService(pool, backplane))
+    val api = ApiRoutes(
+      UserService(pool),
+      ChannelService(pool, backplane),
+      MessageService(pool, backplane),
+      ReactionService(pool, backplane),
+    )
     val securedApi = ServerHmacAuth(ApiKeys.fromConfig(cfg))(api.routes)
     val ws =
       WsRoutes(

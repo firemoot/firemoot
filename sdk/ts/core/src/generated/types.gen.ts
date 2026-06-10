@@ -13,6 +13,14 @@ export type AddMemberRequest = {
 };
 
 /**
+ * AddReactionRequest
+ */
+export type AddReactionRequest = {
+    userId: string;
+    type: string;
+};
+
+/**
  * Channel
  */
 export type Channel = {
@@ -49,6 +57,13 @@ export type EditMessageRequest = {
 };
 
 /**
+ * Map_Long
+ */
+export type MapLong = {
+    [key: string]: number;
+};
+
+/**
  * Message
  */
 export type Message = {
@@ -75,6 +90,14 @@ export type Problem = {
     title: string;
     status: number;
     detail?: string;
+};
+
+/**
+ * ReactionSummary
+ */
+export type ReactionSummary = {
+    messageId: string;
+    counts: MapLong;
 };
 
 /**
@@ -389,3 +412,59 @@ export type PatchV1ChannelsTypeIdMessagesMessageidResponses = {
 };
 
 export type PatchV1ChannelsTypeIdMessagesMessageidResponse = PatchV1ChannelsTypeIdMessagesMessageidResponses[keyof PatchV1ChannelsTypeIdMessagesMessageidResponses];
+
+export type PostV1ChannelsTypeIdMessagesMessageidReactionsData = {
+    body: AddReactionRequest;
+    path: {
+        type: string;
+        id: string;
+        messageId: string;
+    };
+    query?: never;
+    url: '/v1/channels/{type}/{id}/messages/{messageId}/reactions';
+};
+
+export type PostV1ChannelsTypeIdMessagesMessageidReactionsErrors = {
+    /**
+     * Invalid value for: path parameter messageId, Invalid value for: body
+     */
+    400: string;
+    default: Problem;
+};
+
+export type PostV1ChannelsTypeIdMessagesMessageidReactionsError = PostV1ChannelsTypeIdMessagesMessageidReactionsErrors[keyof PostV1ChannelsTypeIdMessagesMessageidReactionsErrors];
+
+export type PostV1ChannelsTypeIdMessagesMessageidReactionsResponses = {
+    200: ReactionSummary;
+};
+
+export type PostV1ChannelsTypeIdMessagesMessageidReactionsResponse = PostV1ChannelsTypeIdMessagesMessageidReactionsResponses[keyof PostV1ChannelsTypeIdMessagesMessageidReactionsResponses];
+
+export type DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridData = {
+    body?: never;
+    path: {
+        type: string;
+        id: string;
+        messageId: string;
+        reactionType: string;
+        userId: string;
+    };
+    query?: never;
+    url: '/v1/channels/{type}/{id}/messages/{messageId}/reactions/{reactionType}/{userId}';
+};
+
+export type DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridErrors = {
+    /**
+     * Invalid value for: path parameter messageId
+     */
+    400: string;
+    default: Problem;
+};
+
+export type DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridError = DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridErrors[keyof DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridErrors];
+
+export type DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridResponses = {
+    200: ReactionSummary;
+};
+
+export type DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridResponse = DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridResponses[keyof DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridResponses];

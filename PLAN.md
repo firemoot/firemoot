@@ -214,8 +214,13 @@ Ordered so each task ships behind a passing protocol/integration suite.
       the send/delete transaction. System messages via `type` (validated
       regular/system -> 400). Send-as-user (`userId`) and opaque JSONB attachments
       already plumbed. Service + endpoint tests (incl. reply_count, events). 28 green.
-- [ ] **M1.5 Reactions**: add/remove, `reaction.new`/`reaction.deleted`, per-type
-      counts on the message view.
+- [x] **M1.5 Reactions**: `POST`/`DELETE`
+      `/v1/channels/{type}/{id}/messages/{messageId}/reactions[/{type}/{userId}]`
+      (idempotent add, no-op remove). Each real change emits a seq'd
+      `reaction.new`/`reaction.deleted` carrying the per-type counts, and the
+      endpoints return the updated `ReactionSummary` (per-type counts). 404 if the
+      message is absent. The remove user is a path segment (so the HMAC signature,
+      which covers the path not the query, binds it). Service + endpoint tests. 30 green.
 - [ ] **M1.6 Read state**: `markRead` endpoint advancing `last_read_seq`;
       `read.updated` to channel (receipt) + reader's other devices (badge sync);
       total-unread sum in `hello` and on `read.updated`; unread arithmetic

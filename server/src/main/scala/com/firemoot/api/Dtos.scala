@@ -64,3 +64,16 @@ final case class EditMessageRequest(text: Option[String], custom: Option[Json])
 object EditMessageRequest:
   given Codec[EditMessageRequest] = deriveCodec
   given Schema[EditMessageRequest] = Schema.derived
+
+final case class AddReactionRequest(userId: String, `type`: String)
+
+object AddReactionRequest:
+  given Codec[AddReactionRequest] = deriveCodec
+  given Schema[AddReactionRequest] = Schema.derived
+
+/** A message's per-type reaction counts after a reaction change. */
+final case class ReactionSummary(messageId: UUID, counts: Map[String, Long])
+
+object ReactionSummary:
+  given Codec[ReactionSummary] = deriveCodec
+  given Schema[ReactionSummary] = Schema.derived

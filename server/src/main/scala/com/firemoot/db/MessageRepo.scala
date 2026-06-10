@@ -63,3 +63,7 @@ object MessageRepo:
 
   val decrementReplyCount: Command[UUID] =
     sql"update messages set reply_count = greatest(reply_count - 1, 0) where id = $uuid".command
+
+  /** Returns the id if a live message with that id exists in the channel. */
+  val existsInChannel: Query[(UUID, String), UUID] =
+    sql"select id from messages where id = $uuid and cid = $text and deleted_at is null".query(uuid)

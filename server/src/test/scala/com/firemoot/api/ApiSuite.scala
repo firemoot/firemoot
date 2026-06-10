@@ -9,7 +9,7 @@ import com.firemoot.backplane.Backplane
 import com.firemoot.config.{DbConfig, ServerConfig}
 import com.firemoot.db.{Database, Migrations}
 import com.firemoot.domain.{Channel, Message, User}
-import com.firemoot.service.{ChannelService, MessageService, UserService}
+import com.firemoot.service.{ChannelService, MessageService, ReactionService, UserService}
 import com.firemoot.testkit.Signing
 import io.circe.Encoder
 import munit.CatsEffectSuite
@@ -51,6 +51,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               UserService(pool),
               ChannelService(pool, backplane),
               MessageService(pool, backplane),
+              ReactionService(pool, backplane),
             )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
 
@@ -123,6 +124,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               UserService(pool),
               ChannelService(pool, backplane),
               MessageService(pool, backplane),
+              ReactionService(pool, backplane),
             )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val chPath = "/v1/channels/messaging/room2"
@@ -180,6 +182,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               UserService(pool),
               ChannelService(pool, backplane),
               MessageService(pool, backplane),
+              ReactionService(pool, backplane),
             )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val msgs = "/v1/channels/messaging/room3/messages"
@@ -217,6 +220,58 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
             _ = assertEquals(deleted.status, Status.NoContent)
             deleteMissing <- app.run(del(s"$msgs/$random"))
           yield assertEquals(deleteMissing.status, Status.NotFound)
+        }
+      }
+    }
+  }
+
+  test("reaction endpoints: add / remove / counts / missing message") {
+    withContainers { pg =>
+      val cfg = dbConfig(pg)
+      Backplane.inProcess.flatMap { backplane =>
+        Migrations.run(cfg) >> Database.pool(cfg).use { pool =>
+          val api = ApiRoutes(
+            UserService(pool),
+            ChannelService(pool, backplane),
+            MessageService(pool, backplane),
+            ReactionService(pool, backplane),
+          )
+          val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
+          val msgs = "/v1/channels/messaging/room4/messages"
+
+          for
+            _ <- app.run(post("/v1/users", UpsertUserRequest("frank", None, None, None, None)))
+            _ <- app.run(post(
+              "/v1/channels",
+              CreateChannelRequest("messaging", "room4", Some("frank"), None),
+            ))
+            sent <-
+              app.run(post(msgs, SendMessageRequest(Some("frank"), Some("hi"), None, None, None)))
+            msg <- sent.as[Message]
+
+            added <-
+              app.run(post(s"$msgs/${msg.id}/reactions", AddReactionRequest("frank", "like")))
+            _ = assertEquals(added.status, Status.Ok)
+            addedSummary <- added.as[ReactionSummary]
+            _ = assertEquals(addedSummary.counts, Map("like" -> 1L))
+
+            removed <- app.run(
+              Signing.signedNoBody(
+                DELETE,
+                Uri.unsafeFromString(s"$msgs/${msg.id}/reactions/like/frank"),
+                apiKey,
+                secret,
+              )
+            )
+            _ = assertEquals(removed.status, Status.Ok)
+            removedSummary <- removed.as[ReactionSummary]
+            _ = assertEquals(removedSummary.counts, Map.empty[String, Long])
+
+            missing <- app.run(post(
+              s"$msgs/${java.util.UUID.randomUUID()}/reactions",
+              AddReactionRequest("frank", "like"),
+            ))
+          yield assertEquals(missing.status, Status.NotFound)
         }
       }
     }

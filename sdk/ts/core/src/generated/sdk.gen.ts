@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.js';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.js';
-import type { DeleteV1ChannelsTypeIdData, DeleteV1ChannelsTypeIdErrors, DeleteV1ChannelsTypeIdMembersUseridData, DeleteV1ChannelsTypeIdMembersUseridErrors, DeleteV1ChannelsTypeIdMembersUseridResponses, DeleteV1ChannelsTypeIdMessagesMessageidData, DeleteV1ChannelsTypeIdMessagesMessageidErrors, DeleteV1ChannelsTypeIdMessagesMessageidResponses, DeleteV1ChannelsTypeIdResponses, DeleteV1UsersIdData, DeleteV1UsersIdErrors, DeleteV1UsersIdResponses, GetV1ChannelsTypeIdData, GetV1ChannelsTypeIdErrors, GetV1ChannelsTypeIdResponses, PatchV1ChannelsTypeIdData, PatchV1ChannelsTypeIdErrors, PatchV1ChannelsTypeIdMessagesMessageidData, PatchV1ChannelsTypeIdMessagesMessageidErrors, PatchV1ChannelsTypeIdMessagesMessageidResponses, PatchV1ChannelsTypeIdResponses, PostV1ChannelsData, PostV1ChannelsErrors, PostV1ChannelsResponses, PostV1ChannelsTypeIdMembersData, PostV1ChannelsTypeIdMembersErrors, PostV1ChannelsTypeIdMembersResponses, PostV1ChannelsTypeIdMessagesData, PostV1ChannelsTypeIdMessagesErrors, PostV1ChannelsTypeIdMessagesResponses, PostV1UsersData, PostV1UsersErrors, PostV1UsersResponses } from './types.gen.js';
+import type { DeleteV1ChannelsTypeIdData, DeleteV1ChannelsTypeIdErrors, DeleteV1ChannelsTypeIdMembersUseridData, DeleteV1ChannelsTypeIdMembersUseridErrors, DeleteV1ChannelsTypeIdMembersUseridResponses, DeleteV1ChannelsTypeIdMessagesMessageidData, DeleteV1ChannelsTypeIdMessagesMessageidErrors, DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridData, DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridErrors, DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridResponses, DeleteV1ChannelsTypeIdMessagesMessageidResponses, DeleteV1ChannelsTypeIdResponses, DeleteV1UsersIdData, DeleteV1UsersIdErrors, DeleteV1UsersIdResponses, GetV1ChannelsTypeIdData, GetV1ChannelsTypeIdErrors, GetV1ChannelsTypeIdResponses, PatchV1ChannelsTypeIdData, PatchV1ChannelsTypeIdErrors, PatchV1ChannelsTypeIdMessagesMessageidData, PatchV1ChannelsTypeIdMessagesMessageidErrors, PatchV1ChannelsTypeIdMessagesMessageidResponses, PatchV1ChannelsTypeIdResponses, PostV1ChannelsData, PostV1ChannelsErrors, PostV1ChannelsResponses, PostV1ChannelsTypeIdMembersData, PostV1ChannelsTypeIdMembersErrors, PostV1ChannelsTypeIdMembersResponses, PostV1ChannelsTypeIdMessagesData, PostV1ChannelsTypeIdMessagesErrors, PostV1ChannelsTypeIdMessagesMessageidReactionsData, PostV1ChannelsTypeIdMessagesMessageidReactionsErrors, PostV1ChannelsTypeIdMessagesMessageidReactionsResponses, PostV1ChannelsTypeIdMessagesResponses, PostV1UsersData, PostV1UsersErrors, PostV1UsersResponses } from './types.gen.js';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -114,3 +114,20 @@ export const patchV1ChannelsTypeIdMessagesMessageid = <ThrowOnError extends bool
         ...options.headers
     }
 });
+
+/**
+ * Add a reaction to a message
+ */
+export const postV1ChannelsTypeIdMessagesMessageidReactions = <ThrowOnError extends boolean = false>(options: Options<PostV1ChannelsTypeIdMessagesMessageidReactionsData, ThrowOnError>): RequestResult<PostV1ChannelsTypeIdMessagesMessageidReactionsResponses, PostV1ChannelsTypeIdMessagesMessageidReactionsErrors, ThrowOnError> => (options.client ?? client).post<PostV1ChannelsTypeIdMessagesMessageidReactionsResponses, PostV1ChannelsTypeIdMessagesMessageidReactionsErrors, ThrowOnError>({
+    url: '/v1/channels/{type}/{id}/messages/{messageId}/reactions',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Remove a user's reaction from a message
+ */
+export const deleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUserid = <ThrowOnError extends boolean = false>(options: Options<DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridData, ThrowOnError>): RequestResult<DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridResponses, DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridErrors, ThrowOnError> => (options.client ?? client).delete<DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridResponses, DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridErrors, ThrowOnError>({ url: '/v1/channels/{type}/{id}/messages/{messageId}/reactions/{reactionType}/{userId}', ...options });

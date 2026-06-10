@@ -1,7 +1,13 @@
 package com.firemoot.api
 
 import cats.effect.IO
-import com.firemoot.service.{ChannelService, MessageService, SendError, UserService}
+import com.firemoot.service.{
+  ChannelService,
+  MessageService,
+  ReactionService,
+  SendError,
+  UserService,
+}
 import io.circe.Json
 import org.http4s.HttpRoutes
 import sttp.tapir.server.http4s.Http4sServerInterpreter
@@ -14,6 +20,7 @@ final class ApiRoutes(
     users: UserService,
     channels: ChannelService,
     messages: MessageService,
+    reactions: ReactionService,
 ):
 
   private def cid(channelType: String, id: String): String = s"$channelType:$id"
@@ -139,6 +146,23 @@ final class ApiRoutes(
       }
     }
 
+  private val addReactionServer =
+    ApiEndpoints.addReaction.serverLogic { case (channelType, id, messageId, req) =>
+      reactions.add(cid(channelType, id), messageId, req.userId, req.`type`).map {
+        case Some(counts) => Right(ReactionSummary(messageId, counts))
+        case None => Left(notFound(s"message '$messageId'"))
+      }
+    }
+
+  private val removeReactionServer =
+    ApiEndpoints.removeReaction.serverLogic {
+      case (channelType, id, messageId, reactionType, user) =>
+        reactions.remove(cid(channelType, id), messageId, user, reactionType).map {
+          case Some(counts) => Right(ReactionSummary(messageId, counts))
+          case None => Left(notFound(s"message '$messageId'"))
+        }
+    }
+
   val routes: HttpRoutes[IO] =
     Http4sServerInterpreter[IO]().toRoutes(
       List(
@@ -153,6 +177,8 @@ final class ApiRoutes(
         sendMessageServer,
         editMessageServer,
         deleteMessageServer,
+        addReactionServer,
+        removeReactionServer,
       )
     )
 

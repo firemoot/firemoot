@@ -581,6 +581,162 @@
           }
         }
       }
+    },
+    "/v1/channels/{type}/{id}/messages/{messageId}/reactions" : {
+      "post" : {
+        "summary" : "Add a reaction to a message",
+        "operationId" : "postV1ChannelsTypeIdMessagesMessageidReactions",
+        "parameters" : [
+          {
+            "name" : "type",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "id",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "messageId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AddReactionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ReactionSummary"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid value for: path parameter messageId, Invalid value for: body",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/channels/{type}/{id}/messages/{messageId}/reactions/{reactionType}/{userId}" : {
+      "delete" : {
+        "summary" : "Remove a user's reaction from a message",
+        "operationId" : "deleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUserid",
+        "parameters" : [
+          {
+            "name" : "type",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "id",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "messageId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
+          },
+          {
+            "name" : "reactionType",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "userId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ReactionSummary"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid value for: path parameter messageId",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components" : {
@@ -596,6 +752,22 @@
             "type" : "string"
           },
           "role" : {
+            "type" : "string"
+          }
+        }
+      },
+      "AddReactionRequest" : {
+        "title" : "AddReactionRequest",
+        "type" : "object",
+        "required" : [
+          "userId",
+          "type"
+        ],
+        "properties" : {
+          "userId" : {
+            "type" : "string"
+          },
+          "type" : {
             "type" : "string"
           }
         }
@@ -692,6 +864,14 @@
           }
         }
       },
+      "Map_Long" : {
+        "title" : "Map_Long",
+        "type" : "object",
+        "additionalProperties" : {
+          "type" : "integer",
+          "format" : "int64"
+        }
+      },
       "Message" : {
         "title" : "Message",
         "type" : "object",
@@ -776,6 +956,23 @@
           },
           "detail" : {
             "type" : "string"
+          }
+        }
+      },
+      "ReactionSummary" : {
+        "title" : "ReactionSummary",
+        "type" : "object",
+        "required" : [
+          "messageId",
+          "counts"
+        ],
+        "properties" : {
+          "messageId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "counts" : {
+            "$ref" : "#/components/schemas/Map_Long"
           }
         }
       },
