@@ -139,6 +139,9 @@ jobs:
       - name: Boot the compose stack and assert healthy < 15s
         working-directory: deploy/compose
         run: |
+          # Pre-pull the only remote image so the gate times boot, not the
+          # registry download (firemoot:latest was just built locally).
+          docker pull postgres:17
           start=$(date +%s)
           docker compose up -d
           healthy=0
