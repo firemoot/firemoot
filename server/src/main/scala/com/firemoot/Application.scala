@@ -10,6 +10,7 @@ import com.firemoot.backplane.Backplane
 import com.firemoot.config.ServerConfig
 import com.firemoot.http.{DemoRoutes, HealthRoutes}
 import com.firemoot.media.MediaService
+import com.firemoot.metrics.{MetricsRoutes, MetricsService}
 import com.firemoot.ratelimit.RateGuard
 import com.firemoot.service.{
   ChannelService,
@@ -77,12 +78,13 @@ object Application:
     val openApi = HttpRoutes.of[IO] { case GET -> Root / "v1" / "openapi.json" =>
       Ok(api.openApiJson).map(_.withContentType(`Content-Type`(MediaType.application.json)))
     }
+    val metrics = MetricsRoutes(MetricsService(pool), registry.count).routes
     val demo = if devDemo then DemoRoutes.routes else HttpRoutes.empty[IO]
 
-    // securedApi is last: health, openapi, demo and ws own their paths and must not
-    // be intercepted by the HMAC middleware (which would 401 the WS handshake).
+    // securedApi is last: health, metrics, openapi, demo and ws own their paths and
+    // must not be intercepted by the HMAC middleware (which would 401 the handshake).
     wsb =>
       Logger.httpApp(logHeaders = true, logBody = false)(
-        (HealthRoutes(pool).routes <+> openApi <+> demo <+>
+        (HealthRoutes(pool).routes <+> metrics <+> openApi <+> demo <+>
           ws.routes(wsb) <+> securedApi).orNotFound
       )

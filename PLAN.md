@@ -363,14 +363,22 @@ queries/FTS, webhooks, moderation and rate limiting.
 
 ## 7. M3 - dashboard and metrics
 
-- [ ] **M3.1 Fact capture**: connection/API activity → `activity_facts`; CCU gauge
-      sampled every 60s.
-- [ ] **M3.2 Rollup worker**: hourly rollups → `metrics_hourly`; compaction to
-      `metrics_daily` after 7 days; raw fact pruning after rollup. MAU = distinct
-      users active in trailing 30 days, computed daily; DAU/WAU alongside; messages/
-      day with per-channel-type breakdown; storage gauges (media bytes, DB size).
-- [ ] **M3.3 Prometheus `/metrics`**: live gauges/counters (prometheus4cats or
-      http4s-metrics - decide here). Dashboard must not depend on it.
+- [x] **M3.1 Fact capture**: a connecting user records an `activity_facts` row for
+      the day (idempotent) via the `onActive` hook; `CcuSampler` writes a
+      `ccu_samples` row from `ConnectionRegistry.count` every 60s (V005 migration:
+      activity_facts, ccu_samples, metrics_hourly/daily, settings).
+- [x] **M3.2 Rollup worker**: `RollupWorker` snapshots the day's MAU/DAU/WAU
+      (trailing 30/7/1-day distinct actives), messages-by-channel-type and storage
+      gauges (media bytes via `sum(size_bytes)`, DB size via `pg_database_size`)
+      into `metrics_daily`; rolls the previous hour's CCU up to max + p95
+      (`percentile_cont`) into `metrics_hourly`; and prunes raw facts/samples behind
+      the rollups. Live tiles are computed on demand from base tables. Tested:
+      windowed actives, snapshot, CCU rollup and prune in one integration suite.
+- [x] **M3.3 Prometheus `/metrics`**: decision - **hand-rendered exposition text**,
+      no metrics library (keeps deps/RSS minimal). Unauthenticated operational
+      route (beside `/healthz`) exposing live gauges (ccu, dau/wau/mau, media/db
+      bytes, messages by channel type). The dashboard reads the rollup tables, not
+      this endpoint. 82 green.
 - [ ] **M3.4 Admin auth**: password set at install (env or CLI), argon2 hash in
       `settings`, session cookie, CSRF token, no default password (SPEC open
       question 3 resolved: local password only in v1; OIDC is v1.x).

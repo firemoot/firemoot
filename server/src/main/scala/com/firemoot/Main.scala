@@ -10,6 +10,7 @@ import com.firemoot.db.SessionSyntax.*
 import com.firemoot.db.{Database, Migrations, UserRepo}
 import com.firemoot.http.HttpServer
 import com.firemoot.media.{MediaService, ObjectStore, ThumbnailWorker}
+import com.firemoot.metrics.{CcuSampler, MetricsService, RollupWorker}
 import com.firemoot.ratelimit.RateGuard
 import com.firemoot.service.{LastActiveTracker, MessageService, WebhookService}
 import com.firemoot.webhook.{WebhookConfig, WebhookDispatcher}
@@ -52,6 +53,12 @@ object Main extends IOApp.Simple:
               pool.use(_.run(UserRepo.touchLastActive, userId))
             }
             rate <- RateGuard.inMemory()
+            metrics = MetricsService(pool)
+            ccuSampler = CcuSampler(registry, metrics)
+            rollup = RollupWorker(metrics)
+            // A connecting user touches last_active_at and counts toward MAU/DAU.
+            onActive =
+              (userId: String) => lastActive.touch(userId) >> metrics.record(userId).attempt.void
             webhooks = WebhookService(pool)
             dispatcher = WebhookDispatcher(pool, httpClient, WebhookConfig.default)
             // Persisted channel events fan out to registered webhook endpoints.
@@ -65,13 +72,16 @@ object Main extends IOApp.Simple:
               backplane,
               registry,
               cfg.devDemo,
-              lastActive.touch,
+              onActive,
               rate,
               mediaService,
             )
-            _ <- HttpServer
-              .resource(cfg.http, app)
-              .use(_ => dispatcher.stream.merge(enqueue).merge(thumbnails).compile.drain)
+            workers = dispatcher.stream
+              .merge(enqueue)
+              .merge(thumbnails)
+              .merge(ccuSampler.stream)
+              .merge(rollup.stream)
+            _ <- HttpServer.resource(cfg.http, app).use(_ => workers.compile.drain)
           yield ()
         }
       }
