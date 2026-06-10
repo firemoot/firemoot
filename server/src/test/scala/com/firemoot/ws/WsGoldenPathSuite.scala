@@ -96,7 +96,7 @@ class WsGoldenPathSuite extends CatsEffectSuite, TestContainerForAll:
                     .compile
                     .toList
                     .start
-                  _ <- IO.sleep(500.millis)
+                  _ <- IO.sleep(800.millis)
                   _ <- http.status(
                     Signing.signedRequest(
                       POST,

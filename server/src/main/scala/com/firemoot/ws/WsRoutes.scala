@@ -135,10 +135,13 @@ final class WsRoutes(
     WsFrames.parse(body) match
       case WsFrames.ClientFrame.Subscribe(channels) =>
         channels.toList.traverse_ { (cid, lastSeen) =>
-          replay
-            .since(cid, lastSeen)
-            .flatMap(_.traverse_(event => outbound.offer(Some(text(WsFrames.event(event)))))) >>
-            subscribed.update(_ + (cid -> lastSeen))
+          // Join the live set first so events published during the (possibly slow)
+          // replay query are delivered, not dropped. Ordering is reconciled by the
+          // client's seq dedupe; M1.8 hardens the splice.
+          subscribed.update(_ + (cid -> lastSeen)) >>
+            replay
+              .since(cid, lastSeen)
+              .flatMap(_.traverse_(event => outbound.offer(Some(text(WsFrames.event(event))))))
         }
       case WsFrames.ClientFrame.Ping =>
         IO.realTimeInstant.flatMap(i =>
