@@ -144,10 +144,10 @@ settled.
 - [ ] **M0.5 WS gateway**: `GET /v1/ws?token=` upgrade; JWT parse (full verification
       lands M1.1); `hello` frame with `connection_id`, server time, user; server ping
       every 25s, reap after 2 missed pongs; connection registry (in-memory).
-- [ ] **M0.6 Backplane trait + in-proc impl**: start with a single global
-      `fs2.concurrent.Topic[F, Event]` with per-connection subscription filtering
-      (simplest correct thing at single-node scale); per-channel topics are a
-      measured optimisation later, not a default.
+- [x] **M0.6 Backplane trait + in-proc impl**: `Backplane` trait
+      (`publish`/`subscribe`); in-process `Topic[IO, Event]` impl. Per-connection
+      filtering by subscribed cid happens in the WS handler (M0.5/M0.7). Tested:
+      published events reach an active subscriber in order.
 - [ ] **M0.7 The golden path**: `sendMessage` REST → txn (message + seq + event) →
       backplane publish → subscribed WS connections receive `message.new`.
       `subscribe` client frame accepted with `{cid: last_seen_seq}`; replay from
