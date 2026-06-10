@@ -1196,6 +1196,54 @@
           }
         }
       }
+    },
+    "/v1/uploads" : {
+      "post" : {
+        "summary" : "Presign a direct-to-S3 upload (501 if media is not configured)",
+        "operationId" : "postV1Uploads",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateUploadRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UploadTicket"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid value for: body",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components" : {
@@ -1374,6 +1422,30 @@
           },
           "custom" : {
             
+          }
+        }
+      },
+      "CreateUploadRequest" : {
+        "title" : "CreateUploadRequest",
+        "type" : "object",
+        "required" : [
+          "filename",
+          "mime",
+          "sizeBytes"
+        ],
+        "properties" : {
+          "userId" : {
+            "type" : "string"
+          },
+          "filename" : {
+            "type" : "string"
+          },
+          "mime" : {
+            "type" : "string"
+          },
+          "sizeBytes" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },
@@ -1715,6 +1787,32 @@
           },
           "archived" : {
             "type" : "boolean"
+          }
+        }
+      },
+      "UploadTicket" : {
+        "title" : "UploadTicket",
+        "type" : "object",
+        "required" : [
+          "uploadId",
+          "uploadUrl",
+          "objectUrl",
+          "expiresInSeconds"
+        ],
+        "properties" : {
+          "uploadId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "uploadUrl" : {
+            "type" : "string"
+          },
+          "objectUrl" : {
+            "type" : "string"
+          },
+          "expiresInSeconds" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },

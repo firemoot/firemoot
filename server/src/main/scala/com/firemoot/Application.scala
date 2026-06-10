@@ -9,6 +9,7 @@ import com.firemoot.auth.{ApiKeys, ServerHmacAuth}
 import com.firemoot.backplane.Backplane
 import com.firemoot.config.ServerConfig
 import com.firemoot.http.{DemoRoutes, HealthRoutes}
+import com.firemoot.media.MediaService
 import com.firemoot.ratelimit.RateGuard
 import com.firemoot.service.{
   ChannelService,
@@ -43,6 +44,7 @@ object Application:
       devDemo: Boolean = false,
       onUserActive: String => IO[Unit] = _ => IO.unit,
       rate: RateGuard = RateGuard.unlimited,
+      media: Option[MediaService] = None,
   ): WebSocketBuilder2[IO] => HttpApp[IO] =
     val webhooks = WebhookService(pool)
     val api = ApiRoutes(
@@ -55,6 +57,7 @@ object Application:
       webhooks,
       ModerationService(pool, webhooks),
       rate,
+      media,
     )
     val securedApi = ServerHmacAuth(ApiKeys.fromConfig(cfg), rate)(api.routes)
     val ws =

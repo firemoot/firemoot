@@ -318,16 +318,22 @@ queries/FTS, webhooks, moderation and rate limiting.
 
 ## 6. M2 - media
 
-- [ ] **M2.1 S3 presigner**: AWS SDK v2 S3 presigner (generic endpoint + path-style
-      config; *no vendor admin APIs* - SPEC §7 hard rule). `POST /v1/uploads`
-      validates MIME allowlist + size policy (10MB images / 50MB files defaults) →
-      presigned PUT + final object URL; `uploads` row tracks lifecycle.
-- [ ] **M2.2 Media-disabled mode**: no S3 config → uploads return 501 with a clear
-      problem+json body; zero S3 code paths touched at boot.
+- [x] **M2.1 S3 presigner**: AWS SDK v2 `S3Presigner` (path-style endpoint +
+      static creds; offline signing, *no vendor admin APIs*). `POST /v1/uploads`
+      validates the MIME allowlist and size policy (10MB images / 50MB files
+      defaults, all configurable) -> a presigned PUT URL + the final object URL
+      (`publicBaseUrl` override or path-style), recording a `pending` `uploads` row
+      (V004 migration). `MediaConfig` is loaded from `FIREMOOT_S3_*` env (absent =
+      disabled). Tested: presign structure (SigV4 query params, path-style key),
+      lifecycle row, MIME/size rejection (400/413), public-url override.
+- [x] **M2.2 Media-disabled mode**: no S3 config -> `media = None`, so `POST
+      /v1/uploads` returns `501` problem+json and no S3 client is constructed at
+      boot. Tested.
 - [ ] **M2.3 Thumbnailing worker**: in-process queue off `uploads`; longest-edge
       512px (imageio + TwelveMonkeys for format coverage); write-back to store;
       patch `thumb_url` onto the attachment; re-emit `message.updated`.
-- [ ] **M2.4 Per-user upload rate limit** (uses M1.12 interface).
+- [x] **M2.4 Per-user upload rate limit**: an `upload` bucket on the M1.12
+      `RateGuard`, checked per user in the uploads endpoint -> `429`. Tested.
 - [ ] **M2.5 Compose adds `pgsty/minio`**; Testcontainers S3 integration suite runs
       the full presign→PUT→thumbnail→message.updated loop.
 - [ ] **M2.6 Tigris verification on Fly** (manual checklist + docs note) - proves the

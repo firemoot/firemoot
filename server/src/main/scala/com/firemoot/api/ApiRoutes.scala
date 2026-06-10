@@ -1,6 +1,7 @@
 package com.firemoot.api
 
 import cats.effect.IO
+import com.firemoot.media.{MediaService, UploadError}
 import com.firemoot.ratelimit.{RateGuard, RateLimitDecision}
 import com.firemoot.service.{
   ChannelService,
@@ -31,6 +32,7 @@ final class ApiRoutes(
     webhooks: WebhookService,
     moderation: ModerationService,
     rate: RateGuard = RateGuard.unlimited,
+    media: Option[MediaService] = None,
 ):
 
   private def cid(channelType: String, id: String): String = s"$channelType:$id"
@@ -45,15 +47,21 @@ final class ApiRoutes(
       Some(s"rate limit exceeded; retry after ${retryAfterSeconds}s"),
     )
 
+  private def limited(decision: RateLimitDecision): Option[Problem] =
+    decision match
+      case RateLimitDecision.Allowed => None
+      case RateLimitDecision.Retry(after) => Some(tooManyRequests(after.toSeconds))
+
   /** Per-user send budget. None = allowed; Some(problem) = 429. */
   private def sendAllowed(userId: Option[String]): IO[Option[Problem]] =
     userId match
       case None => IO.pure(None)
-      case Some(user) =>
-        rate.send(user).map {
-          case RateLimitDecision.Allowed => None
-          case RateLimitDecision.Retry(after) => Some(tooManyRequests(after.toSeconds))
-        }
+      case Some(user) => rate.send(user).map(limited)
+
+  private def uploadAllowed(userId: Option[String]): IO[Option[Problem]] =
+    userId match
+      case None => IO.pure(None)
+      case Some(user) => rate.upload(user).map(limited)
 
   private val validRoles = Set("owner", "moderator", "member")
   private val validMessageTypes = Set("regular", "system")
@@ -241,6 +249,33 @@ final class ApiRoutes(
       moderation.listFlags(status.getOrElse("open")).map(Right(_))
     }
 
+  private val createUploadServer =
+    ApiEndpoints.createUpload.serverLogic { req =>
+      media match
+        case None =>
+          IO.pure(Left(Problem.of(
+            501,
+            "Not Implemented",
+            Some("media uploads are not configured"),
+          )))
+        case Some(svc) =>
+          uploadAllowed(req.userId).flatMap {
+            case Some(problem) => IO.pure(Left(problem))
+            case None =>
+              svc.presignUpload(req).map {
+                case Right(ticket) => Right(ticket)
+                case Left(UploadError.UnsupportedType(mime)) =>
+                  Left(Problem.of(400, "Bad Request", Some(s"unsupported media type '$mime'")))
+                case Left(UploadError.TooLarge(maxBytes)) =>
+                  Left(Problem.of(
+                    413,
+                    "Payload Too Large",
+                    Some(s"exceeds the $maxBytes byte limit"),
+                  ))
+              }
+          }
+    }
+
   val routes: HttpRoutes[IO] =
     Http4sServerInterpreter[IO]().toRoutes(
       List(
@@ -266,6 +301,7 @@ final class ApiRoutes(
         deleteWebhookServer,
         flagMessageServer,
         listFlagsServer,
+        createUploadServer,
       )
     )
 

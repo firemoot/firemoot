@@ -78,6 +78,16 @@ export type CreateChannelRequest = {
 };
 
 /**
+ * CreateUploadRequest
+ */
+export type CreateUploadRequest = {
+    userId?: string;
+    filename: string;
+    mime: string;
+    sizeBytes: number;
+};
+
+/**
  * CreateWebhookRequest
  */
 export type CreateWebhookRequest = {
@@ -228,6 +238,16 @@ export type UpdateChannelRequest = {
     custom?: unknown;
     frozen?: boolean;
     archived?: boolean;
+};
+
+/**
+ * UploadTicket
+ */
+export type UploadTicket = {
+    uploadId: string;
+    uploadUrl: string;
+    objectUrl: string;
+    expiresInSeconds: number;
 };
 
 /**
@@ -809,3 +829,26 @@ export type GetV1ModerationFlagsResponses = {
 };
 
 export type GetV1ModerationFlagsResponse = GetV1ModerationFlagsResponses[keyof GetV1ModerationFlagsResponses];
+
+export type PostV1UploadsData = {
+    body: CreateUploadRequest;
+    path?: never;
+    query?: never;
+    url: '/v1/uploads';
+};
+
+export type PostV1UploadsErrors = {
+    /**
+     * Invalid value for: body
+     */
+    400: string;
+    default: Problem;
+};
+
+export type PostV1UploadsError = PostV1UploadsErrors[keyof PostV1UploadsErrors];
+
+export type PostV1UploadsResponses = {
+    201: UploadTicket;
+};
+
+export type PostV1UploadsResponse = PostV1UploadsResponses[keyof PostV1UploadsResponses];

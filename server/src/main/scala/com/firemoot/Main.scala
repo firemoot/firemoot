@@ -2,12 +2,14 @@ package com.firemoot
 
 import scala.concurrent.duration.*
 
-import cats.effect.{IO, IOApp}
+import cats.effect.{IO, IOApp, Resource}
+import cats.syntax.all.*
 import com.firemoot.backplane.Backplane
 import com.firemoot.config.AppConfig
 import com.firemoot.db.SessionSyntax.*
 import com.firemoot.db.{Database, Migrations, UserRepo}
 import com.firemoot.http.HttpServer
+import com.firemoot.media.MediaService
 import com.firemoot.ratelimit.RateGuard
 import com.firemoot.service.{LastActiveTracker, WebhookService}
 import com.firemoot.webhook.{WebhookConfig, WebhookDispatcher}
@@ -27,8 +29,14 @@ object Main extends IOApp.Simple:
       backplane <- Backplane.inProcess
       registry <- ConnectionRegistry.create
       _ <- Database.pool(cfg.db).use { pool =>
-        EmberClientBuilder.default[IO].build.use { httpClient =>
+        val media: Resource[IO, Option[MediaService]] =
+          cfg.media.fold(Resource.pure[IO, Option[MediaService]](None))(
+            MediaService.resource(_, pool).map(Some(_))
+          )
+        (EmberClientBuilder.default[IO].build, media).tupled.use { (httpClient, mediaService) =>
           for
+            _ <-
+              log.info(s"Media uploads ${if mediaService.isDefined then "enabled" else "disabled"}")
             lastActive <- LastActiveTracker.create(60.seconds) { userId =>
               pool.use(_.run(UserRepo.touchLastActive, userId))
             }
@@ -48,6 +56,7 @@ object Main extends IOApp.Simple:
               cfg.devDemo,
               lastActive.touch,
               rate,
+              mediaService,
             )
             _ <- HttpServer
               .resource(cfg.http, app)

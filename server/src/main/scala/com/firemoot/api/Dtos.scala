@@ -184,6 +184,32 @@ object FlagMessageRequest:
   given Codec[FlagMessageRequest] = deriveCodec
   given Schema[FlagMessageRequest] = Schema.derived
 
+final case class CreateUploadRequest(
+    userId: Option[String],
+    filename: String,
+    mime: String,
+    sizeBytes: Long,
+)
+
+object CreateUploadRequest:
+  given Codec[CreateUploadRequest] = deriveCodec
+  given Schema[CreateUploadRequest] = Schema.derived
+
+/**
+ * A presigned upload: PUT the bytes to `uploadUrl` (within `expiresInSeconds`),
+ * then reference `objectUrl` in a message's attachments.
+ */
+final case class UploadTicket(
+    uploadId: UUID,
+    uploadUrl: String,
+    objectUrl: String,
+    expiresInSeconds: Long,
+)
+
+object UploadTicket:
+  given Codec[UploadTicket] = deriveCodec
+  given Schema[UploadTicket] = Schema.derived
+
 /** A moderation flag against a message. `flaggedUser` is the message's author. */
 final case class Flag(
     id: UUID,

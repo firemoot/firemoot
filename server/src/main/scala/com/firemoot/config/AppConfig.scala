@@ -1,5 +1,7 @@
 package com.firemoot.config
 
+import scala.concurrent.duration.*
+
 import cats.effect.IO
 import cats.syntax.all.*
 import ciris.*
@@ -17,11 +19,30 @@ final case class DbConfig(
 
 final case class ServerConfig(apiKeyId: String, apiSecret: Secret[String])
 
+/**
+ * S3-compatible media storage (SPEC.md §7, M2). Absent config means media is
+ * disabled (uploads return 501). Generic S3 only: a path-style endpoint plus
+ * static credentials, no vendor admin APIs.
+ */
+final case class MediaConfig(
+    endpoint: String,
+    region: String,
+    bucket: String,
+    accessKey: String,
+    secretKey: Secret[String],
+    publicBaseUrl: Option[String],
+    presignExpiry: FiniteDuration,
+    maxImageBytes: Long,
+    maxFileBytes: Long,
+    allowedMime: Set[String],
+)
+
 final case class AppConfig(
     http: HttpConfig,
     db: DbConfig,
     server: ServerConfig,
     devDemo: Boolean,
+    media: Option[MediaConfig],
 )
 
 object AppConfig:
@@ -51,5 +72,41 @@ object AppConfig:
   private val devDemo: ConfigValue[Effect, Boolean] =
     env("FIREMOOT_DEV_DEMO").as[Boolean].default(false)
 
+  private val defaultMime =
+    "image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain"
+
+  // Media is enabled iff an S3 endpoint is configured; the rest then load (the
+  // access key/secret being required, so a half-configured store fails fast).
+  private val media: ConfigValue[Effect, Option[MediaConfig]] =
+    env("FIREMOOT_S3_ENDPOINT").option.flatMap {
+      case None => default(Option.empty[MediaConfig])
+      case Some(endpoint) =>
+        (
+          env("FIREMOOT_S3_REGION").default("us-east-1"),
+          env("FIREMOOT_S3_BUCKET").default("firemoot"),
+          env("FIREMOOT_S3_ACCESS_KEY"),
+          env("FIREMOOT_S3_SECRET_KEY").secret,
+          env("FIREMOOT_S3_PUBLIC_URL").option,
+          env("FIREMOOT_S3_PRESIGN_EXPIRY_SECONDS").as[Int].default(900),
+          env("FIREMOOT_MEDIA_MAX_IMAGE_BYTES").as[Long].default(10L * 1024 * 1024),
+          env("FIREMOOT_MEDIA_MAX_FILE_BYTES").as[Long].default(50L * 1024 * 1024),
+          env("FIREMOOT_MEDIA_ALLOWED_MIME").default(defaultMime),
+        ).parMapN {
+          (region, bucket, accessKey, secret, publicUrl, expiry, maxImage, maxFile, mimes) =>
+            Some(MediaConfig(
+              endpoint = endpoint,
+              region = region,
+              bucket = bucket,
+              accessKey = accessKey,
+              secretKey = secret,
+              publicBaseUrl = publicUrl,
+              presignExpiry = expiry.seconds,
+              maxImageBytes = maxImage,
+              maxFileBytes = maxFile,
+              allowedMime = mimes.split(",").map(_.trim).filter(_.nonEmpty).toSet,
+            ))
+        }
+    }
+
   val load: IO[AppConfig] =
-    (http, db, server, devDemo).parMapN(AppConfig.apply).load[IO]
+    (http, db, server, devDemo, media).parMapN(AppConfig.apply).load[IO]

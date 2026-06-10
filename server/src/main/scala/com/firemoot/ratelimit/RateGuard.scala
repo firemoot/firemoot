@@ -7,6 +7,7 @@ final case class RateLimits(
     apiKey: RateLimitConfig,
     send: RateLimitConfig,
     connect: RateLimitConfig,
+    upload: RateLimitConfig,
 )
 
 object RateLimits:
@@ -14,6 +15,7 @@ object RateLimits:
     apiKey = RateLimitConfig(capacity = 200, refillPerSecond = 100.0),
     send = RateLimitConfig(capacity = 30, refillPerSecond = 10.0),
     connect = RateLimitConfig(capacity = 10, refillPerSecond = 1.0),
+    upload = RateLimitConfig(capacity = 20, refillPerSecond = 2.0),
   )
 
 /**
@@ -29,6 +31,8 @@ final class RateGuard(limiter: RateLimiter, limits: RateLimits):
     limiter.check(s"send:$userId", limits.send)
   def connect(userId: String): IO[RateLimitDecision] =
     limiter.check(s"connect:$userId", limits.connect)
+  def upload(userId: String): IO[RateLimitDecision] =
+    limiter.check(s"upload:$userId", limits.upload)
 
 object RateGuard:
 

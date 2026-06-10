@@ -16,6 +16,8 @@ object Dependencies {
     val flyway = "12.8.1"
     val postgres = "42.7.11"
 
+    val awsSdk = "2.34.0"
+
     val circe = "0.14.15"
     val ciris = "3.15.0"
     val jwtScala = "11.0.4"
@@ -61,6 +63,13 @@ object Dependencies {
     "org.postgresql" % "postgresql" % V.postgres % Runtime,
   )
 
+  // AWS SDK v2: S3 presigner (offline) + a lightweight sync client for the
+  // thumbnail write-back. Generic-S3 only - no vendor admin APIs (SPEC.md §7).
+  val media: Seq[ModuleID] = Seq(
+    "software.amazon.awssdk" % "s3" % V.awsSdk,
+    "software.amazon.awssdk" % "url-connection-client" % V.awsSdk,
+  )
+
   val json: Seq[ModuleID] = Seq(
     "io.circe" %% "circe-core" % V.circe,
     "io.circe" %% "circe-generic" % V.circe,
@@ -92,5 +101,5 @@ object Dependencies {
   ).map(_ % Test)
 
   val all: Seq[ModuleID] =
-    runtime ++ http4s ++ tapir ++ persistence ++ json ++ config ++ auth ++ logging ++ tests
+    runtime ++ http4s ++ tapir ++ persistence ++ media ++ json ++ config ++ auth ++ logging ++ tests
 }

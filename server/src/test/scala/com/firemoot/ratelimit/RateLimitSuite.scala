@@ -66,7 +66,12 @@ class RateLimitSuite extends CatsEffectSuite, TestContainerForAll:
     withContainers { pg =>
       val cfg = dbConfig(pg)
       val limits =
-        RateLimits(apiKey = RateLimitConfig(1, 0.001), send = generous, connect = generous)
+        RateLimits(
+          apiKey = RateLimitConfig(1, 0.001),
+          send = generous,
+          connect = generous,
+          upload = generous,
+        )
       Backplane.inProcess.flatMap { backplane =>
         Migrations.run(cfg) >> Database.pool(cfg).use { pool =>
           RateGuard.inMemory(limits).flatMap { rate =>
@@ -91,7 +96,12 @@ class RateLimitSuite extends CatsEffectSuite, TestContainerForAll:
     withContainers { pg =>
       val cfg = dbConfig(pg)
       val limits =
-        RateLimits(apiKey = generous, send = RateLimitConfig(1, 0.001), connect = generous)
+        RateLimits(
+          apiKey = generous,
+          send = RateLimitConfig(1, 0.001),
+          connect = generous,
+          upload = generous,
+        )
       Backplane.inProcess.flatMap { backplane =>
         Migrations.run(cfg) >> Database.pool(cfg).use { pool =>
           RateGuard.inMemory(limits).flatMap { rate =>

@@ -187,6 +187,14 @@ object ApiEndpoints:
       .out(jsonBody[List[Flag]])
       .summary("List moderation flags (default: open)")
 
+  val createUpload =
+    base.post
+      .in("uploads")
+      .in(jsonBody[CreateUploadRequest])
+      .out(statusCode(StatusCode.Created))
+      .out(jsonBody[UploadTicket])
+      .summary("Presign a direct-to-S3 upload (501 if media is not configured)")
+
   val all: List[AnyEndpoint] = List(
     upsertUser,
     deleteUser,
@@ -210,4 +218,5 @@ object ApiEndpoints:
     deleteWebhook,
     flagMessage,
     listFlags,
+    createUpload,
   )
