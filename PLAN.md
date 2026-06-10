@@ -379,9 +379,16 @@ queries/FTS, webhooks, moderation and rate limiting.
       route (beside `/healthz`) exposing live gauges (ccu, dau/wau/mau, media/db
       bytes, messages by channel type). The dashboard reads the rollup tables, not
       this endpoint. 82 green.
-- [ ] **M3.4 Admin auth**: password set at install (env or CLI), argon2 hash in
-      `settings`, session cookie, CSRF token, no default password (SPEC open
-      question 3 resolved: local password only in v1; OIDC is v1.x).
+- [x] **M3.4 Admin auth**: the admin password is set at install from
+      `FIREMOOT_ADMIN_PASSWORD` (no default - admin stays locked until set), stored
+      as an **Argon2id** hash (BouncyCastle, pure-JVM, no native deps) in
+      `settings`. `POST /admin/login` verifies it (constant-time) and mints an
+      admin-scoped session JWT in an httpOnly, SameSite=Strict cookie, returning a
+      CSRF token (also a readable cookie). `AdminRoutes.withSession` gates protected
+      routes and requires a matching `X-CSRF-Token` on mutating requests
+      (double-submit) - the M3.5 admin data routes build on it. Local password only
+      in v1 (OIDC is v1.x). Tested: hasher, service (no-default/login/session), and
+      the login->cookie->session route flow. 87 green.
 - [ ] **M3.5 Admin SPA**: Vite + TS, baked into binary resources at `/admin`;
       charts (90-day default window): MAU/DAU/WAU, CCU p95/max + live now,
       messages/day stacked by type, storage; webhook dead-letter list with replay

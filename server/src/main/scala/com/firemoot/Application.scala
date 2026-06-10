@@ -4,6 +4,7 @@ import scala.concurrent.duration.*
 
 import cats.effect.{IO, Resource}
 import cats.syntax.semigroupk.*
+import com.firemoot.admin.{AdminRoutes, AdminService}
 import com.firemoot.api.ApiRoutes
 import com.firemoot.auth.{ApiKeys, ServerHmacAuth}
 import com.firemoot.backplane.Backplane
@@ -79,12 +80,14 @@ object Application:
       Ok(api.openApiJson).map(_.withContentType(`Content-Type`(MediaType.application.json)))
     }
     val metrics = MetricsRoutes(MetricsService(pool), registry.count).routes
+    val admin =
+      AdminRoutes(AdminService(pool, cfg.apiSecret.value), secureCookies = !devDemo).routes
     val demo = if devDemo then DemoRoutes.routes else HttpRoutes.empty[IO]
 
-    // securedApi is last: health, metrics, openapi, demo and ws own their paths and
-    // must not be intercepted by the HMAC middleware (which would 401 the handshake).
+    // securedApi is last: health, metrics, admin, openapi, demo and ws own their
+    // paths and must not be intercepted by the HMAC middleware (which 401s them).
     wsb =>
       Logger.httpApp(logHeaders = true, logBody = false)(
-        (HealthRoutes(pool).routes <+> metrics <+> openApi <+> demo <+>
+        (HealthRoutes(pool).routes <+> metrics <+> admin <+> openApi <+> demo <+>
           ws.routes(wsb) <+> securedApi).orNotFound
       )

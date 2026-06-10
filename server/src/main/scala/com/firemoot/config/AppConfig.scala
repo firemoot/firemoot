@@ -48,6 +48,7 @@ final case class AppConfig(
     server: ServerConfig,
     devDemo: Boolean,
     media: Option[MediaConfig],
+    adminPassword: Option[String],
 )
 
 object AppConfig:
@@ -76,6 +77,10 @@ object AppConfig:
 
   private val devDemo: ConfigValue[Effect, Boolean] =
     env("FIREMOOT_DEV_DEMO").as[Boolean].default(false)
+
+  // Set at install to enable the admin dashboard; no default (admin stays locked).
+  private val adminPassword: ConfigValue[Effect, Option[String]] =
+    env("FIREMOOT_ADMIN_PASSWORD").option
 
   private val defaultMime =
     "image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain"
@@ -114,4 +119,4 @@ object AppConfig:
     }
 
   val load: IO[AppConfig] =
-    (http, db, server, devDemo, media).parMapN(AppConfig.apply).load[IO]
+    (http, db, server, devDemo, media, adminPassword).parMapN(AppConfig.apply).load[IO]

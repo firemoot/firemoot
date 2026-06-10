@@ -22,6 +22,7 @@ object Dependencies {
     val circe = "0.14.15"
     val ciris = "3.15.0"
     val jwtScala = "11.0.4"
+    val bouncycastle = "1.84"
 
     val log4cats = "2.8.0"
     val logback = "1.5.34"
@@ -85,7 +86,9 @@ object Dependencies {
   )
 
   val auth: Seq[ModuleID] = Seq(
-    "com.github.jwt-scala" %% "jwt-circe" % V.jwtScala
+    "com.github.jwt-scala" %% "jwt-circe" % V.jwtScala,
+    // Pure-JVM Argon2id for the admin password hash (no native deps; M3.4).
+    "org.bouncycastle" % "bcprov-jdk18on" % V.bouncycastle,
   )
 
   val logging: Seq[ModuleID] = Seq(

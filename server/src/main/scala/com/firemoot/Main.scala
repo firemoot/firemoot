@@ -4,6 +4,7 @@ import scala.concurrent.duration.*
 
 import cats.effect.{IO, IOApp, Resource}
 import cats.syntax.all.*
+import com.firemoot.admin.AdminService
 import com.firemoot.backplane.Backplane
 import com.firemoot.config.AppConfig
 import com.firemoot.db.SessionSyntax.*
@@ -53,6 +54,11 @@ object Main extends IOApp.Simple:
               pool.use(_.run(UserRepo.touchLastActive, userId))
             }
             rate <- RateGuard.inMemory()
+            // Install/reset the admin password from the environment (no default).
+            _ <- cfg.adminPassword.traverse_(AdminService(
+              pool,
+              cfg.server.apiSecret.value,
+            ).setPassword)
             metrics = MetricsService(pool)
             ccuSampler = CcuSampler(registry, metrics)
             rollup = RollupWorker(metrics)
