@@ -230,10 +230,19 @@ Ordered so each task ships behind a passing protocol/integration suite.
       is a pure `domain.Unread` spec, **scalacheck property-tested** and confirmed
       against the SQL in an integration test. 404 for missing channel/membership.
       36 green.
-- [ ] **M1.7 Typing + presence**: `typing.start`/`typing.stop` WS frames with
-      server-side throttle and auto-expiry (no seq, never replayed); presence
-      online/offline from connection registry + `last_active_at`,
-      `presence.changed` fan-out.
+- [x] **M1.7 Typing + presence**: `typing.start`/`typing.stop` WS frames are
+      ephemeral - published straight to the backplane (seq 0, never persisted to
+      `channel_events`, never replayed) and delivered to the channel's current
+      subscribers. A per-connection `TypingTracker` throttles re-broadcasts and
+      auto-expires a stuck indicator via generation-tagged timers (a superseded
+      timer no-ops, so no fiber cancellation is needed); a connection may only
+      signal typing for a channel it is watching. Presence: `ConnectionRegistry`
+      now counts connections per user, so the gateway detects online (first
+      connection) / offline (last connection) transitions; `PresenceService` fans
+      `presence.changed` out to the user's co-members (everyone sharing a channel)
+      as user-directed events, stamping `last_active_at` on disconnect. Unit
+      (registry transitions, typing throttle/expiry/refresh) + Testcontainers
+      (co-member fan-out) + end-to-end two-socket WS suite. 44 green.
 - [ ] **M1.8 Resume, hardened**: re-subscribe with last-seen seqs replays exactly the
       gap then splices into live without loss or duplication (the race between
       replay-read and live-publish is *the* correctness problem here - solve with

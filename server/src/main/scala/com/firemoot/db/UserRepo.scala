@@ -1,5 +1,7 @@
 package com.firemoot.db
 
+import java.time.OffsetDateTime
+
 import com.firemoot.domain.User
 import io.circe.Json
 import skunk.*
@@ -30,6 +32,11 @@ object UserRepo:
 
   val touchLastActive: Command[String] =
     sql"update users set last_active_at = now() where id = $text".command
+
+  /** Stamps `last_active_at = now()` and returns it (none if the user is gone). */
+  val touchLastActiveReturning: Query[String, OffsetDateTime] =
+    sql"update users set last_active_at = now() where id = $text returning last_active_at"
+      .query(timestamptz)
 
   /**
    * GDPR scrub: erase the content of a user's authored messages while keeping the

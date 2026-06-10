@@ -12,6 +12,7 @@ import com.firemoot.backplane.Backplane
 import com.firemoot.db.SessionSyntax.*
 import com.firemoot.db.{ReadRepo, UserRepo}
 import com.firemoot.domain.UuidV7
+import com.firemoot.service.PresenceService
 import fs2.{Pipe, Stream}
 import io.circe.Json
 import io.circe.syntax.*
@@ -37,9 +38,12 @@ final class WsRoutes(
     registry: ConnectionRegistry,
     replay: EventReplay,
     pool: Resource[IO, Session[IO]],
+    presence: PresenceService,
     jwtSecret: String,
     devDemo: Boolean,
     userActive: String => IO[Unit],
+    typingThrottle: FiniteDuration,
+    typingExpiry: FiniteDuration,
 ):
 
   private object TokenParam extends OptionalQueryParamDecoderMatcher[String]("token")
@@ -79,13 +83,17 @@ final class WsRoutes(
       outbound <- Queue.unbounded[IO, Option[WebSocketFrame]]
       subscribed <- Ref[IO].of(Map.empty[String, Long])
       lastPong <- IO.realTime.flatMap(Ref[IO].of)
+      typing <- TypingTracker.create(userId, typingThrottle, typingExpiry)(backplane.publish)
       me <- lookupUser(userId)
       totalUnread <- pool.use(_.runUnique(ReadRepo.totalUnread, userId))
       now <- IO.realTimeInstant.map(_.atOffset(ZoneOffset.UTC))
       _ <- userActive(userId)
-      _ <- registry.register(connectionId, userId)
+      first <- registry.register(connectionId, userId)
+      // Presence fan-out is best-effort and detached: a hiccup must neither delay
+      // nor fail the handshake. PresenceService is independently tested.
+      _ <- presence.online(userId).attempt.void.start.whenA(first)
       _ <- outbound.offer(Some(text(WsFrames.hello(connectionId, now, me, totalUnread))))
-      response <- build(wsb, connectionId, userId, outbound, subscribed, lastPong)
+      response <- build(wsb, connectionId, userId, outbound, subscribed, lastPong, typing)
     yield response
 
   private def build(
@@ -95,9 +103,17 @@ final class WsRoutes(
       outbound: Queue[IO, Option[WebSocketFrame]],
       subscribed: Ref[IO, Map[String, Long]],
       lastPong: Ref[IO, FiniteDuration],
+      typing: TypingTracker,
   ): IO[Response[IO]] =
+    val cleanup: IO[Unit] =
+      typing.shutdown.attempt.void >>
+        registry.unregister(connectionId).flatMap {
+          case Some((uid, true)) => presence.offline(uid).attempt.void
+          case _ => IO.unit
+        }
+
     val send: Stream[IO, WebSocketFrame] =
-      Stream.fromQueueNoneTerminated(outbound).onFinalize(registry.unregister(connectionId))
+      Stream.fromQueueNoneTerminated(outbound).onFinalize(cleanup)
 
     // Deliver user-directed events (target = this user) regardless of subscription;
     // otherwise deliver channel-broadcast events for subscribed channels.
@@ -130,7 +146,7 @@ final class WsRoutes(
         .drain
 
     val receive: Pipe[IO, WebSocketFrame, Unit] = _.evalMap {
-      case WebSocketFrame.Text(body, _) => onClientFrame(body, subscribed, outbound)
+      case WebSocketFrame.Text(body, _) => onClientFrame(body, subscribed, outbound, typing)
       case _: WebSocketFrame.Pong => IO.realTime.flatMap(lastPong.set)
       case _ => IO.unit
     }
@@ -141,6 +157,7 @@ final class WsRoutes(
       body: String,
       subscribed: Ref[IO, Map[String, Long]],
       outbound: Queue[IO, Option[WebSocketFrame]],
+      typing: TypingTracker,
   ): IO[Unit] =
     WsFrames.parse(body) match
       case WsFrames.ClientFrame.Subscribe(channels) =>
@@ -153,6 +170,11 @@ final class WsRoutes(
               .since(cid, lastSeen)
               .flatMap(_.traverse_(event => outbound.offer(Some(text(WsFrames.event(event))))))
         }
+      case WsFrames.ClientFrame.TypingStart(cid) =>
+        // Only members of a channel the connection is watching may signal typing.
+        subscribed.get.flatMap(subs => typing.start(cid).whenA(subs.contains(cid)))
+      case WsFrames.ClientFrame.TypingStop(cid) =>
+        typing.stop(cid)
       case WsFrames.ClientFrame.Ping =>
         IO.realTimeInstant.flatMap(i =>
           outbound.offer(Some(text(WsFrames.pong(i.atOffset(ZoneOffset.UTC)))))

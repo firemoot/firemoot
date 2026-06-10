@@ -1,5 +1,7 @@
 package com.firemoot
 
+import scala.concurrent.duration.*
+
 import cats.effect.{IO, Resource}
 import cats.syntax.semigroupk.*
 import com.firemoot.api.ApiRoutes
@@ -10,6 +12,7 @@ import com.firemoot.http.{DemoRoutes, HealthRoutes}
 import com.firemoot.service.{
   ChannelService,
   MessageService,
+  PresenceService,
   ReactionService,
   ReadService,
   UserService,
@@ -50,9 +53,12 @@ object Application:
         registry,
         EventReplay(pool),
         pool,
+        PresenceService(pool, backplane),
         cfg.apiSecret.value,
         devDemo,
         onUserActive,
+        typingThrottle = 3.seconds,
+        typingExpiry = 7.seconds,
       )
     val openApi = HttpRoutes.of[IO] { case GET -> Root / "v1" / "openapi.json" =>
       Ok(api.openApiJson).map(_.withContentType(`Content-Type`(MediaType.application.json)))

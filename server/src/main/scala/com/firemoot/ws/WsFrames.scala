@@ -37,6 +37,8 @@ object WsFrames:
   // Client -> server
   enum ClientFrame:
     case Subscribe(channels: Map[String, Long])
+    case TypingStart(cid: String)
+    case TypingStop(cid: String)
     case Ping
     case Unknown
 
@@ -46,9 +48,13 @@ object WsFrames:
       .toOption
       .flatMap { json =>
         val cursor = json.hcursor
+        def withCid(make: String => ClientFrame): ClientFrame =
+          cursor.get[String]("cid").toOption.fold(ClientFrame.Unknown)(make)
         cursor.get[String]("type").toOption.map {
           case "subscribe" =>
             ClientFrame.Subscribe(cursor.get[Map[String, Long]]("channels").getOrElse(Map.empty))
+          case "typing.start" => withCid(ClientFrame.TypingStart.apply)
+          case "typing.stop" => withCid(ClientFrame.TypingStop.apply)
           case "ping" => ClientFrame.Ping
           case _ => ClientFrame.Unknown
         }
