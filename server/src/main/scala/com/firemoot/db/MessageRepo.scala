@@ -67,3 +67,21 @@ object MessageRepo:
   /** Returns the id if a live message with that id exists in the channel. */
   val existsInChannel: Query[(UUID, String), UUID] =
     sql"select id from messages where id = $uuid and cid = $text and deleted_at is null".query(uuid)
+
+  /**
+   * Live messages whose attachments contain (jsonb `@>`) the given fragment -
+   * used to find the message(s) referencing a freshly-thumbnailed upload.
+   */
+  val withAttachment: Query[Json, (UUID, String, Json)] =
+    sql"""
+      select id, cid, attachments from messages
+      where deleted_at is null and attachments @> ${jsonb[Json]}
+    """.query(uuid *: text *: jsonb[Json])
+
+  /** Replaces a message's attachments, returning the updated row. */
+  val setAttachments: Query[(Json, UUID), Message] =
+    sql"""
+      update messages set attachments = ${jsonb[Json]}, updated_at = now()
+      where id = $uuid
+      returning $columns
+    """.query(Codecs.message)

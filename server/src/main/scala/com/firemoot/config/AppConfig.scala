@@ -35,7 +35,12 @@ final case class MediaConfig(
     maxImageBytes: Long,
     maxFileBytes: Long,
     allowedMime: Set[String],
-)
+):
+  /** The public URL for an object key (`publicBaseUrl` override, else path-style). */
+  def objectUrl(key: String): String =
+    publicBaseUrl match
+      case Some(base) => s"${base.stripSuffix("/")}/$key"
+      case None => s"${endpoint.stripSuffix("/")}/$bucket/$key"
 
 final case class AppConfig(
     http: HttpConfig,

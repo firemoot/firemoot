@@ -329,9 +329,15 @@ queries/FTS, webhooks, moderation and rate limiting.
 - [x] **M2.2 Media-disabled mode**: no S3 config -> `media = None`, so `POST
       /v1/uploads` returns `501` problem+json and no S3 client is constructed at
       boot. Tested.
-- [ ] **M2.3 Thumbnailing worker**: in-process queue off `uploads`; longest-edge
-      512px (imageio + TwelveMonkeys for format coverage); write-back to store;
-      patch `thumb_url` onto the attachment; re-emit `message.updated`.
+- [x] **M2.3 Thumbnailing worker**: `ThumbnailWorker` polls `stored` image
+      uploads, downloads via an `ObjectStore` (S3 impl on the url-connection
+      client), downscales to a 512px longest edge (`Thumbnailer`, ImageIO +
+      TwelveMonkeys JPEG/WebP plugins, output PNG, never upscales), writes the
+      thumbnail back, marks the upload `thumbnailed`, and patches `thumbUrl` onto
+      every message attachment referencing it (jsonb `@>` lookup) - re-emitting a
+      seq'd `message.updated` per affected message. Tested: the thumbnailer
+      (downscale/aspect/no-upscale/garbage) and the **whole loop** against an
+      in-memory store (the real S3 store is M2.5). 79 green.
 - [x] **M2.4 Per-user upload rate limit**: an `upload` bucket on the M1.12
       `RateGuard`, checked per user in the uploads endpoint -> `429`. Tested.
 - [ ] **M2.5 Compose adds `pgsty/minio`**; Testcontainers S3 integration suite runs

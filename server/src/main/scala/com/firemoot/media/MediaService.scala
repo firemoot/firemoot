@@ -42,7 +42,7 @@ final class MediaService(
           key = objectKey(id, req.filename)
           _ <- pool.use(_.run(UploadRepo.insert, (id, req.userId, key, req.mime, req.sizeBytes)))
           url <- presignPut(key, req.mime)
-        yield Right(UploadTicket(id, url, objectUrl(key), cfg.presignExpiry.toSeconds))
+        yield Right(UploadTicket(id, url, cfg.objectUrl(key), cfg.presignExpiry.toSeconds))
 
   private def validate(req: CreateUploadRequest): Either[UploadError, Unit] =
     if !cfg.allowedMime.contains(req.mime) then Left(UploadError.UnsupportedType(req.mime))
@@ -53,11 +53,6 @@ final class MediaService(
   private def objectKey(id: java.util.UUID, filename: String): String =
     val safe = filename.replaceAll("[^A-Za-z0-9._-]", "_")
     s"uploads/$id/${if safe.isEmpty then "file" else safe}"
-
-  private def objectUrl(key: String): String =
-    cfg.publicBaseUrl match
-      case Some(base) => s"${base.stripSuffix("/")}/$key"
-      case None => s"${cfg.endpoint.stripSuffix("/")}/${cfg.bucket}/$key"
 
   private def presignPut(key: String, mime: String): IO[String] =
     IO.blocking {

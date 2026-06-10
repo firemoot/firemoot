@@ -88,6 +88,39 @@ final class MessageService(pool: Resource[IO, Session[IO]], backplane: Backplane
       .flatMap((message, event) => event.traverse_(backplane.publish).as(message))
 
   /**
+   * Patches the `thumbUrl` onto every attachment referencing `originalUrl` and
+   * re-emits `message.updated` for each affected message (M2.3 thumbnailing).
+   */
+  def attachThumbnail(originalUrl: String, thumbUrl: String): IO[Unit] =
+    val matchFragment = Json.arr(Json.obj("url" -> originalUrl.asJson))
+    pool.use(_.runList(MessageRepo.withAttachment, matchFragment)).flatMap { rows =>
+      rows.traverse_ { (id, cid, attachments) =>
+        val patched = patchAttachments(attachments, originalUrl, thumbUrl)
+        pool
+          .use { session =>
+            session.transaction.use { _ =>
+              session
+                .runUnique(MessageRepo.setAttachments, (patched, id))
+                .flatMap(message =>
+                  ChannelEvents.persist(session, cid, "message.updated", message.asJson)
+                )
+            }
+          }
+          .flatMap(backplane.publish)
+      }
+    }
+
+  private def patchAttachments(attachments: Json, originalUrl: String, thumbUrl: String): Json =
+    attachments.asArray match
+      case None => attachments
+      case Some(items) =>
+        Json.fromValues(items.map { item =>
+          if item.hcursor.get[String]("url").toOption.contains(originalUrl) then
+            item.deepMerge(Json.obj("thumbUrl" -> thumbUrl.asJson))
+          else item
+        })
+
+  /**
    * Soft-deletes a message (scrubbing its text), decrements the parent thread's
    * `reply_count`, and emits `message.deleted`. False if nothing was deleted.
    */

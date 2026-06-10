@@ -17,6 +17,7 @@ object Dependencies {
     val postgres = "42.7.11"
 
     val awsSdk = "2.34.0"
+    val twelvemonkeys = "3.12.0"
 
     val circe = "0.14.15"
     val ciris = "3.15.0"
@@ -65,9 +66,12 @@ object Dependencies {
 
   // AWS SDK v2: S3 presigner (offline) + a lightweight sync client for the
   // thumbnail write-back. Generic-S3 only - no vendor admin APIs (SPEC.md §7).
+  // TwelveMonkeys widens ImageIO format coverage (JPEG variants, WebP) for thumbs.
   val media: Seq[ModuleID] = Seq(
     "software.amazon.awssdk" % "s3" % V.awsSdk,
     "software.amazon.awssdk" % "url-connection-client" % V.awsSdk,
+    "com.twelvemonkeys.imageio" % "imageio-jpeg" % V.twelvemonkeys,
+    "com.twelvemonkeys.imageio" % "imageio-webp" % V.twelvemonkeys,
   )
 
   val json: Seq[ModuleID] = Seq(

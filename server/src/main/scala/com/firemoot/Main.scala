@@ -9,11 +9,12 @@ import com.firemoot.config.AppConfig
 import com.firemoot.db.SessionSyntax.*
 import com.firemoot.db.{Database, Migrations, UserRepo}
 import com.firemoot.http.HttpServer
-import com.firemoot.media.MediaService
+import com.firemoot.media.{MediaService, ObjectStore, ThumbnailWorker}
 import com.firemoot.ratelimit.RateGuard
-import com.firemoot.service.{LastActiveTracker, WebhookService}
+import com.firemoot.service.{LastActiveTracker, MessageService, WebhookService}
 import com.firemoot.webhook.{WebhookConfig, WebhookDispatcher}
 import com.firemoot.ws.ConnectionRegistry
+import fs2.Stream
 import org.http4s.ember.client.EmberClientBuilder
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
@@ -29,11 +30,21 @@ object Main extends IOApp.Simple:
       backplane <- Backplane.inProcess
       registry <- ConnectionRegistry.create
       _ <- Database.pool(cfg.db).use { pool =>
-        val media: Resource[IO, Option[MediaService]] =
-          cfg.media.fold(Resource.pure[IO, Option[MediaService]](None))(
-            MediaService.resource(_, pool).map(Some(_))
-          )
-        (EmberClientBuilder.default[IO].build, media).tupled.use { (httpClient, mediaService) =>
+        // When media is configured, build the presigner (for uploads) and an
+        // object store + thumbnail worker (for the write-back loop).
+        val media: Resource[IO, Option[(MediaService, ThumbnailWorker)]] =
+          cfg.media match
+            case None => Resource.pure(None)
+            case Some(mc) =>
+              (MediaService.presigner(mc), ObjectStore.s3(mc)).tupled.map { (presigner, store) =>
+                Some((
+                  new MediaService(mc, pool, presigner),
+                  ThumbnailWorker(mc, pool, store, MessageService(pool, backplane), log),
+                ))
+              }
+        (EmberClientBuilder.default[IO].build, media).tupled.use { (httpClient, mediaParts) =>
+          val mediaService = mediaParts.map(_._1)
+          val thumbnails = mediaParts.fold(Stream.empty.covary[IO])(_._2.stream)
           for
             _ <-
               log.info(s"Media uploads ${if mediaService.isDefined then "enabled" else "disabled"}")
@@ -60,7 +71,7 @@ object Main extends IOApp.Simple:
             )
             _ <- HttpServer
               .resource(cfg.http, app)
-              .use(_ => dispatcher.stream.merge(enqueue).compile.drain)
+              .use(_ => dispatcher.stream.merge(enqueue).merge(thumbnails).compile.drain)
           yield ()
         }
       }
