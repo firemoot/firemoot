@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.js';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.js';
-import type { DeleteV1UsersIdData, DeleteV1UsersIdErrors, DeleteV1UsersIdResponses, PostV1ChannelsData, PostV1ChannelsErrors, PostV1ChannelsResponses, PostV1ChannelsTypeIdMessagesData, PostV1ChannelsTypeIdMessagesErrors, PostV1ChannelsTypeIdMessagesResponses, PostV1UsersData, PostV1UsersErrors, PostV1UsersResponses } from './types.gen.js';
+import type { DeleteV1ChannelsTypeIdData, DeleteV1ChannelsTypeIdErrors, DeleteV1ChannelsTypeIdMembersUseridData, DeleteV1ChannelsTypeIdMembersUseridErrors, DeleteV1ChannelsTypeIdMembersUseridResponses, DeleteV1ChannelsTypeIdResponses, DeleteV1UsersIdData, DeleteV1UsersIdErrors, DeleteV1UsersIdResponses, GetV1ChannelsTypeIdData, GetV1ChannelsTypeIdErrors, GetV1ChannelsTypeIdResponses, PatchV1ChannelsTypeIdData, PatchV1ChannelsTypeIdErrors, PatchV1ChannelsTypeIdResponses, PostV1ChannelsData, PostV1ChannelsErrors, PostV1ChannelsResponses, PostV1ChannelsTypeIdMembersData, PostV1ChannelsTypeIdMembersErrors, PostV1ChannelsTypeIdMembersResponses, PostV1ChannelsTypeIdMessagesData, PostV1ChannelsTypeIdMessagesErrors, PostV1ChannelsTypeIdMessagesResponses, PostV1UsersData, PostV1UsersErrors, PostV1UsersResponses } from './types.gen.js';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -46,6 +46,45 @@ export const postV1Channels = <ThrowOnError extends boolean = false>(options: Op
         ...options.headers
     }
 });
+
+/**
+ * Delete a channel (soft)
+ */
+export const deleteV1ChannelsTypeId = <ThrowOnError extends boolean = false>(options: Options<DeleteV1ChannelsTypeIdData, ThrowOnError>): RequestResult<DeleteV1ChannelsTypeIdResponses, DeleteV1ChannelsTypeIdErrors, ThrowOnError> => (options.client ?? client).delete<DeleteV1ChannelsTypeIdResponses, DeleteV1ChannelsTypeIdErrors, ThrowOnError>({ url: '/v1/channels/{type}/{id}', ...options });
+
+/**
+ * Get a channel
+ */
+export const getV1ChannelsTypeId = <ThrowOnError extends boolean = false>(options: Options<GetV1ChannelsTypeIdData, ThrowOnError>): RequestResult<GetV1ChannelsTypeIdResponses, GetV1ChannelsTypeIdErrors, ThrowOnError> => (options.client ?? client).get<GetV1ChannelsTypeIdResponses, GetV1ChannelsTypeIdErrors, ThrowOnError>({ url: '/v1/channels/{type}/{id}', ...options });
+
+/**
+ * Update a channel (custom data, frozen, archived)
+ */
+export const patchV1ChannelsTypeId = <ThrowOnError extends boolean = false>(options: Options<PatchV1ChannelsTypeIdData, ThrowOnError>): RequestResult<PatchV1ChannelsTypeIdResponses, PatchV1ChannelsTypeIdErrors, ThrowOnError> => (options.client ?? client).patch<PatchV1ChannelsTypeIdResponses, PatchV1ChannelsTypeIdErrors, ThrowOnError>({
+    url: '/v1/channels/{type}/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Add a member to a channel
+ */
+export const postV1ChannelsTypeIdMembers = <ThrowOnError extends boolean = false>(options: Options<PostV1ChannelsTypeIdMembersData, ThrowOnError>): RequestResult<PostV1ChannelsTypeIdMembersResponses, PostV1ChannelsTypeIdMembersErrors, ThrowOnError> => (options.client ?? client).post<PostV1ChannelsTypeIdMembersResponses, PostV1ChannelsTypeIdMembersErrors, ThrowOnError>({
+    url: '/v1/channels/{type}/{id}/members',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Remove a member from a channel
+ */
+export const deleteV1ChannelsTypeIdMembersUserid = <ThrowOnError extends boolean = false>(options: Options<DeleteV1ChannelsTypeIdMembersUseridData, ThrowOnError>): RequestResult<DeleteV1ChannelsTypeIdMembersUseridResponses, DeleteV1ChannelsTypeIdMembersUseridErrors, ThrowOnError> => (options.client ?? client).delete<DeleteV1ChannelsTypeIdMembersUseridResponses, DeleteV1ChannelsTypeIdMembersUseridErrors, ThrowOnError>({ url: '/v1/channels/{type}/{id}/members/{userId}', ...options });
 
 /**
  * Send a message to a channel

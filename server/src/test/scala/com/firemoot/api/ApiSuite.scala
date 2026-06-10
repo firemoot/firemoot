@@ -47,7 +47,11 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
       Backplane.inProcess.flatMap { backplane =>
         Migrations.run(cfg) >> Database.pool(cfg).use { pool =>
           val api =
-            ApiRoutes(UserService(pool), ChannelService(pool), MessageService(pool, backplane))
+            ApiRoutes(
+              UserService(pool),
+              ChannelService(pool, backplane),
+              MessageService(pool, backplane),
+            )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
 
           for
@@ -104,6 +108,63 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
           yield
             assert(OpenApiDocs.compact.contains("/v1/users"), "openapi should document /v1/users")
             assert(OpenApiDocs.compact.contains("Firemoot"), "openapi should carry the title")
+        }
+      }
+    }
+  }
+
+  test("channel endpoints: get / update / members / frozen / delete status codes") {
+    withContainers { pg =>
+      val cfg = dbConfig(pg)
+      Backplane.inProcess.flatMap { backplane =>
+        Migrations.run(cfg) >> Database.pool(cfg).use { pool =>
+          val api =
+            ApiRoutes(
+              UserService(pool),
+              ChannelService(pool, backplane),
+              MessageService(pool, backplane),
+            )
+          val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
+          val chPath = "/v1/channels/messaging/room2"
+          def get(path: String) =
+            Signing.signedNoBody(GET, Uri.unsafeFromString(path), apiKey, secret)
+          def del(path: String) =
+            Signing.signedNoBody(DELETE, Uri.unsafeFromString(path), apiKey, secret)
+          def send[A: Encoder](method: org.http4s.Method, path: String, dto: A) =
+            Signing.signedRequest(method, Uri.unsafeFromString(path), dto, apiKey, secret)
+
+          for
+            _ <- app.run(post("/v1/users", UpsertUserRequest("carol", None, None, None, None)))
+            missing <- app.run(get(chPath))
+            _ = assertEquals(missing.status, Status.NotFound)
+            created <- app.run(post(
+              "/v1/channels",
+              CreateChannelRequest("messaging", "room2", Some("carol"), None),
+            ))
+            _ = assertEquals(created.status, Status.Created)
+            got <- app.run(get(chPath))
+            _ = assertEquals(got.status, Status.Ok)
+            badRole <-
+              app.run(send(POST, s"$chPath/members", AddMemberRequest("dave", Some("king"))))
+            _ = assertEquals(badRole.status, Status.BadRequest)
+            _ <- app.run(post("/v1/users", UpsertUserRequest("dave", None, None, None, None)))
+            addOk <-
+              app.run(send(POST, s"$chPath/members", AddMemberRequest("dave", Some("moderator"))))
+            _ = assertEquals(addOk.status, Status.NoContent)
+            removeOk <- app.run(del(s"$chPath/members/dave"))
+            _ = assertEquals(removeOk.status, Status.NoContent)
+            frozen <- app.run(send(PATCH, chPath, UpdateChannelRequest(None, Some(true), None)))
+            _ = assertEquals(frozen.status, Status.Ok)
+            sendFrozen <- app.run(send(
+              POST,
+              s"$chPath/messages",
+              SendMessageRequest(Some("carol"), Some("hi"), None, None, None),
+            ))
+            _ = assertEquals(sendFrozen.status, Status.Conflict)
+            deleted <- app.run(del(chPath))
+            _ = assertEquals(deleted.status, Status.NoContent)
+            gone <- app.run(get(chPath))
+          yield assertEquals(gone.status, Status.NotFound)
         }
       }
     }

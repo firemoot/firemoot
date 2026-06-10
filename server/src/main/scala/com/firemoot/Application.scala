@@ -30,7 +30,8 @@ object Application:
       devDemo: Boolean = false,
       onUserActive: String => IO[Unit] = _ => IO.unit,
   ): WebSocketBuilder2[IO] => HttpApp[IO] =
-    val api = ApiRoutes(UserService(pool), ChannelService(pool), MessageService(pool, backplane))
+    val api =
+      ApiRoutes(UserService(pool), ChannelService(pool, backplane), MessageService(pool, backplane))
     val securedApi = ServerHmacAuth(ApiKeys.fromConfig(cfg))(api.routes)
     val ws =
       WsRoutes(

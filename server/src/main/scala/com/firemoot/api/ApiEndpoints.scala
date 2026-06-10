@@ -51,12 +51,53 @@ object ApiEndpoints:
       .out(jsonBody[Channel])
       .summary("Create a channel")
 
+  private val channelPath = "channels" / path[String]("type") / path[String]("id")
+
+  val getChannel =
+    base.get.in(channelPath).out(jsonBody[Channel]).summary("Get a channel")
+
+  val updateChannel =
+    base.patch
+      .in(channelPath)
+      .in(jsonBody[UpdateChannelRequest])
+      .out(jsonBody[Channel])
+      .summary("Update a channel (custom data, frozen, archived)")
+
+  val deleteChannel =
+    base.delete
+      .in(channelPath)
+      .out(statusCode(StatusCode.NoContent))
+      .summary("Delete a channel (soft)")
+
+  val addMember =
+    base.post
+      .in(channelPath / "members")
+      .in(jsonBody[AddMemberRequest])
+      .out(statusCode(StatusCode.NoContent))
+      .summary("Add a member to a channel")
+
+  val removeMember =
+    base.delete
+      .in(channelPath / "members" / path[String]("userId"))
+      .out(statusCode(StatusCode.NoContent))
+      .summary("Remove a member from a channel")
+
   val sendMessage =
     base.post
-      .in("channels" / path[String]("type") / path[String]("id") / "messages")
+      .in(channelPath / "messages")
       .in(jsonBody[SendMessageRequest])
       .out(statusCode(StatusCode.Created))
       .out(jsonBody[Message])
       .summary("Send a message to a channel")
 
-  val all: List[AnyEndpoint] = List(upsertUser, deleteUser, createChannel, sendMessage)
+  val all: List[AnyEndpoint] = List(
+    upsertUser,
+    deleteUser,
+    createChannel,
+    getChannel,
+    updateChannel,
+    deleteChannel,
+    addMember,
+    removeMember,
+    sendMessage,
+  )

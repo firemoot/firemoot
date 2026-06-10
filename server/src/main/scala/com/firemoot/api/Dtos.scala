@@ -30,6 +30,22 @@ object CreateChannelRequest:
   given Codec[CreateChannelRequest] = deriveCodec
   given Schema[CreateChannelRequest] = Schema.derived
 
+final case class UpdateChannelRequest(
+    custom: Option[Json],
+    frozen: Option[Boolean],
+    archived: Option[Boolean],
+)
+
+object UpdateChannelRequest:
+  given Codec[UpdateChannelRequest] = deriveCodec
+  given Schema[UpdateChannelRequest] = Schema.derived
+
+final case class AddMemberRequest(userId: String, role: Option[String])
+
+object AddMemberRequest:
+  given Codec[AddMemberRequest] = deriveCodec
+  given Schema[AddMemberRequest] = Schema.derived
+
 final case class SendMessageRequest(
     userId: Option[String],
     text: Option[String],

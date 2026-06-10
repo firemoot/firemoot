@@ -48,20 +48,22 @@ class UserServiceSuite extends CatsEffectSuite, TestContainerForAll:
       Backplane.inProcess.flatMap { backplane =>
         Migrations.run(cfg) >> Database.pool(cfg).use { pool =>
           val users = UserService(pool)
-          val channels = ChannelService(pool)
+          val channels = ChannelService(pool, backplane)
           val messages = MessageService(pool, backplane)
 
           for
             _ <- users.upsert("alice", Some("Alice"), None, "user", Json.obj())
             _ <- channels.create("messaging", "general", Some("alice"), Json.obj())
-            msg <- messages.send(
-              "messaging:general",
-              Some("alice"),
-              Some("secret text"),
-              Json.obj(),
-              Json.arr(),
-              None,
-            )
+            msg <- messages
+              .send(
+                "messaging:general",
+                Some("alice"),
+                Some("secret text"),
+                Json.obj(),
+                Json.arr(),
+                None,
+              )
+              .map(_.toOption.get)
             _ <- pool.use(_.run(insertReaction, (msg.id, "alice", "like")))
 
             membersBefore <- pool.use(_.runUnique(countMembers, "alice"))

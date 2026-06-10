@@ -198,11 +198,15 @@ Ordered so each task ships behind a passing protocol/integration suite.
       with content erased. **Removed:** user row, memberships, reactions. 204 on
       success, 404 if absent. `last_active_at` via `LastActiveTracker` (in-memory
       per-user debounce, touched on WS connect). Unit + Testcontainers tested.
-- [ ] **M1.3 Channels**: full CRUD; member add/remove with roles
-      (owner/moderator/member fixed set - SPEC open question 2 resolved as "simple");
-      frozen (reject sends) and archived (hide from default queries) semantics;
-      `channel.updated`/`channel.deleted`, `member.added`/`member.removed`,
-      `notification.added_to_channel`/`notification.removed_from_channel` events.
+- [x] **M1.3 Channels**: GET/PATCH/DELETE channel + POST/DELETE members
+      (owner/moderator/member fixed set, validated -> 400; SPEC open question 2
+      resolved "simple"); frozen rejects sends (409), archived flag stored (queries
+      respect it in M1.9). All ops emit seq'd channel events via `ChannelEvents`
+      (`channel.updated`/`channel.deleted`, `member.added`/`member.removed`) reusing
+      cid-filtered WS delivery + replay. `notification.added_to_channel`/
+      `removed_from_channel` are **user-targeted** (new `Event.target`; WS live filter
+      delivers to the target user or to cid subscribers) - live-only, not persisted.
+      Service + endpoint + targeted-delivery tests. 26 green.
 - [ ] **M1.4 Messages, full lifecycle**: edit + soft delete (`message.updated`/
       `message.deleted`); threads (`parent_message_id`, transactional `reply_count`
       denorm); system messages; server "send as user"; attachments as opaque JSONB

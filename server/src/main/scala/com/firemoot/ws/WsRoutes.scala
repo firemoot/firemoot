@@ -84,12 +84,13 @@ final class WsRoutes(
       _ <- userActive(userId)
       _ <- registry.register(connectionId, userId)
       _ <- outbound.offer(Some(text(WsFrames.hello(connectionId, now, me))))
-      response <- build(wsb, connectionId, outbound, subscribed, lastPong)
+      response <- build(wsb, connectionId, userId, outbound, subscribed, lastPong)
     yield response
 
   private def build(
       wsb: WebSocketBuilder2[IO],
       connectionId: String,
+      userId: String,
       outbound: Queue[IO, Option[WebSocketFrame]],
       subscribed: Ref[IO, Map[String, Long]],
       lastPong: Ref[IO, FiniteDuration],
@@ -97,12 +98,18 @@ final class WsRoutes(
     val send: Stream[IO, WebSocketFrame] =
       Stream.fromQueueNoneTerminated(outbound).onFinalize(registry.unregister(connectionId))
 
+    // Deliver user-directed events (target = this user) regardless of subscription;
+    // otherwise deliver channel-broadcast events for subscribed channels.
     val live: Stream[IO, Nothing] =
       backplane.subscribe.evalMap { event =>
-        subscribed.get.flatMap { subs =>
-          if subs.contains(event.cid) then outbound.offer(Some(text(WsFrames.event(event))))
-          else IO.unit
-        }
+        event.target match
+          case Some(target) =>
+            if target == userId then outbound.offer(Some(text(WsFrames.event(event)))) else IO.unit
+          case None =>
+            subscribed.get.flatMap { subs =>
+              if subs.contains(event.cid) then outbound.offer(Some(text(WsFrames.event(event))))
+              else IO.unit
+            }
       }.drain
 
     val pings: Stream[IO, Nothing] =

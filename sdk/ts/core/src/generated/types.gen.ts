@@ -5,6 +5,14 @@ export type ClientOptions = {
 };
 
 /**
+ * AddMemberRequest
+ */
+export type AddMemberRequest = {
+    userId: string;
+    role?: string;
+};
+
+/**
  * Channel
  */
 export type Channel = {
@@ -70,6 +78,15 @@ export type SendMessageRequest = {
     custom?: unknown;
     attachments?: unknown;
     parentMessageId?: string;
+};
+
+/**
+ * UpdateChannelRequest
+ */
+export type UpdateChannelRequest = {
+    custom?: unknown;
+    frozen?: boolean;
+    archived?: boolean;
 };
 
 /**
@@ -164,6 +181,125 @@ export type PostV1ChannelsResponses = {
 };
 
 export type PostV1ChannelsResponse = PostV1ChannelsResponses[keyof PostV1ChannelsResponses];
+
+export type DeleteV1ChannelsTypeIdData = {
+    body?: never;
+    path: {
+        type: string;
+        id: string;
+    };
+    query?: never;
+    url: '/v1/channels/{type}/{id}';
+};
+
+export type DeleteV1ChannelsTypeIdErrors = {
+    default: Problem;
+};
+
+export type DeleteV1ChannelsTypeIdError = DeleteV1ChannelsTypeIdErrors[keyof DeleteV1ChannelsTypeIdErrors];
+
+export type DeleteV1ChannelsTypeIdResponses = {
+    204: void;
+};
+
+export type DeleteV1ChannelsTypeIdResponse = DeleteV1ChannelsTypeIdResponses[keyof DeleteV1ChannelsTypeIdResponses];
+
+export type GetV1ChannelsTypeIdData = {
+    body?: never;
+    path: {
+        type: string;
+        id: string;
+    };
+    query?: never;
+    url: '/v1/channels/{type}/{id}';
+};
+
+export type GetV1ChannelsTypeIdErrors = {
+    default: Problem;
+};
+
+export type GetV1ChannelsTypeIdError = GetV1ChannelsTypeIdErrors[keyof GetV1ChannelsTypeIdErrors];
+
+export type GetV1ChannelsTypeIdResponses = {
+    200: Channel;
+};
+
+export type GetV1ChannelsTypeIdResponse = GetV1ChannelsTypeIdResponses[keyof GetV1ChannelsTypeIdResponses];
+
+export type PatchV1ChannelsTypeIdData = {
+    body: UpdateChannelRequest;
+    path: {
+        type: string;
+        id: string;
+    };
+    query?: never;
+    url: '/v1/channels/{type}/{id}';
+};
+
+export type PatchV1ChannelsTypeIdErrors = {
+    /**
+     * Invalid value for: body
+     */
+    400: string;
+    default: Problem;
+};
+
+export type PatchV1ChannelsTypeIdError = PatchV1ChannelsTypeIdErrors[keyof PatchV1ChannelsTypeIdErrors];
+
+export type PatchV1ChannelsTypeIdResponses = {
+    200: Channel;
+};
+
+export type PatchV1ChannelsTypeIdResponse = PatchV1ChannelsTypeIdResponses[keyof PatchV1ChannelsTypeIdResponses];
+
+export type PostV1ChannelsTypeIdMembersData = {
+    body: AddMemberRequest;
+    path: {
+        type: string;
+        id: string;
+    };
+    query?: never;
+    url: '/v1/channels/{type}/{id}/members';
+};
+
+export type PostV1ChannelsTypeIdMembersErrors = {
+    /**
+     * Invalid value for: body
+     */
+    400: string;
+    default: Problem;
+};
+
+export type PostV1ChannelsTypeIdMembersError = PostV1ChannelsTypeIdMembersErrors[keyof PostV1ChannelsTypeIdMembersErrors];
+
+export type PostV1ChannelsTypeIdMembersResponses = {
+    204: void;
+};
+
+export type PostV1ChannelsTypeIdMembersResponse = PostV1ChannelsTypeIdMembersResponses[keyof PostV1ChannelsTypeIdMembersResponses];
+
+export type DeleteV1ChannelsTypeIdMembersUseridData = {
+    body?: never;
+    path: {
+        type: string;
+        id: string;
+        userId: string;
+    };
+    query?: never;
+    url: '/v1/channels/{type}/{id}/members/{userId}';
+};
+
+export type DeleteV1ChannelsTypeIdMembersUseridErrors = {
+    default: Problem;
+};
+
+export type DeleteV1ChannelsTypeIdMembersUseridError = DeleteV1ChannelsTypeIdMembersUseridErrors[keyof DeleteV1ChannelsTypeIdMembersUseridErrors];
+
+export type DeleteV1ChannelsTypeIdMembersUseridResponses = {
+    204: void;
+};
+
+export type DeleteV1ChannelsTypeIdMembersUseridResponse = DeleteV1ChannelsTypeIdMembersUseridResponses[keyof DeleteV1ChannelsTypeIdMembersUseridResponses];
 
 export type PostV1ChannelsTypeIdMessagesData = {
     body: SendMessageRequest;

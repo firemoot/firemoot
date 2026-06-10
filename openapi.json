@@ -132,6 +132,259 @@
         }
       }
     },
+    "/v1/channels/{type}/{id}" : {
+      "get" : {
+        "summary" : "Get a channel",
+        "operationId" : "getV1ChannelsTypeId",
+        "parameters" : [
+          {
+            "name" : "type",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "id",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Channel"
+                }
+              }
+            }
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "summary" : "Delete a channel (soft)",
+        "operationId" : "deleteV1ChannelsTypeId",
+        "parameters" : [
+          {
+            "name" : "type",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "id",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "204" : {
+            "description" : ""
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch" : {
+        "summary" : "Update a channel (custom data, frozen, archived)",
+        "operationId" : "patchV1ChannelsTypeId",
+        "parameters" : [
+          {
+            "name" : "type",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "id",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateChannelRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Channel"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid value for: body",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/channels/{type}/{id}/members" : {
+      "post" : {
+        "summary" : "Add a member to a channel",
+        "operationId" : "postV1ChannelsTypeIdMembers",
+        "parameters" : [
+          {
+            "name" : "type",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "id",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AddMemberRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : ""
+          },
+          "400" : {
+            "description" : "Invalid value for: body",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/channels/{type}/{id}/members/{userId}" : {
+      "delete" : {
+        "summary" : "Remove a member from a channel",
+        "operationId" : "deleteV1ChannelsTypeIdMembersUserid",
+        "parameters" : [
+          {
+            "name" : "type",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "id",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "userId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "204" : {
+            "description" : ""
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/channels/{type}/{id}/messages" : {
       "post" : {
         "summary" : "Send a message to a channel",
@@ -201,6 +454,21 @@
   },
   "components" : {
     "schemas" : {
+      "AddMemberRequest" : {
+        "title" : "AddMemberRequest",
+        "type" : "object",
+        "required" : [
+          "userId"
+        ],
+        "properties" : {
+          "userId" : {
+            "type" : "string"
+          },
+          "role" : {
+            "type" : "string"
+          }
+        }
+      },
       "Channel" : {
         "title" : "Channel",
         "type" : "object",
@@ -387,6 +655,21 @@
           "parentMessageId" : {
             "type" : "string",
             "format" : "uuid"
+          }
+        }
+      },
+      "UpdateChannelRequest" : {
+        "title" : "UpdateChannelRequest",
+        "type" : "object",
+        "properties" : {
+          "custom" : {
+            
+          },
+          "frozen" : {
+            "type" : "boolean"
+          },
+          "archived" : {
+            "type" : "boolean"
           }
         }
       },
