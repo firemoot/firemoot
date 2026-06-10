@@ -134,10 +134,13 @@ settled.
       SPEC.md §15 and `docs/decisions/0001-database-library.md`.
 - [ ] **M0.3 Flyway on boot** + `V001__initial.sql` covering §3 (users, channels,
       channel_members, messages, channel_events, api_keys minimum).
-- [ ] **M0.4 tapir foundation**: endpoint definitions module; RFC 9457 problem+json
-      error model; `/v1/openapi.json`; first endpoints: `POST /v1/users` (upsert),
-      `POST /v1/channels`, `POST /v1/channels/{type}/{id}/messages`. Server-key HMAC
-      auth middleware (stub validation acceptable until M1.1).
+- [x] **M0.4 tapir foundation**: `ApiEndpoints` module; RFC 9457 `Problem` model
+      (status derived from body; media type tightened in M1.1); `/v1/openapi.json`
+      served; `POST /v1/users`, `POST /v1/channels`, `POST /v1/channels/{type}/{id}/messages`.
+      Domain models + skunk codecs/repos; seq-allocating message transaction
+      (seq + message + `channel_events` in one commit). Server-key auth via
+      `X-Firemoot-Key` header (stub: key-id equality; HMAC in M1.1). Testcontainers
+      suite covers the happy path, seq increment and 401.
 - [ ] **M0.5 WS gateway**: `GET /v1/ws?token=` upgrade; JWT parse (full verification
       lands M1.1); `hello` frame with `connection_id`, server time, user; server ping
       every 25s, reap after 2 missed pongs; connection registry (in-memory).

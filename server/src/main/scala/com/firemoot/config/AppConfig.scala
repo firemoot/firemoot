@@ -15,7 +15,9 @@ final case class DbConfig(
     maxConnections: Int,
 )
 
-final case class AppConfig(http: HttpConfig, db: DbConfig)
+final case class ServerConfig(apiKeyId: String, apiSecret: Secret[String])
+
+final case class AppConfig(http: HttpConfig, db: DbConfig, server: ServerConfig)
 
 object AppConfig:
 
@@ -35,5 +37,11 @@ object AppConfig:
       env("FIREMOOT_DB_MAX_CONNECTIONS").as[Int].default(10),
     ).parMapN(DbConfig.apply)
 
+  private val server: ConfigValue[Effect, ServerConfig] =
+    (
+      env("FIREMOOT_API_KEY_ID").default("firemoot"),
+      env("FIREMOOT_API_SECRET").default("dev-secret").secret,
+    ).parMapN(ServerConfig.apply)
+
   val load: IO[AppConfig] =
-    (http, db).parMapN(AppConfig.apply).load[IO]
+    (http, db, server).parMapN(AppConfig.apply).load[IO]

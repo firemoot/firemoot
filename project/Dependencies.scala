@@ -54,6 +54,7 @@ object Dependencies {
 
   val persistence: Seq[ModuleID] = Seq(
     "org.tpolecat" %% "skunk-core" % V.skunk,
+    "org.tpolecat" %% "skunk-circe" % V.skunk,
     "org.flywaydb" % "flyway-core" % V.flyway,
     "org.flywaydb" % "flyway-database-postgresql" % V.flyway,
     "org.postgresql" % "postgresql" % V.postgres % Runtime,
