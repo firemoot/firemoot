@@ -300,12 +300,19 @@ Ordered so each task ships behind a passing protocol/integration suite.
       a 429 instead of upgrading). Wired generously by default; limits are opt-in
       (`Main` enables them). Tested: bucket burst/limit/refill + key isolation, and
       per-key + per-user 429s through the real auth/routing stack. 65 green.
-- [ ] **M1.13 Protocol test suite**: raw-frame WS tests - handshake, heartbeat
-      reaping, resume-after-gap, multi-device read sync, subscribe/replay ordering.
-      This suite is the protocol's executable spec; grow it with every event type.
+- [x] **M1.13 Protocol test suite**: `WsProtocolSuite` - raw-frame tests over a
+      real Ember server: the `hello` handshake (identity + total unread), ordered
+      subscribe/replay then live, resume-from-a-seq (only the gap after it), the
+      client ping -> pong heartbeat, and multi-device fan-out of a user-directed
+      `read.updated` to all of a user's connections. This is the protocol's
+      executable spec; grow it with every new event type. (Resume-splice races and
+      typing/presence have their own dedicated suites from M1.7/M1.8.) 70 green.
 
-Exit criteria: every SPEC §3 "v1 In" line except media/dashboard demonstrably
-covered by an integration or protocol test.
+Exit criteria (met 10/06/2026): every SPEC §3 "v1 In" line except media/dashboard
+is covered by an integration or protocol test. **M1 chat core complete** - 70
+server tests green across auth, users/GDPR, channels/membership, message
+lifecycle/threads, reactions, read state, typing/presence, hardened resume,
+queries/FTS, webhooks, moderation and rate limiting.
 
 ---
 
