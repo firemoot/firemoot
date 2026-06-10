@@ -27,3 +27,24 @@ object UserRepo:
 
   val byId: Query[String, User] =
     sql"select $columns from users where id = $text".query(Codecs.user)
+
+  val touchLastActive: Command[String] =
+    sql"update users set last_active_at = now() where id = $text".command
+
+  /**
+   * GDPR scrub: erase the content of a user's authored messages while keeping the
+   * rows (seq, reply_count, thread structure) intact, so channels stay consistent.
+   */
+  val scrubAuthoredMessages: Command[String] =
+    sql"""
+      update messages
+      set text = null, custom = '{}'::jsonb, deleted_at = now()
+      where user_id = $text and deleted_at is null
+    """.command
+
+  /**
+   * Deletes the user, returning its id if it existed. Cascades remove the user's
+   * memberships and reactions; the FK nulls `user_id` on their messages.
+   */
+  val deleteReturningId: Query[String, String] =
+    sql"delete from users where id = $text returning id".query(text)

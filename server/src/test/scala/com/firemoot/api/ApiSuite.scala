@@ -95,6 +95,12 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               signingSecret = "wrong",
             ))
             _ = assertEquals(badSig.status, Status.Unauthorized)
+
+            delOk <- app.run(Signing.signedNoBody(DELETE, uri"/v1/users/alice", apiKey, secret))
+            _ = assertEquals(delOk.status, Status.NoContent)
+            delMissing <-
+              app.run(Signing.signedNoBody(DELETE, uri"/v1/users/alice", apiKey, secret))
+            _ = assertEquals(delMissing.status, Status.NotFound)
           yield
             assert(OpenApiDocs.compact.contains("/v1/users"), "openapi should document /v1/users")
             assert(OpenApiDocs.compact.contains("Firemoot"), "openapi should carry the title")

@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.js';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.js';
-import type { PostV1ChannelsData, PostV1ChannelsErrors, PostV1ChannelsResponses, PostV1ChannelsTypeIdMessagesData, PostV1ChannelsTypeIdMessagesErrors, PostV1ChannelsTypeIdMessagesResponses, PostV1UsersData, PostV1UsersErrors, PostV1UsersResponses } from './types.gen.js';
+import type { DeleteV1UsersIdData, DeleteV1UsersIdErrors, DeleteV1UsersIdResponses, PostV1ChannelsData, PostV1ChannelsErrors, PostV1ChannelsResponses, PostV1ChannelsTypeIdMessagesData, PostV1ChannelsTypeIdMessagesErrors, PostV1ChannelsTypeIdMessagesResponses, PostV1UsersData, PostV1UsersErrors, PostV1UsersResponses } from './types.gen.js';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -29,6 +29,11 @@ export const postV1Users = <ThrowOnError extends boolean = false>(options: Optio
         ...options.headers
     }
 });
+
+/**
+ * Delete a user (GDPR hard-delete)
+ */
+export const deleteV1UsersId = <ThrowOnError extends boolean = false>(options: Options<DeleteV1UsersIdData, ThrowOnError>): RequestResult<DeleteV1UsersIdResponses, DeleteV1UsersIdErrors, ThrowOnError> => (options.client ?? client).delete<DeleteV1UsersIdResponses, DeleteV1UsersIdErrors, ThrowOnError>({ url: '/v1/users/{id}', ...options });
 
 /**
  * Create a channel

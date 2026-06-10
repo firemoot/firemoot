@@ -53,6 +53,37 @@
         }
       }
     },
+    "/v1/users/{id}" : {
+      "delete" : {
+        "summary" : "Delete a user (GDPR hard-delete)",
+        "operationId" : "deleteV1UsersId",
+        "parameters" : [
+          {
+            "name" : "id",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "204" : {
+            "description" : ""
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/channels" : {
       "post" : {
         "summary" : "Create a channel",

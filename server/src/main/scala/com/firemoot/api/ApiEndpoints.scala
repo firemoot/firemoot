@@ -37,6 +37,12 @@ object ApiEndpoints:
       .out(jsonBody[User])
       .summary("Create or update a user")
 
+  val deleteUser =
+    base.delete
+      .in("users" / path[String]("id"))
+      .out(statusCode(StatusCode.NoContent))
+      .summary("Delete a user (GDPR hard-delete)")
+
   val createChannel =
     base.post
       .in("channels")
@@ -53,4 +59,4 @@ object ApiEndpoints:
       .out(jsonBody[Message])
       .summary("Send a message to a channel")
 
-  val all: List[AnyEndpoint] = List(upsertUser, createChannel, sendMessage)
+  val all: List[AnyEndpoint] = List(upsertUser, deleteUser, createChannel, sendMessage)

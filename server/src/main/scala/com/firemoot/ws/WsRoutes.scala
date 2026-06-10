@@ -39,6 +39,7 @@ final class WsRoutes(
     pool: Resource[IO, Session[IO]],
     jwtSecret: String,
     devDemo: Boolean,
+    userActive: String => IO[Unit],
 ):
 
   private object TokenParam extends OptionalQueryParamDecoderMatcher[String]("token")
@@ -80,6 +81,7 @@ final class WsRoutes(
       lastPong <- IO.realTime.flatMap(Ref[IO].of)
       me <- lookupUser(userId)
       now <- IO.realTimeInstant.map(_.atOffset(ZoneOffset.UTC))
+      _ <- userActive(userId)
       _ <- registry.register(connectionId, userId)
       _ <- outbound.offer(Some(text(WsFrames.hello(connectionId, now, me))))
       response <- build(wsb, connectionId, outbound, subscribed, lastPong)

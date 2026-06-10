@@ -121,6 +121,27 @@ export type PostV1UsersResponses = {
 
 export type PostV1UsersResponse = PostV1UsersResponses[keyof PostV1UsersResponses];
 
+export type DeleteV1UsersIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/users/{id}';
+};
+
+export type DeleteV1UsersIdErrors = {
+    default: Problem;
+};
+
+export type DeleteV1UsersIdError = DeleteV1UsersIdErrors[keyof DeleteV1UsersIdErrors];
+
+export type DeleteV1UsersIdResponses = {
+    204: void;
+};
+
+export type DeleteV1UsersIdResponse = DeleteV1UsersIdResponses[keyof DeleteV1UsersIdResponses];
+
 export type PostV1ChannelsData = {
     body: CreateChannelRequest;
     path?: never;

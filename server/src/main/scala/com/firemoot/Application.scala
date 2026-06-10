@@ -28,10 +28,20 @@ object Application:
       backplane: Backplane,
       registry: ConnectionRegistry,
       devDemo: Boolean = false,
+      onUserActive: String => IO[Unit] = _ => IO.unit,
   ): WebSocketBuilder2[IO] => HttpApp[IO] =
     val api = ApiRoutes(UserService(pool), ChannelService(pool), MessageService(pool, backplane))
     val securedApi = ServerHmacAuth(ApiKeys.fromConfig(cfg))(api.routes)
-    val ws = WsRoutes(backplane, registry, EventReplay(pool), pool, cfg.apiSecret.value, devDemo)
+    val ws =
+      WsRoutes(
+        backplane,
+        registry,
+        EventReplay(pool),
+        pool,
+        cfg.apiSecret.value,
+        devDemo,
+        onUserActive,
+      )
     val openApi = HttpRoutes.of[IO] { case GET -> Root / "v1" / "openapi.json" =>
       Ok(api.openApiJson).map(_.withContentType(`Content-Type`(MediaType.application.json)))
     }

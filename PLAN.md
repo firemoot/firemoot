@@ -191,9 +191,13 @@ Ordered so each task ships behind a passing protocol/integration suite.
       `application/problem+json` (RFC 9457). Membership/role authz isn't needed yet
       (current surface is all server-trusted); it lands with client-authenticated
       endpoints. Unit + integration tested; tapir `securityIn` removed (SDK regenerated).
-- [ ] **M1.2 Users**: upsert/delete (GDPR hard-delete: erase user row + authored
-      message text/custom → tombstone, cascade reactions/memberships; document
-      exactly what survives); `last_active_at` debounced writes.
+- [x] **M1.2 Users**: `DELETE /v1/users/{id}` GDPR hard-delete (one txn: scrub
+      authored messages' text/custom + tombstone them, then delete the user -
+      cascading memberships and reactions, nulling `user_id` on the messages).
+      **Survives:** message rows (seq, reply_count, created_at, thread structure)
+      with content erased. **Removed:** user row, memberships, reactions. 204 on
+      success, 404 if absent. `last_active_at` via `LastActiveTracker` (in-memory
+      per-user debounce, touched on WS connect). Unit + Testcontainers tested.
 - [ ] **M1.3 Channels**: full CRUD; member add/remove with roles
       (owner/moderator/member fixed set - SPEC open question 2 resolved as "simple");
       frozen (reject sends) and archived (hide from default queries) semantics;

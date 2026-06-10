@@ -1,10 +1,14 @@
 package com.firemoot
 
+import scala.concurrent.duration.*
+
 import cats.effect.{IO, IOApp}
 import com.firemoot.backplane.Backplane
 import com.firemoot.config.AppConfig
-import com.firemoot.db.{Database, Migrations}
+import com.firemoot.db.SessionSyntax.*
+import com.firemoot.db.{Database, Migrations, UserRepo}
 import com.firemoot.http.HttpServer
+import com.firemoot.service.LastActiveTracker
 import com.firemoot.ws.ConnectionRegistry
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
@@ -20,9 +24,19 @@ object Main extends IOApp.Simple:
       backplane <- Backplane.inProcess
       registry <- ConnectionRegistry.create
       _ <- Database.pool(cfg.db).use { pool =>
-        HttpServer.resource(
-          cfg.http,
-          Application.httpApp(cfg.server, pool, backplane, registry, cfg.devDemo),
-        ).useForever
+        for
+          lastActive <- LastActiveTracker.create(60.seconds) { userId =>
+            pool.use(_.run(UserRepo.touchLastActive, userId))
+          }
+          app = Application.httpApp(
+            cfg.server,
+            pool,
+            backplane,
+            registry,
+            cfg.devDemo,
+            lastActive.touch,
+          )
+          _ <- HttpServer.resource(cfg.http, app).useForever
+        yield ()
       }
     yield ()

@@ -29,6 +29,14 @@ final class ApiRoutes(
         .map(Right(_))
     }
 
+  private val deleteUserServer =
+    ApiEndpoints.deleteUser.serverLogic { id =>
+      users.delete(id).map {
+        case true => Right(())
+        case false => Left(Problem.of(404, "Not Found", Some(s"user '$id' does not exist")))
+      }
+    }
+
   private val createChannelServer =
     ApiEndpoints.createChannel.serverLogic { req =>
       channels
@@ -52,7 +60,7 @@ final class ApiRoutes(
 
   val routes: HttpRoutes[IO] =
     Http4sServerInterpreter[IO]().toRoutes(
-      List(upsertUserServer, createChannelServer, sendMessageServer)
+      List(upsertUserServer, deleteUserServer, createChannelServer, sendMessageServer)
     )
 
   val openApiJson: String = OpenApiDocs.compact
