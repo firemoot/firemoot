@@ -34,6 +34,13 @@ object WsFrames:
   def pong(serverTime: OffsetDateTime): Json =
     Json.obj("type" -> "pong".asJson, "serverTime" -> serverTime.asJson)
 
+  /**
+   * The resume point predates retained events: the gap can't be replayed, so the
+   * client must re-query the channel and re-subscribe from its current state.
+   */
+  def resyncRequired(cid: String): Json =
+    Json.obj("type" -> "resync_required".asJson, "cid" -> cid.asJson)
+
   // Client -> server
   enum ClientFrame:
     case Subscribe(channels: Map[String, Long])

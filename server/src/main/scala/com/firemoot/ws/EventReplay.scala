@@ -16,3 +16,7 @@ final class EventReplay(pool: Resource[IO, Session[IO]]):
     pool
       .use(_.runList(EventRepo.since, (cid, lastSeenSeq)))
       .map(_.map((seq, eventType, payload) => Event(eventType, cid, seq, payload)))
+
+  /** Lowest retained seq for the channel, if any. */
+  def earliestSeq(cid: String): IO[Option[Long]] =
+    pool.use(_.runUnique(EventRepo.earliest, cid))

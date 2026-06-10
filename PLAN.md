@@ -243,11 +243,19 @@ Ordered so each task ships behind a passing protocol/integration suite.
       as user-directed events, stamping `last_active_at` on disconnect. Unit
       (registry transitions, typing throttle/expiry/refresh) + Testcontainers
       (co-member fan-out) + end-to-end two-socket WS suite. 44 green.
-- [ ] **M1.8 Resume, hardened**: re-subscribe with last-seen seqs replays exactly the
-      gap then splices into live without loss or duplication (the race between
-      replay-read and live-publish is *the* correctness problem here - solve with
-      buffer-then-dedupe-by-seq, test with concurrent writes during resume);
-      `resync_required` path when the resume point predates event retention.
+- [x] **M1.8 Resume, hardened**: a re-subscribe enters a per-channel *replaying*
+      phase (`ResumeBuffer`) **before** the gap is read, so live persisted events
+      that land during the replay query are buffered rather than delivered - they
+      can't race ahead and either suppress an earlier replay event (loss) or
+      duplicate one. The gap is replayed, then the buffer is flushed in seq order
+      and deduped by a high-water seq; the flush re-checks the buffer between
+      drains so events arriving mid-flush are caught before the live phase begins,
+      making the handoff atomic (no reordering). Ephemeral events (seq 0, typing)
+      bypass the buffer. A resume point older than the retained events (`min(seq)`
+      gap) yields `resync_required`. Tested: deterministic race/dedupe/ordering +
+      a 60-event concurrent flush-vs-live property in `ResumeBufferSuite`, and an
+      end-to-end suite firing writes during re-subscribe (gapless, unique,
+      ordered) plus the resync path. 51 green.
 - [ ] **M1.9 Queries**: filter DSL (`type`, `cid $in`, `members $in`, custom-field
       equality) parsed into parameterised SQL - property-test against injection;
       sort by `last_message_at`; cursor pagination; message history `before_seq`

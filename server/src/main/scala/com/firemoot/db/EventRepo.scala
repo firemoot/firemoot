@@ -25,3 +25,10 @@ object EventRepo:
       where cid = $text and seq > $int8
       order by seq
     """.query(int8 *: text *: jsonb[Json])
+
+  /**
+   * Lowest retained seq for a channel; none if it has no events. Used to detect
+   * a resume point that predates the retention window (a gap we can't replay).
+   */
+  val earliest: Query[String, Option[Long]] =
+    sql"select min(seq) from channel_events where cid = $text".query(int8.opt)

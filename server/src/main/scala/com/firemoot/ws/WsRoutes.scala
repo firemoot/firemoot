@@ -11,7 +11,7 @@ import com.firemoot.auth.JwtAuth
 import com.firemoot.backplane.Backplane
 import com.firemoot.db.SessionSyntax.*
 import com.firemoot.db.{ReadRepo, UserRepo}
-import com.firemoot.domain.UuidV7
+import com.firemoot.domain.{Event, UuidV7}
 import com.firemoot.service.PresenceService
 import fs2.{Pipe, Stream}
 import io.circe.Json
@@ -29,9 +29,11 @@ import skunk.Session
  *   - `subscribe` replays persisted events past `last_seen_seq` then live-streams;
  *   - server pings every 25s and reaps a connection that misses ~2 pongs.
  *
- * The replay-then-live splice has a small race (an event arriving between the
- * replay read and joining the live set could duplicate); the client dedupes by
- * seq, and M1.8 hardens this with buffer-then-dedupe.
+ * The replay-then-live splice is made exact by [[ResumeBuffer]] (M1.8): live
+ * persisted events that arrive while the replay query is in flight are buffered,
+ * then flushed in seq order and deduped against what was replayed, so resume
+ * loses nothing and duplicates nothing. A resume point older than the retained
+ * events yields a `resync_required` frame instead.
  */
 final class WsRoutes(
     backplane: Backplane,
@@ -81,7 +83,7 @@ final class WsRoutes(
     for
       connectionId <- UuidV7.next.map(_.toString)
       outbound <- Queue.unbounded[IO, Option[WebSocketFrame]]
-      subscribed <- Ref[IO].of(Map.empty[String, Long])
+      resume <- ResumeBuffer.create
       lastPong <- IO.realTime.flatMap(Ref[IO].of)
       typing <- TypingTracker.create(userId, typingThrottle, typingExpiry)(backplane.publish)
       me <- lookupUser(userId)
@@ -93,7 +95,7 @@ final class WsRoutes(
       // nor fail the handshake. PresenceService is independently tested.
       _ <- presence.online(userId).attempt.void.start.whenA(first)
       _ <- outbound.offer(Some(text(WsFrames.hello(connectionId, now, me, totalUnread))))
-      response <- build(wsb, connectionId, userId, outbound, subscribed, lastPong, typing)
+      response <- build(wsb, connectionId, userId, outbound, resume, lastPong, typing)
     yield response
 
   private def build(
@@ -101,7 +103,7 @@ final class WsRoutes(
       connectionId: String,
       userId: String,
       outbound: Queue[IO, Option[WebSocketFrame]],
-      subscribed: Ref[IO, Map[String, Long]],
+      resume: ResumeBuffer,
       lastPong: Ref[IO, FiniteDuration],
       typing: TypingTracker,
   ): IO[Response[IO]] =
@@ -115,18 +117,21 @@ final class WsRoutes(
     val send: Stream[IO, WebSocketFrame] =
       Stream.fromQueueNoneTerminated(outbound).onFinalize(cleanup)
 
-    // Deliver user-directed events (target = this user) regardless of subscription;
-    // otherwise deliver channel-broadcast events for subscribed channels.
+    val emit: Event => IO[Unit] = event => outbound.offer(Some(text(WsFrames.event(event))))
+
+    // Routing per event:
+    //   - user-directed (target set): delivered to this user regardless of subscription;
+    //   - ephemeral channel event (seq 0, e.g. typing): delivered if subscribed, no dedupe;
+    //   - persisted channel event (seq > 0): routed through the resume buffer, which
+    //     buffers it while replaying and dedupes it once live.
     val live: Stream[IO, Nothing] =
       backplane.subscribe.evalMap { event =>
         event.target match
-          case Some(target) =>
-            if target == userId then outbound.offer(Some(text(WsFrames.event(event)))) else IO.unit
+          case Some(target) => emit(event).whenA(target == userId)
+          case None if event.seq == 0L =>
+            resume.isSubscribed(event.cid).flatMap(emit(event).whenA)
           case None =>
-            subscribed.get.flatMap { subs =>
-              if subs.contains(event.cid) then outbound.offer(Some(text(WsFrames.event(event))))
-              else IO.unit
-            }
+            resume.onLive(event).flatMap(emit(event).whenA)
       }.drain
 
     val pings: Stream[IO, Nothing] =
@@ -146,7 +151,7 @@ final class WsRoutes(
         .drain
 
     val receive: Pipe[IO, WebSocketFrame, Unit] = _.evalMap {
-      case WebSocketFrame.Text(body, _) => onClientFrame(body, subscribed, outbound, typing)
+      case WebSocketFrame.Text(body, _) => onClientFrame(body, resume, outbound, typing)
       case _: WebSocketFrame.Pong => IO.realTime.flatMap(lastPong.set)
       case _ => IO.unit
     }
@@ -155,24 +160,18 @@ final class WsRoutes(
 
   private def onClientFrame(
       body: String,
-      subscribed: Ref[IO, Map[String, Long]],
+      resume: ResumeBuffer,
       outbound: Queue[IO, Option[WebSocketFrame]],
       typing: TypingTracker,
   ): IO[Unit] =
     WsFrames.parse(body) match
       case WsFrames.ClientFrame.Subscribe(channels) =>
-        channels.toList.traverse_ { (cid, lastSeen) =>
-          // Join the live set first so events published during the (possibly slow)
-          // replay query are delivered, not dropped. Ordering is reconciled by the
-          // client's seq dedupe; M1.8 hardens the splice.
-          subscribed.update(_ + (cid -> lastSeen)) >>
-            replay
-              .since(cid, lastSeen)
-              .flatMap(_.traverse_(event => outbound.offer(Some(text(WsFrames.event(event))))))
-        }
+        channels.toList.traverse_((cid, lastSeen) =>
+          subscribeChannel(cid, lastSeen, resume, outbound)
+        )
       case WsFrames.ClientFrame.TypingStart(cid) =>
         // Only members of a channel the connection is watching may signal typing.
-        subscribed.get.flatMap(subs => typing.start(cid).whenA(subs.contains(cid)))
+        resume.isSubscribed(cid).flatMap(typing.start(cid).whenA)
       case WsFrames.ClientFrame.TypingStop(cid) =>
         typing.stop(cid)
       case WsFrames.ClientFrame.Ping =>
@@ -180,3 +179,29 @@ final class WsRoutes(
           outbound.offer(Some(text(WsFrames.pong(i.atOffset(ZoneOffset.UTC)))))
         )
       case WsFrames.ClientFrame.Unknown => IO.unit
+
+  /**
+   * Resumes one channel: enter the replaying phase first (so live events are
+   * buffered, not lost), replay the gap past `lastSeen`, then flush the buffer
+   * and go live. If the resume point predates retained events the gap is
+   * unrecoverable, so we send `resync_required` and go live from here.
+   */
+  private def subscribeChannel(
+      cid: String,
+      lastSeen: Long,
+      resume: ResumeBuffer,
+      outbound: Queue[IO, Option[WebSocketFrame]],
+  ): IO[Unit] =
+    val emit: Event => IO[Unit] = event => outbound.offer(Some(text(WsFrames.event(event))))
+    resume.beginReplay(cid) >>
+      replay.earliestSeq(cid).flatMap { earliest =>
+        val unrecoverable = lastSeen > 0 && earliest.exists(_ > lastSeen + 1)
+        if unrecoverable then
+          outbound.offer(Some(text(WsFrames.resyncRequired(cid)))) >>
+            resume.flush(cid, lastSeen)(emit)
+        else
+          replay.since(cid, lastSeen).flatMap { events =>
+            val watermark = events.lastOption.map(_.seq).getOrElse(lastSeen)
+            events.traverse_(emit) >> resume.flush(cid, watermark)(emit)
+          }
+      }
