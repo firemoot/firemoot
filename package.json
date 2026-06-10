@@ -13,6 +13,7 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
+    "codegen": "sbt -batch \"server/runMain com.firemoot.OpenApiExport openapi.json\" && pnpm --filter @firemoot/core run generate",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

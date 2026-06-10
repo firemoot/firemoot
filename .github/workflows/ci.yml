@@ -68,3 +68,47 @@ jobs:
 
       - name: Build
         run: pnpm -r build
+
+  codegen:
+    name: SDK codegen drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
+        with:
+          cache: true
+
+      - name: Cache Coursier and sbt
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/coursier
+            ~/.sbt
+          key: sbt-${{ runner.os }}-${{ hashFiles('build.sbt', 'project/**', '.scalafmt.conf') }}
+          restore-keys: sbt-${{ runner.os }}-
+
+      - name: Cache pnpm store
+        uses: actions/cache@v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install SDK dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Regenerate OpenAPI document
+        run: sbt -batch "server/runMain com.firemoot.OpenApiExport openapi.json"
+
+      - name: Regenerate @firemoot/core
+        run: pnpm --filter @firemoot/core run generate
+
+      - name: Fail on drift
+        run: |
+          git add -A -- openapi.json sdk/ts/core/src/generated
+          if ! git diff --cached --exit-code -- openapi.json sdk/ts/core/src/generated; then
+            echo "::error::OpenAPI spec or generated SDK is stale. Run the codegen steps locally and commit the result."
+            exit 1
+          fi

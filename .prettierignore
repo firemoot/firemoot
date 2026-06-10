@@ -4,6 +4,7 @@
 **/generated/
 pnpm-lock.yaml
 LICENSE
+openapi.json
 
 # Prose docs are hand-maintained (tables, deliberate wrapping); keep prettier off them.
 *.md

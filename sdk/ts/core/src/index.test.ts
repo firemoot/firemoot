@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
-import { CORE_PACKAGE } from "./index.js";
+import { postV1Users, postV1ChannelsTypeIdMessages } from "./index.js";
 
-test("core package surface is reachable", () => {
-  expect(CORE_PACKAGE).toBe("@firemoot/core");
+test("generated SDK operations are exported as functions", () => {
+  expect(typeof postV1Users).toBe("function");
+  expect(typeof postV1ChannelsTypeIdMessages).toBe("function");
 });

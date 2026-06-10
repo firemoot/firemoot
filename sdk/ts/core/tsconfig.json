@@ -3,7 +3,10 @@
   "compilerOptions": {
     "lib": ["ES2023", "DOM"],
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    // Generated transport (@hey-api/openapi-ts output) is not written to this
+    // strictness; the hand-written @firemoot/client keeps it on.
+    "exactOptionalPropertyTypes": false
   },
   "include": ["src"],
   "exclude": ["**/*.test.ts"]

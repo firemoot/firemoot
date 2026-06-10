@@ -1,8 +1,8 @@
 /**
- * @firemoot/core - generated transport layer.
+ * @firemoot/core - generated OpenAPI transport, types and REST client.
  *
- * The REST client and types are generated from the server's OpenAPI document
- * (`/v1/openapi.json`) in PLAN.md M0.8. This placeholder reserves the package
- * surface; generated modules will land under `src/generated`.
+ * Everything under `src/generated` is machine-written by @hey-api/openapi-ts from
+ * the server's OpenAPI document (PLAN.md M0.8) - do not hand-edit. Regenerate with
+ * `pnpm --filter @firemoot/core run generate`; CI fails on drift.
  */
-export const CORE_PACKAGE = "@firemoot/core" as const;
+export * from "./generated/index.js";

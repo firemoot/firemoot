@@ -1,0 +1,457 @@
+{
+  "openapi" : "3.1.0",
+  "info" : {
+    "title" : "Firemoot",
+    "version" : "0.1.0"
+  },
+  "paths" : {
+    "/v1/users" : {
+      "post" : {
+        "summary" : "Create or update a user",
+        "operationId" : "postV1Users",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpsertUserRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid value for: body",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security" : [
+          {
+            "apiKeyAuth" : [
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/channels" : {
+      "post" : {
+        "summary" : "Create a channel",
+        "operationId" : "postV1Channels",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateChannelRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Channel"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid value for: body",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security" : [
+          {
+            "apiKeyAuth" : [
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/channels/{type}/{id}/messages" : {
+      "post" : {
+        "summary" : "Send a message to a channel",
+        "operationId" : "postV1ChannelsTypeIdMessages",
+        "parameters" : [
+          {
+            "name" : "type",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "id",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SendMessageRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid value for: body",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security" : [
+          {
+            "apiKeyAuth" : [
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "Channel" : {
+        "title" : "Channel",
+        "type" : "object",
+        "required" : [
+          "cid",
+          "type",
+          "id",
+          "custom",
+          "frozen",
+          "archived",
+          "currentSeq",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties" : {
+          "cid" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "string"
+          },
+          "createdBy" : {
+            "type" : "string"
+          },
+          "custom" : {
+            
+          },
+          "frozen" : {
+            "type" : "boolean"
+          },
+          "archived" : {
+            "type" : "boolean"
+          },
+          "currentSeq" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "lastMessageAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "deletedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "CreateChannelRequest" : {
+        "title" : "CreateChannelRequest",
+        "type" : "object",
+        "required" : [
+          "type",
+          "id"
+        ],
+        "properties" : {
+          "type" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "string"
+          },
+          "createdBy" : {
+            "type" : "string"
+          },
+          "custom" : {
+            
+          }
+        }
+      },
+      "Message" : {
+        "title" : "Message",
+        "type" : "object",
+        "required" : [
+          "id",
+          "cid",
+          "seq",
+          "type",
+          "custom",
+          "attachments",
+          "replyCount",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "cid" : {
+            "type" : "string"
+          },
+          "seq" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "userId" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          },
+          "text" : {
+            "type" : "string"
+          },
+          "custom" : {
+            
+          },
+          "attachments" : {
+            
+          },
+          "parentMessageId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "replyCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "deletedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "Problem" : {
+        "title" : "Problem",
+        "type" : "object",
+        "required" : [
+          "type",
+          "title",
+          "status"
+        ],
+        "properties" : {
+          "type" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "detail" : {
+            "type" : "string"
+          }
+        }
+      },
+      "SendMessageRequest" : {
+        "title" : "SendMessageRequest",
+        "type" : "object",
+        "properties" : {
+          "userId" : {
+            "type" : "string"
+          },
+          "text" : {
+            "type" : "string"
+          },
+          "custom" : {
+            
+          },
+          "attachments" : {
+            
+          },
+          "parentMessageId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }
+      },
+      "UpsertUserRequest" : {
+        "title" : "UpsertUserRequest",
+        "type" : "object",
+        "required" : [
+          "id"
+        ],
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "image" : {
+            "type" : "string"
+          },
+          "role" : {
+            "type" : "string"
+          },
+          "custom" : {
+            
+          }
+        }
+      },
+      "User" : {
+        "title" : "User",
+        "type" : "object",
+        "required" : [
+          "id",
+          "role",
+          "custom",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "image" : {
+            "type" : "string"
+          },
+          "role" : {
+            "type" : "string"
+          },
+          "custom" : {
+            
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "lastActiveAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "deletedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      }
+    },
+    "securitySchemes" : {
+      "apiKeyAuth" : {
+        "type" : "apiKey",
+        "name" : "X-Firemoot-Key",
+        "in" : "header"
+      }
+    }
+  }
+}

@@ -4,10 +4,7 @@ import cats.effect.IO
 import com.firemoot.config.ServerConfig
 import com.firemoot.service.{ChannelService, MessageService, UserService}
 import io.circe.Json
-import io.circe.syntax.*
 import org.http4s.HttpRoutes
-import sttp.apispec.openapi.circe.*
-import sttp.tapir.docs.openapi.OpenAPIDocsInterpreter
 import sttp.tapir.server.http4s.Http4sServerInterpreter
 
 final class ApiRoutes(
@@ -64,9 +61,4 @@ final class ApiRoutes(
       List(upsertUserServer, createChannelServer, sendMessageServer)
     )
 
-  val openApiJson: String =
-    OpenAPIDocsInterpreter()
-      .toOpenAPI(ApiEndpoints.all, "Firemoot", "0.1.0")
-      .asJson
-      .deepDropNullValues
-      .noSpaces
+  val openApiJson: String = OpenApiDocs.compact

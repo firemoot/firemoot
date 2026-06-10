@@ -156,10 +156,12 @@ settled.
       `channel_events` then live-streams (full resume hardened in M1.8). Proven by
       an end-to-end Testcontainers suite: real Ember server + JDK WS client, REST
       send arrives as a `message.new` frame.
-- [ ] **M0.8 TS codegen pipeline**: `@firemoot/core` generated from
-      `/v1/openapi.json` via @hey-api/openapi-ts (fetch client); committed to the
-      repo; CI job regenerates and fails on `git diff --exit-code` (the drift gate
-      from SPEC §10).
+- [x] **M0.8 TS codegen pipeline**: `OpenApiExport` writes `openapi.json` from the
+      tapir endpoints (pure, no server boot); `@firemoot/core` generated from it via
+      @hey-api/openapi-ts (fetch client + types + sdk), committed under
+      `src/generated`. `pnpm codegen` regenerates both; the CI `codegen` job
+      regenerates and fails on any staged drift (SPEC §10). `exactOptionalPropertyTypes`
+      is relaxed for the generated package only.
 - [ ] **M0.9 Compose + boot-speed gate**: `deploy/compose/docker-compose.yml`
       (firemoot + postgres:17); CI job: `docker compose up -d`, assert `/healthz`
       OK in **<15s** from cold (SPEC §12's standing pitch-assertion).
