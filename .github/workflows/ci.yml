@@ -112,3 +112,46 @@ jobs:
             echo "::error::OpenAPI spec or generated SDK is stale. Run the codegen steps locally and commit the result."
             exit 1
           fi
+
+  boot:
+    name: Cold-boot gate (<15s)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
+        with:
+          cache: true
+
+      - name: Cache Coursier and sbt
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/coursier
+            ~/.sbt
+          key: sbt-${{ runner.os }}-${{ hashFiles('build.sbt', 'project/**', '.scalafmt.conf') }}
+          restore-keys: sbt-${{ runner.os }}-
+
+      - name: Build Docker image
+        run: sbt -batch "server/Docker/publishLocal"
+
+      - name: Boot the compose stack and assert healthy < 15s
+        working-directory: deploy/compose
+        run: |
+          start=$(date +%s)
+          docker compose up -d
+          healthy=0
+          for _ in $(seq 1 150); do
+            if curl -fsS localhost:6668/healthz >/dev/null 2>&1; then healthy=1; break; fi
+            sleep 0.2
+          done
+          elapsed=$(( $(date +%s) - start ))
+          echo "cold start to healthy: ${elapsed}s (healthy=${healthy})"
+          curl -fsS localhost:6668/readyz || true
+          docker compose logs firemoot || true
+          docker compose down -v
+          if [ "$healthy" -ne 1 ] || [ "$elapsed" -ge 15 ]; then
+            echo "::error::cold start to healthy exceeded 15s (or never became healthy)"
+            exit 1
+          fi

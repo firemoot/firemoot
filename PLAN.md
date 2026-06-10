@@ -162,9 +162,11 @@ settled.
       `src/generated`. `pnpm codegen` regenerates both; the CI `codegen` job
       regenerates and fails on any staged drift (SPEC §10). `exactOptionalPropertyTypes`
       is relaxed for the generated package only.
-- [ ] **M0.9 Compose + boot-speed gate**: `deploy/compose/docker-compose.yml`
-      (firemoot + postgres:17); CI job: `docker compose up -d`, assert `/healthz`
-      OK in **<15s** from cold (SPEC §12's standing pitch-assertion).
+- [x] **M0.9 Compose + boot-speed gate**: Docker image via sbt-native-packager
+      (`eclipse-temurin:25-jre`, JDK 25 RSS flags baked in); `deploy/compose/docker-compose.yml`
+      (firemoot + postgres:17, postgres healthcheck gating the app). CI `boot` job
+      builds the image, `docker compose up`, polls `/healthz`, and fails if cold
+      start to healthy is >=15s. Locally observed healthy in ~4s.
 - [ ] **M0.10 Two-tab demo**: minimal static page (server resource, dev-flag-gated)
       that connects, subscribes, sends via REST, renders `message.new`. This is the
       M0 demo artefact, not a product surface.

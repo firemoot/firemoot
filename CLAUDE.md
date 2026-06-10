@@ -25,6 +25,11 @@ After editing `mise.toml`, run `mise trust && mise install`.
   sbt-tpolecat turns warnings into errors when `CI=true`, so a clean local run
   (without `CI`) can still fail CI - always check with `CI=true`.
 - Formatting: `mise exec -- sbt scalafmtAll scalafmtSbt` and `mise exec -- pnpm run format`.
+- Codegen (OpenAPI -> `@firemoot/core`): `mise exec -- pnpm run codegen` (writes
+  `openapi.json` from the tapir endpoints, then regenerates `sdk/ts/core/src/generated`).
+  CI fails on drift, so commit the regenerated output.
+- Docker image + local stack: `mise exec -- sbt "server/Docker/publishLocal"` then
+  `docker compose -f deploy/compose/docker-compose.yml up`.
 
 ## Gotchas
 

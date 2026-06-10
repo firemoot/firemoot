@@ -1,0 +1,34 @@
+# Reference deployment (SPEC.md §11) and the exact stack downstream CI runs.
+# Build the image first: `sbt "server/Docker/publishLocal"` (tags firemoot:latest).
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: firemoot
+      POSTGRES_PASSWORD: firemoot
+      POSTGRES_DB: firemoot
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U firemoot -d firemoot"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    # No host port published by default; the app reaches Postgres over the compose network.
+
+  firemoot:
+    image: firemoot:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      FIREMOOT_HTTP_HOST: 0.0.0.0
+      FIREMOOT_HTTP_PORT: "6668"
+      FIREMOOT_DB_HOST: postgres
+      FIREMOOT_DB_PORT: "5432"
+      FIREMOOT_DB_NAME: firemoot
+      FIREMOOT_DB_USER: firemoot
+      FIREMOOT_DB_PASSWORD: firemoot
+      # Override these before exposing the instance publicly.
+      FIREMOOT_API_KEY_ID: firemoot
+      FIREMOOT_API_SECRET: change-me
+    ports:
+      - "6668:6668"
