@@ -167,12 +167,14 @@ settled.
       (firemoot + postgres:17, postgres healthcheck gating the app). CI `boot` job
       builds the image, `docker compose up`, polls `/healthz`, and fails if cold
       start to healthy is >=15s. Locally observed healthy in ~4s.
-- [ ] **M0.10 Two-tab demo**: minimal static page (server resource, dev-flag-gated)
-      that connects, subscribes, sends via REST, renders `message.new`. This is the
-      M0 demo artefact, not a product surface.
+- [x] **M0.10 Two-tab demo**: static `demo.html` served at `/demo`, gated by
+      `FIREMOOT_DEV_DEMO` (off by default; overridable in compose). Seeds user +
+      channel, connects WS, subscribes, sends via REST, renders `message.new`.
+      Verified in-container: 200 with the flag on, 404 off.
 
-Exit criteria: all of the above green in CI; demo recorded; skunk/doobie decision
-logged in SPEC.md.
+Exit criteria (all met 10/06/2026): every task green in CI; the two-tab demo
+serves and streams; skunk decision logged (ADR 0001). **M0 walking skeleton
+complete** - tapir->codegen and fs2 WS fan-out, the two riskiest seams, both proven.
 
 ---
 

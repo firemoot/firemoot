@@ -30,5 +30,7 @@ services:
       # Override these before exposing the instance publicly.
       FIREMOOT_API_KEY_ID: firemoot
       FIREMOOT_API_SECRET: change-me
+      # Set FIREMOOT_DEV_DEMO=true to serve the dev demo page at /demo (never in prod).
+      FIREMOOT_DEV_DEMO: ${FIREMOOT_DEV_DEMO:-false}
     ports:
       - "6668:6668"

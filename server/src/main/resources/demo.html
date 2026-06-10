@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Firemoot - M0 demo</title>
+    <style>
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        max-width: 640px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        color: #1a1a1a;
+      }
+      h1 {
+        font-size: 1.3rem;
+      }
+      .row {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+        flex-wrap: wrap;
+      }
+      input {
+        padding: 0.4rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      input#text {
+        flex: 1;
+      }
+      button {
+        padding: 0.4rem 0.8rem;
+        border: 0;
+        border-radius: 4px;
+        background: #c0392b;
+        color: #fff;
+        cursor: pointer;
+      }
+      button:disabled {
+        background: #aaa;
+        cursor: default;
+      }
+      #status {
+        font-size: 0.85rem;
+        color: #666;
+        margin: 0.5rem 0;
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+        border: 1px solid #eee;
+        border-radius: 6px;
+        min-height: 200px;
+      }
+      li {
+        padding: 0.4rem 0.6rem;
+        border-bottom: 1px solid #f2f2f2;
+      }
+      li .who {
+        font-weight: 600;
+        color: #c0392b;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Firemoot - M0 demo</h1>
+    <p>Open this page in two tabs with different users and watch messages stream live.</p>
+    <div class="row">
+      <input id="user" value="alice" placeholder="user id" />
+      <input id="channel" value="messaging:general" placeholder="type:id" />
+      <input id="key" value="firemoot" placeholder="api key" />
+      <button id="connect">Connect</button>
+    </div>
+    <div id="status">disconnected</div>
+    <ul id="messages"></ul>
+    <div class="row">
+      <input id="text" placeholder="type a message and hit Send" />
+      <button id="send" disabled>Send</button>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let ws;
+
+      function add(who, text) {
+        const li = document.createElement("li");
+        const w = document.createElement("span");
+        w.className = "who";
+        w.textContent = who + ": ";
+        li.appendChild(w);
+        li.appendChild(document.createTextNode(text));
+        $("messages").appendChild(li);
+        li.scrollIntoView();
+      }
+
+      function post(path, body) {
+        return fetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Firemoot-Key": $("key").value },
+          body: JSON.stringify(body),
+        });
+      }
+
+      $("connect").onclick = async () => {
+        const user = $("user").value.trim();
+        const cid = $("channel").value.trim();
+        const [type, id] = cid.split(":");
+
+        await post("/v1/users", { id: user, name: user });
+        // A second tab creating the same channel returns a conflict - harmless here.
+        await post("/v1/channels", { type, id, createdBy: user });
+
+        ws = new WebSocket(`ws://${location.host}/v1/ws?user=${encodeURIComponent(user)}`);
+        ws.onopen = () => ($("status").textContent = "connected as " + user);
+        ws.onclose = () => {
+          $("status").textContent = "disconnected";
+          $("send").disabled = true;
+        };
+        ws.onmessage = (e) => {
+          const frame = JSON.parse(e.data);
+          if (frame.type === "hello") {
+            ws.send(JSON.stringify({ type: "subscribe", channels: { [cid]: 0 } }));
+            $("send").disabled = false;
+          } else if (frame.type === "message.new") {
+            add(frame.data.userId || "?", frame.data.text || "");
+          }
+        };
+      };
+
+      $("send").onclick = async () => {
+        const [type, id] = $("channel").value.trim().split(":");
+        const text = $("text").value;
+        if (!text) return;
+        await post(`/v1/channels/${type}/${id}/messages`, { userId: $("user").value.trim(), text });
+        $("text").value = "";
+      };
+      $("text").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") $("send").click();
+      });
+    </script>
+  </body>
+</html>

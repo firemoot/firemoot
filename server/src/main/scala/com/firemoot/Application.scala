@@ -5,7 +5,7 @@ import cats.syntax.semigroupk.*
 import com.firemoot.api.ApiRoutes
 import com.firemoot.backplane.Backplane
 import com.firemoot.config.ServerConfig
-import com.firemoot.http.HealthRoutes
+import com.firemoot.http.{DemoRoutes, HealthRoutes}
 import com.firemoot.service.{ChannelService, MessageService, UserService}
 import com.firemoot.ws.{ConnectionRegistry, EventReplay, WsRoutes}
 import org.http4s.dsl.io.*
@@ -26,6 +26,7 @@ object Application:
       pool: Resource[IO, Session[IO]],
       backplane: Backplane,
       registry: ConnectionRegistry,
+      devDemo: Boolean = false,
   ): WebSocketBuilder2[IO] => HttpApp[IO] =
     val api = ApiRoutes(
       cfg,
@@ -37,8 +38,10 @@ object Application:
     val openApi = HttpRoutes.of[IO] { case GET -> Root / "v1" / "openapi.json" =>
       Ok(api.openApiJson).map(_.withContentType(`Content-Type`(MediaType.application.json)))
     }
+    val demo = if devDemo then DemoRoutes.routes else HttpRoutes.empty[IO]
 
     wsb =>
       Logger.httpApp(logHeaders = true, logBody = false)(
-        (HealthRoutes(pool).routes <+> api.routes <+> openApi <+> ws.routes(wsb)).orNotFound
+        (HealthRoutes(pool).routes <+> api.routes <+> openApi <+> demo <+>
+          ws.routes(wsb)).orNotFound
       )

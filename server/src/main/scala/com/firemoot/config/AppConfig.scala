@@ -17,7 +17,12 @@ final case class DbConfig(
 
 final case class ServerConfig(apiKeyId: String, apiSecret: Secret[String])
 
-final case class AppConfig(http: HttpConfig, db: DbConfig, server: ServerConfig)
+final case class AppConfig(
+    http: HttpConfig,
+    db: DbConfig,
+    server: ServerConfig,
+    devDemo: Boolean,
+)
 
 object AppConfig:
 
@@ -43,5 +48,8 @@ object AppConfig:
       env("FIREMOOT_API_SECRET").default("dev-secret").secret,
     ).parMapN(ServerConfig.apply)
 
+  private val devDemo: ConfigValue[Effect, Boolean] =
+    env("FIREMOOT_DEV_DEMO").as[Boolean].default(false)
+
   val load: IO[AppConfig] =
-    (http, db, server).parMapN(AppConfig.apply).load[IO]
+    (http, db, server, devDemo).parMapN(AppConfig.apply).load[IO]

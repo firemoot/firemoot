@@ -22,7 +22,7 @@ object Main extends IOApp.Simple:
       _ <- Database.pool(cfg.db).use { pool =>
         HttpServer.resource(
           cfg.http,
-          Application.httpApp(cfg.server, pool, backplane, registry),
+          Application.httpApp(cfg.server, pool, backplane, registry, cfg.devDemo),
         ).useForever
       }
     yield ()
