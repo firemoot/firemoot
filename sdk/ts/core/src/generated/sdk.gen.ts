@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.js';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.js';
-import type { DeleteV1ChannelsTypeIdData, DeleteV1ChannelsTypeIdErrors, DeleteV1ChannelsTypeIdMembersUseridData, DeleteV1ChannelsTypeIdMembersUseridErrors, DeleteV1ChannelsTypeIdMembersUseridResponses, DeleteV1ChannelsTypeIdMessagesMessageidData, DeleteV1ChannelsTypeIdMessagesMessageidErrors, DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridData, DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridErrors, DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridResponses, DeleteV1ChannelsTypeIdMessagesMessageidResponses, DeleteV1ChannelsTypeIdResponses, DeleteV1UsersIdData, DeleteV1UsersIdErrors, DeleteV1UsersIdResponses, GetV1ChannelsTypeIdData, GetV1ChannelsTypeIdErrors, GetV1ChannelsTypeIdResponses, PatchV1ChannelsTypeIdData, PatchV1ChannelsTypeIdErrors, PatchV1ChannelsTypeIdMessagesMessageidData, PatchV1ChannelsTypeIdMessagesMessageidErrors, PatchV1ChannelsTypeIdMessagesMessageidResponses, PatchV1ChannelsTypeIdResponses, PostV1ChannelsData, PostV1ChannelsErrors, PostV1ChannelsResponses, PostV1ChannelsTypeIdMembersData, PostV1ChannelsTypeIdMembersErrors, PostV1ChannelsTypeIdMembersResponses, PostV1ChannelsTypeIdMessagesData, PostV1ChannelsTypeIdMessagesErrors, PostV1ChannelsTypeIdMessagesMessageidReactionsData, PostV1ChannelsTypeIdMessagesMessageidReactionsErrors, PostV1ChannelsTypeIdMessagesMessageidReactionsResponses, PostV1ChannelsTypeIdMessagesResponses, PostV1ChannelsTypeIdReadData, PostV1ChannelsTypeIdReadErrors, PostV1ChannelsTypeIdReadResponses, PostV1UsersData, PostV1UsersErrors, PostV1UsersResponses } from './types.gen.js';
+import type { DeleteV1ChannelsTypeIdData, DeleteV1ChannelsTypeIdErrors, DeleteV1ChannelsTypeIdMembersUseridData, DeleteV1ChannelsTypeIdMembersUseridErrors, DeleteV1ChannelsTypeIdMembersUseridResponses, DeleteV1ChannelsTypeIdMessagesMessageidData, DeleteV1ChannelsTypeIdMessagesMessageidErrors, DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridData, DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridErrors, DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridResponses, DeleteV1ChannelsTypeIdMessagesMessageidResponses, DeleteV1ChannelsTypeIdResponses, DeleteV1UsersIdData, DeleteV1UsersIdErrors, DeleteV1UsersIdResponses, GetV1ChannelsTypeIdData, GetV1ChannelsTypeIdErrors, GetV1ChannelsTypeIdMessagesData, GetV1ChannelsTypeIdMessagesErrors, GetV1ChannelsTypeIdMessagesResponses, GetV1ChannelsTypeIdResponses, PatchV1ChannelsTypeIdData, PatchV1ChannelsTypeIdErrors, PatchV1ChannelsTypeIdMessagesMessageidData, PatchV1ChannelsTypeIdMessagesMessageidErrors, PatchV1ChannelsTypeIdMessagesMessageidResponses, PatchV1ChannelsTypeIdResponses, PostV1ChannelsData, PostV1ChannelsErrors, PostV1ChannelsQueryData, PostV1ChannelsQueryErrors, PostV1ChannelsQueryResponses, PostV1ChannelsResponses, PostV1ChannelsTypeIdMembersData, PostV1ChannelsTypeIdMembersErrors, PostV1ChannelsTypeIdMembersResponses, PostV1ChannelsTypeIdMessagesData, PostV1ChannelsTypeIdMessagesErrors, PostV1ChannelsTypeIdMessagesMessageidReactionsData, PostV1ChannelsTypeIdMessagesMessageidReactionsErrors, PostV1ChannelsTypeIdMessagesMessageidReactionsResponses, PostV1ChannelsTypeIdMessagesResponses, PostV1ChannelsTypeIdReadData, PostV1ChannelsTypeIdReadErrors, PostV1ChannelsTypeIdReadResponses, PostV1SearchData, PostV1SearchErrors, PostV1SearchResponses, PostV1UsersData, PostV1UsersErrors, PostV1UsersResponses } from './types.gen.js';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -87,6 +87,11 @@ export const postV1ChannelsTypeIdMembers = <ThrowOnError extends boolean = false
 export const deleteV1ChannelsTypeIdMembersUserid = <ThrowOnError extends boolean = false>(options: Options<DeleteV1ChannelsTypeIdMembersUseridData, ThrowOnError>): RequestResult<DeleteV1ChannelsTypeIdMembersUseridResponses, DeleteV1ChannelsTypeIdMembersUseridErrors, ThrowOnError> => (options.client ?? client).delete<DeleteV1ChannelsTypeIdMembersUseridResponses, DeleteV1ChannelsTypeIdMembersUseridErrors, ThrowOnError>({ url: '/v1/channels/{type}/{id}/members/{userId}', ...options });
 
 /**
+ * List a channel's message history (newest first), paginated by seq
+ */
+export const getV1ChannelsTypeIdMessages = <ThrowOnError extends boolean = false>(options: Options<GetV1ChannelsTypeIdMessagesData, ThrowOnError>): RequestResult<GetV1ChannelsTypeIdMessagesResponses, GetV1ChannelsTypeIdMessagesErrors, ThrowOnError> => (options.client ?? client).get<GetV1ChannelsTypeIdMessagesResponses, GetV1ChannelsTypeIdMessagesErrors, ThrowOnError>({ url: '/v1/channels/{type}/{id}/messages', ...options });
+
+/**
  * Send a message to a channel
  */
 export const postV1ChannelsTypeIdMessages = <ThrowOnError extends boolean = false>(options: Options<PostV1ChannelsTypeIdMessagesData, ThrowOnError>): RequestResult<PostV1ChannelsTypeIdMessagesResponses, PostV1ChannelsTypeIdMessagesErrors, ThrowOnError> => (options.client ?? client).post<PostV1ChannelsTypeIdMessagesResponses, PostV1ChannelsTypeIdMessagesErrors, ThrowOnError>({
@@ -137,6 +142,32 @@ export const deleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUserid 
  */
 export const postV1ChannelsTypeIdRead = <ThrowOnError extends boolean = false>(options: Options<PostV1ChannelsTypeIdReadData, ThrowOnError>): RequestResult<PostV1ChannelsTypeIdReadResponses, PostV1ChannelsTypeIdReadErrors, ThrowOnError> => (options.client ?? client).post<PostV1ChannelsTypeIdReadResponses, PostV1ChannelsTypeIdReadErrors, ThrowOnError>({
     url: '/v1/channels/{type}/{id}/read',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Query channels with filters, sorting and cursor pagination
+ */
+export const postV1ChannelsQuery = <ThrowOnError extends boolean = false>(options: Options<PostV1ChannelsQueryData, ThrowOnError>): RequestResult<PostV1ChannelsQueryResponses, PostV1ChannelsQueryErrors, ThrowOnError> => (options.client ?? client).post<PostV1ChannelsQueryResponses, PostV1ChannelsQueryErrors, ThrowOnError>({
+    url: '/v1/channels/query',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Full-text message search
+ *
+ * Ranked full-text search using PostgreSQL websearch syntax and the 'simple' configuration. Intentionally lower-fidelity than a dedicated search engine: no stemming, language-aware matching or typo tolerance.
+ */
+export const postV1Search = <ThrowOnError extends boolean = false>(options: Options<PostV1SearchData, ThrowOnError>): RequestResult<PostV1SearchResponses, PostV1SearchErrors, ThrowOnError> => (options.client ?? client).post<PostV1SearchResponses, PostV1SearchErrors, ThrowOnError>({
+    url: '/v1/search',
     ...options,
     headers: {
         'Content-Type': 'application/json',

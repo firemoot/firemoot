@@ -12,6 +12,7 @@ import com.firemoot.domain.{Channel, Message, User}
 import com.firemoot.service.{
   ChannelService,
   MessageService,
+  QueryService,
   ReactionService,
   ReadService,
   UserService,
@@ -59,6 +60,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               MessageService(pool, backplane),
               ReactionService(pool, backplane),
               ReadService(pool, backplane),
+              QueryService(pool),
             )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
 
@@ -133,6 +135,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               MessageService(pool, backplane),
               ReactionService(pool, backplane),
               ReadService(pool, backplane),
+              QueryService(pool),
             )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val chPath = "/v1/channels/messaging/room2"
@@ -192,6 +195,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               MessageService(pool, backplane),
               ReactionService(pool, backplane),
               ReadService(pool, backplane),
+              QueryService(pool),
             )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val msgs = "/v1/channels/messaging/room3/messages"
@@ -245,6 +249,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
             MessageService(pool, backplane),
             ReactionService(pool, backplane),
             ReadService(pool, backplane),
+            QueryService(pool),
           )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val msgs = "/v1/channels/messaging/room4/messages"
@@ -298,6 +303,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
             MessageService(pool, backplane),
             ReactionService(pool, backplane),
             ReadService(pool, backplane),
+            QueryService(pool),
           )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
 
@@ -320,6 +326,60 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
             _ = assertEquals(ok.status, Status.Ok)
             state <- ok.as[ReadStateResponse]
           yield assertEquals(state.unreadCount, 0L)
+        }
+      }
+    }
+  }
+
+  test("query, history and search endpoints are wired through the stack") {
+    withContainers { pg =>
+      val cfg = dbConfig(pg)
+      Backplane.inProcess.flatMap { backplane =>
+        Migrations.run(cfg) >> Database.pool(cfg).use { pool =>
+          val api = ApiRoutes(
+            UserService(pool),
+            ChannelService(pool, backplane),
+            MessageService(pool, backplane),
+            ReactionService(pool, backplane),
+            ReadService(pool, backplane),
+            QueryService(pool),
+          )
+          val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
+          val msgs = "/v1/channels/qt/qroom/messages"
+          def get(path: String) =
+            Signing.signedNoBody(GET, Uri.unsafeFromString(path), apiKey, secret)
+
+          for
+            _ <- app.run(post("/v1/users", UpsertUserRequest("ivy", None, None, None, None)))
+            _ <-
+              app.run(post("/v1/channels", CreateChannelRequest("qt", "qroom", Some("ivy"), None)))
+            _ <- app.run(post(
+              msgs,
+              SendMessageRequest(Some("ivy"), Some("hello world"), None, None, None),
+            ))
+            _ <- app.run(post(
+              msgs,
+              SendMessageRequest(Some("ivy"), Some("second message"), None, None, None),
+            ))
+
+            queryRes <- app.run(post(
+              "/v1/channels/query",
+              ChannelQuery(Some("qt"), None, None, None, None, None, None),
+            ))
+            _ = assertEquals(queryRes.status, Status.Ok)
+            page <- queryRes.as[ChannelPage]
+            _ = assertEquals(page.channels.map(_.cid), List("qt:qroom"))
+
+            histRes <- app.run(get(s"$msgs?limit=1"))
+            _ = assertEquals(histRes.status, Status.Ok)
+            hist <- histRes.as[MessagePage]
+            _ = assertEquals(hist.messages.map(_.text), List(Some("second message")))
+            _ = assert(hist.nextBeforeSeq.isDefined, "a full page yields a cursor")
+
+            searchRes <- app.run(post("/v1/search", SearchRequest("hello", Some("qt:qroom"), None)))
+            _ = assertEquals(searchRes.status, Status.Ok)
+            hits <- searchRes.as[SearchPage]
+          yield assertEquals(hits.hits.map(_.message.text), List(Some("hello world")))
         }
       }
     }

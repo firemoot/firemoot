@@ -125,6 +125,33 @@ object ApiEndpoints:
       .out(jsonBody[ReadStateResponse])
       .summary("Mark a channel read up to a seq (default: latest)")
 
+  val queryChannels =
+    base.post
+      .in("channels" / "query")
+      .in(jsonBody[ChannelQuery])
+      .out(jsonBody[ChannelPage])
+      .summary("Query channels with filters, sorting and cursor pagination")
+
+  val listMessages =
+    base.get
+      .in(channelPath / "messages")
+      .in(query[Option[Long]]("before_seq"))
+      .in(query[Option[Int]]("limit"))
+      .out(jsonBody[MessagePage])
+      .summary("List a channel's message history (newest first), paginated by seq")
+
+  val searchMessages =
+    base.post
+      .in("search")
+      .in(jsonBody[SearchRequest])
+      .out(jsonBody[SearchPage])
+      .summary("Full-text message search")
+      .description(
+        "Ranked full-text search using PostgreSQL websearch syntax and the " +
+          "'simple' configuration. Intentionally lower-fidelity than a dedicated " +
+          "search engine: no stemming, language-aware matching or typo tolerance."
+      )
+
   val all: List[AnyEndpoint] = List(
     upsertUser,
     deleteUser,
@@ -140,4 +167,7 @@ object ApiEndpoints:
     addReaction,
     removeReaction,
     markRead,
+    queryChannels,
+    listMessages,
+    searchMessages,
   )

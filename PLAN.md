@@ -256,11 +256,19 @@ Ordered so each task ships behind a passing protocol/integration suite.
       a 60-event concurrent flush-vs-live property in `ResumeBufferSuite`, and an
       end-to-end suite firing writes during re-subscribe (gapless, unique,
       ordered) plus the resync path. 51 green.
-- [ ] **M1.9 Queries**: filter DSL (`type`, `cid $in`, `members $in`, custom-field
-      equality) parsed into parameterised SQL - property-test against injection;
-      sort by `last_message_at`; cursor pagination; message history `before_seq`
-      pagination; FTS search endpoint (`websearch_to_tsquery`, ranked, documented as
-      lower-fidelity).
+- [x] **M1.9 Queries**: `POST /v1/channels/query` filters on `type`, `cids $in`,
+      `members $in`, `custom` (jsonb `@>` containment) and `archived`, sorts by
+      most-recent activity (`coalesce(last_message_at, created_at)`) and pages by a
+      keyset cursor. **Injection-safe by construction**: every value is a bound
+      parameter and the statement shape is fixed (list filters ride in one jsonb
+      array param expanded with `jsonb_array_elements_text`; a NULL param means "no
+      constraint"), so there is no dynamic SQL assembly - covered by an adversarial
+      literal-matching test. `GET /v1/channels/{type}/{id}/messages?before_seq=&limit=`
+      is keyset message history (newest first, excludes deleted). `POST /v1/search`
+      is ranked FTS via `websearch_to_tsquery('simple', ...)` against the stored
+      `text_search` vector, with an optional cid filter, documented as
+      lower-fidelity (no stemming). New tapir endpoints regenerated into
+      `@firemoot/core`. 57 green.
 - [ ] **M1.10 Webhooks**: endpoint registry; enqueue persisted events (+`user.flagged`)
       into `webhook_deliveries`; SKIP LOCKED worker pool; `X-Firemoot-Signature:
       sha256=HMAC(secret, body)`; 5s timeout; retries 1m/5m/30m/2h → dead-letter

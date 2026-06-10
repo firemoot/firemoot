@@ -45,6 +45,8 @@ and skip-gate bypasses with a local Firemoot instance.
 | Scale model v1 | Single node | Backplane is an internal interface stub; Postgres LISTEN/NOTIFY is the planned first multi-node step, Redis pub/sub after. Not v1 work |
 | Tenancy | Single tenant, API key + secret pairs | Stream-style multi-app tenancy deferred |
 | Default port | 6668 | "MOOT" on a phone keypad is 6668; neighbourly nod to IRC's 6667. Avoids overloaded dev defaults |
+| Query filter DSL (added 10/06/2026, M1.9) | Fixed-shape parameterised SQL, not dynamic assembly | The channel filter (`type`/`cids`/`members`/`custom`/`archived`) compiles to a single prepared statement: list filters ride in one jsonb array param (`jsonb_array_elements_text`), custom uses jsonb containment (`@>`), a NULL param means "no constraint". No identifier or value is ever interpolated, so injection-safety is structural, not validated. Channel paging is a keyset cursor on `coalesce(last_message_at, created_at), cid` |
+| Full-text search (added 10/06/2026, M1.9) | Postgres FTS, `simple` config, websearch syntax | `websearch_to_tsquery('simple', ...)` over a stored `text_search` GIN vector, `ts_rank`ed. Deliberately lower-fidelity (no stemming/language awareness/typo tolerance) and documented as such; a dedicated search engine is out of scope for v1 |
 
 ## 3. Scope
 

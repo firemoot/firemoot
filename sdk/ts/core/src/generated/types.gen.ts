@@ -39,6 +39,35 @@ export type Channel = {
 };
 
 /**
+ * ChannelCursor
+ */
+export type ChannelCursor = {
+    ts: string;
+    cid: string;
+};
+
+/**
+ * ChannelPage
+ */
+export type ChannelPage = {
+    channels?: Array<Channel>;
+    nextCursor?: ChannelCursor;
+};
+
+/**
+ * ChannelQuery
+ */
+export type ChannelQuery = {
+    type?: string;
+    cids?: Array<string>;
+    members?: Array<string>;
+    custom?: unknown;
+    archived?: boolean;
+    limit?: number;
+    cursor?: ChannelCursor;
+};
+
+/**
  * CreateChannelRequest
  */
 export type CreateChannelRequest = {
@@ -91,6 +120,14 @@ export type Message = {
 };
 
 /**
+ * MessagePage
+ */
+export type MessagePage = {
+    messages?: Array<Message>;
+    nextBeforeSeq?: number;
+};
+
+/**
  * Problem
  */
 export type Problem = {
@@ -115,6 +152,30 @@ export type ReadStateResponse = {
     lastReadSeq: number;
     unreadCount: number;
     totalUnread: number;
+};
+
+/**
+ * SearchHit
+ */
+export type SearchHit = {
+    message: Message;
+    score: number;
+};
+
+/**
+ * SearchPage
+ */
+export type SearchPage = {
+    hits?: Array<SearchHit>;
+};
+
+/**
+ * SearchRequest
+ */
+export type SearchRequest = {
+    query: string;
+    cid?: string;
+    limit?: number;
 };
 
 /**
@@ -350,6 +411,35 @@ export type DeleteV1ChannelsTypeIdMembersUseridResponses = {
 
 export type DeleteV1ChannelsTypeIdMembersUseridResponse = DeleteV1ChannelsTypeIdMembersUseridResponses[keyof DeleteV1ChannelsTypeIdMembersUseridResponses];
 
+export type GetV1ChannelsTypeIdMessagesData = {
+    body?: never;
+    path: {
+        type: string;
+        id: string;
+    };
+    query?: {
+        before_seq?: number;
+        limit?: number;
+    };
+    url: '/v1/channels/{type}/{id}/messages';
+};
+
+export type GetV1ChannelsTypeIdMessagesErrors = {
+    /**
+     * Invalid value for: query parameter before_seq, Invalid value for: query parameter limit
+     */
+    400: string;
+    default: Problem;
+};
+
+export type GetV1ChannelsTypeIdMessagesError = GetV1ChannelsTypeIdMessagesErrors[keyof GetV1ChannelsTypeIdMessagesErrors];
+
+export type GetV1ChannelsTypeIdMessagesResponses = {
+    200: MessagePage;
+};
+
+export type GetV1ChannelsTypeIdMessagesResponse = GetV1ChannelsTypeIdMessagesResponses[keyof GetV1ChannelsTypeIdMessagesResponses];
+
 export type PostV1ChannelsTypeIdMessagesData = {
     body: SendMessageRequest;
     path: {
@@ -511,3 +601,49 @@ export type PostV1ChannelsTypeIdReadResponses = {
 };
 
 export type PostV1ChannelsTypeIdReadResponse = PostV1ChannelsTypeIdReadResponses[keyof PostV1ChannelsTypeIdReadResponses];
+
+export type PostV1ChannelsQueryData = {
+    body: ChannelQuery;
+    path?: never;
+    query?: never;
+    url: '/v1/channels/query';
+};
+
+export type PostV1ChannelsQueryErrors = {
+    /**
+     * Invalid value for: body
+     */
+    400: string;
+    default: Problem;
+};
+
+export type PostV1ChannelsQueryError = PostV1ChannelsQueryErrors[keyof PostV1ChannelsQueryErrors];
+
+export type PostV1ChannelsQueryResponses = {
+    200: ChannelPage;
+};
+
+export type PostV1ChannelsQueryResponse = PostV1ChannelsQueryResponses[keyof PostV1ChannelsQueryResponses];
+
+export type PostV1SearchData = {
+    body: SearchRequest;
+    path?: never;
+    query?: never;
+    url: '/v1/search';
+};
+
+export type PostV1SearchErrors = {
+    /**
+     * Invalid value for: body
+     */
+    400: string;
+    default: Problem;
+};
+
+export type PostV1SearchError = PostV1SearchErrors[keyof PostV1SearchErrors];
+
+export type PostV1SearchResponses = {
+    200: SearchPage;
+};
+
+export type PostV1SearchResponse = PostV1SearchResponses[keyof PostV1SearchResponses];

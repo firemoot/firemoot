@@ -386,6 +386,78 @@
       }
     },
     "/v1/channels/{type}/{id}/messages" : {
+      "get" : {
+        "summary" : "List a channel's message history (newest first), paginated by seq",
+        "operationId" : "getV1ChannelsTypeIdMessages",
+        "parameters" : [
+          {
+            "name" : "type",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "id",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "before_seq",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "integer",
+              "format" : "int64"
+            }
+          },
+          {
+            "name" : "limit",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "integer",
+              "format" : "int32"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MessagePage"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid value for: query parameter before_seq, Invalid value for: query parameter limit",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
       "post" : {
         "summary" : "Send a message to a channel",
         "operationId" : "postV1ChannelsTypeIdMessages",
@@ -803,6 +875,103 @@
           }
         }
       }
+    },
+    "/v1/channels/query" : {
+      "post" : {
+        "summary" : "Query channels with filters, sorting and cursor pagination",
+        "operationId" : "postV1ChannelsQuery",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ChannelQuery"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChannelPage"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid value for: body",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/search" : {
+      "post" : {
+        "summary" : "Full-text message search",
+        "description" : "Ranked full-text search using PostgreSQL websearch syntax and the 'simple' configuration. Intentionally lower-fidelity than a dedicated search engine: no stemming, language-aware matching or typo tolerance.",
+        "operationId" : "postV1Search",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SearchRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SearchPage"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid value for: body",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components" : {
@@ -893,6 +1062,72 @@
           "deletedAt" : {
             "type" : "string",
             "format" : "date-time"
+          }
+        }
+      },
+      "ChannelCursor" : {
+        "title" : "ChannelCursor",
+        "type" : "object",
+        "required" : [
+          "ts",
+          "cid"
+        ],
+        "properties" : {
+          "ts" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "cid" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ChannelPage" : {
+        "title" : "ChannelPage",
+        "type" : "object",
+        "properties" : {
+          "channels" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Channel"
+            }
+          },
+          "nextCursor" : {
+            "$ref" : "#/components/schemas/ChannelCursor"
+          }
+        }
+      },
+      "ChannelQuery" : {
+        "title" : "ChannelQuery",
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string"
+          },
+          "cids" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "members" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "custom" : {
+            
+          },
+          "archived" : {
+            "type" : "boolean"
+          },
+          "limit" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "cursor" : {
+            "$ref" : "#/components/schemas/ChannelCursor"
           }
         }
       },
@@ -1017,6 +1252,22 @@
           }
         }
       },
+      "MessagePage" : {
+        "title" : "MessagePage",
+        "type" : "object",
+        "properties" : {
+          "messages" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Message"
+            }
+          },
+          "nextBeforeSeq" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
       "Problem" : {
         "title" : "Problem",
         "type" : "object",
@@ -1078,6 +1329,54 @@
           "totalUnread" : {
             "type" : "integer",
             "format" : "int64"
+          }
+        }
+      },
+      "SearchHit" : {
+        "title" : "SearchHit",
+        "type" : "object",
+        "required" : [
+          "message",
+          "score"
+        ],
+        "properties" : {
+          "message" : {
+            "$ref" : "#/components/schemas/Message"
+          },
+          "score" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        }
+      },
+      "SearchPage" : {
+        "title" : "SearchPage",
+        "type" : "object",
+        "properties" : {
+          "hits" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SearchHit"
+            }
+          }
+        }
+      },
+      "SearchRequest" : {
+        "title" : "SearchRequest",
+        "type" : "object",
+        "required" : [
+          "query"
+        ],
+        "properties" : {
+          "query" : {
+            "type" : "string"
+          },
+          "cid" : {
+            "type" : "string"
+          },
+          "limit" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },

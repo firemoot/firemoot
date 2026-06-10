@@ -13,6 +13,7 @@ import com.firemoot.service.{
   ChannelService,
   MessageService,
   PresenceService,
+  QueryService,
   ReactionService,
   ReadService,
   UserService,
@@ -45,6 +46,7 @@ object Application:
       MessageService(pool, backplane),
       ReactionService(pool, backplane),
       ReadService(pool, backplane),
+      QueryService(pool),
     )
     val securedApi = ServerHmacAuth(ApiKeys.fromConfig(cfg))(api.routes)
     val ws =

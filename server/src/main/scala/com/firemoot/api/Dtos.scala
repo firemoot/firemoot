@@ -1,7 +1,9 @@
 package com.firemoot.api
 
+import java.time.OffsetDateTime
 import java.util.UUID
 
+import com.firemoot.domain.{Channel, Message}
 import io.circe.generic.semiauto.deriveCodec
 import io.circe.{Codec, Json}
 import sttp.tapir.Schema
@@ -89,3 +91,61 @@ final case class ReadStateResponse(lastReadSeq: Long, unreadCount: Long, totalUn
 object ReadStateResponse:
   given Codec[ReadStateResponse] = deriveCodec
   given Schema[ReadStateResponse] = Schema.derived
+
+/** Keyset cursor for channel paging: the sort timestamp and cid of the last row. */
+final case class ChannelCursor(ts: OffsetDateTime, cid: String)
+
+object ChannelCursor:
+  given Codec[ChannelCursor] = deriveCodec
+  given Schema[ChannelCursor] = Schema.derived
+
+/**
+ * A channel query (M1.9). All filters are optional and combine with AND:
+ * `type` equality, `cids`/`members` membership ($in), `custom` jsonb containment,
+ * `archived` flag. Results sort by most-recent activity; pass `cursor` (from a
+ * previous page's `nextCursor`) to page.
+ */
+final case class ChannelQuery(
+    `type`: Option[String],
+    cids: Option[List[String]],
+    members: Option[List[String]],
+    custom: Option[Json],
+    archived: Option[Boolean],
+    limit: Option[Int],
+    cursor: Option[ChannelCursor],
+)
+
+object ChannelQuery:
+  given Codec[ChannelQuery] = deriveCodec
+  given Schema[ChannelQuery] = Schema.derived
+
+final case class ChannelPage(channels: List[Channel], nextCursor: Option[ChannelCursor])
+
+object ChannelPage:
+  given Codec[ChannelPage] = deriveCodec
+  given Schema[ChannelPage] = Schema.derived
+
+final case class MessagePage(messages: List[Message], nextBeforeSeq: Option[Long])
+
+object MessagePage:
+  given Codec[MessagePage] = deriveCodec
+  given Schema[MessagePage] = Schema.derived
+
+final case class SearchRequest(query: String, cid: Option[String], limit: Option[Int])
+
+object SearchRequest:
+  given Codec[SearchRequest] = deriveCodec
+  given Schema[SearchRequest] = Schema.derived
+
+/** A full-text search hit: the matching message and its relevance rank. */
+final case class SearchHit(message: Message, score: Double)
+
+object SearchHit:
+  given Codec[SearchHit] = deriveCodec
+  given Schema[SearchHit] = Schema.derived
+
+final case class SearchPage(hits: List[SearchHit])
+
+object SearchPage:
+  given Codec[SearchPage] = deriveCodec
+  given Schema[SearchPage] = Schema.derived

@@ -4,6 +4,7 @@ import cats.effect.IO
 import com.firemoot.service.{
   ChannelService,
   MessageService,
+  QueryService,
   ReactionService,
   ReadService,
   SendError,
@@ -23,6 +24,7 @@ final class ApiRoutes(
     messages: MessageService,
     reactions: ReactionService,
     reads: ReadService,
+    queries: QueryService,
 ):
 
   private def cid(channelType: String, id: String): String = s"$channelType:$id"
@@ -174,6 +176,17 @@ final class ApiRoutes(
       }
     }
 
+  private val queryChannelsServer =
+    ApiEndpoints.queryChannels.serverLogic(query => queries.channels(query).map(Right(_)))
+
+  private val listMessagesServer =
+    ApiEndpoints.listMessages.serverLogic { case (channelType, id, beforeSeq, limit) =>
+      queries.messageHistory(cid(channelType, id), beforeSeq, limit).map(Right(_))
+    }
+
+  private val searchMessagesServer =
+    ApiEndpoints.searchMessages.serverLogic(req => queries.search(req).map(Right(_)))
+
   val routes: HttpRoutes[IO] =
     Http4sServerInterpreter[IO]().toRoutes(
       List(
@@ -191,6 +204,9 @@ final class ApiRoutes(
         addReactionServer,
         removeReactionServer,
         markReadServer,
+        queryChannelsServer,
+        listMessagesServer,
+        searchMessagesServer,
       )
     )
 
