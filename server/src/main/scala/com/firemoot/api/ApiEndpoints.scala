@@ -90,6 +90,19 @@ object ApiEndpoints:
       .out(jsonBody[Message])
       .summary("Send a message to a channel")
 
+  val editMessage =
+    base.patch
+      .in(channelPath / "messages" / path[java.util.UUID]("messageId"))
+      .in(jsonBody[EditMessageRequest])
+      .out(jsonBody[Message])
+      .summary("Edit a message")
+
+  val deleteMessage =
+    base.delete
+      .in(channelPath / "messages" / path[java.util.UUID]("messageId"))
+      .out(statusCode(StatusCode.NoContent))
+      .summary("Delete a message (soft)")
+
   val all: List[AnyEndpoint] = List(
     upsertUser,
     deleteUser,
@@ -100,4 +113,6 @@ object ApiEndpoints:
     addMember,
     removeMember,
     sendMessage,
+    editMessage,
+    deleteMessage,
   )

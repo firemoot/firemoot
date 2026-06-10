@@ -22,6 +22,7 @@ final class ApiRoutes(
     Problem.of(404, "Not Found", Some(s"$what does not exist"))
 
   private val validRoles = Set("owner", "moderator", "member")
+  private val validMessageTypes = Set("regular", "system")
 
   private val upsertUserServer =
     ApiEndpoints.upsertUser.serverLogic { req =>
@@ -96,22 +97,46 @@ final class ApiRoutes(
 
   private val sendMessageServer =
     ApiEndpoints.sendMessage.serverLogic { case (channelType, id, req) =>
+      val messageType = req.`type`.getOrElse("regular")
+      if !validMessageTypes(messageType) then
+        IO.pure(Left(Problem.of(400, "Bad Request", Some(s"invalid message type '$messageType'"))))
+      else
+        messages
+          .send(
+            cid = cid(channelType, id),
+            userId = req.userId,
+            text = req.text,
+            custom = req.custom.getOrElse(Json.obj()),
+            attachments = req.attachments.getOrElse(Json.arr()),
+            parentMessageId = req.parentMessageId,
+            messageType = messageType,
+          )
+          .map {
+            case Right(message) => Right(message)
+            case Left(SendError.ChannelNotFound) =>
+              Left(notFound(s"channel '${cid(channelType, id)}'"))
+            case Left(SendError.ChannelFrozen) =>
+              Left(Problem.of(
+                409,
+                "Conflict",
+                Some(s"channel '${cid(channelType, id)}' is frozen"),
+              ))
+          }
+    }
+
+  private val editMessageServer =
+    ApiEndpoints.editMessage.serverLogic { case (channelType, id, messageId, req) =>
       messages
-        .send(
-          cid = cid(channelType, id),
-          userId = req.userId,
-          text = req.text,
-          custom = req.custom.getOrElse(Json.obj()),
-          attachments = req.attachments.getOrElse(Json.arr()),
-          parentMessageId = req.parentMessageId,
-        )
-        .map {
-          case Right(message) => Right(message)
-          case Left(SendError.ChannelNotFound) =>
-            Left(notFound(s"channel '${cid(channelType, id)}'"))
-          case Left(SendError.ChannelFrozen) =>
-            Left(Problem.of(409, "Conflict", Some(s"channel '${cid(channelType, id)}' is frozen")))
-        }
+        .edit(cid(channelType, id), messageId, req.text, req.custom)
+        .map(_.toRight(notFound(s"message '$messageId'")))
+    }
+
+  private val deleteMessageServer =
+    ApiEndpoints.deleteMessage.serverLogic { case (channelType, id, messageId) =>
+      messages.delete(cid(channelType, id), messageId).map {
+        case true => Right(())
+        case false => Left(notFound(s"message '$messageId'"))
+      }
     }
 
   val routes: HttpRoutes[IO] =
@@ -126,6 +151,8 @@ final class ApiRoutes(
         addMemberServer,
         removeMemberServer,
         sendMessageServer,
+        editMessageServer,
+        deleteMessageServer,
       )
     )
 

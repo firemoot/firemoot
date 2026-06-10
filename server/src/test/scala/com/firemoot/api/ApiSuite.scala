@@ -169,3 +169,55 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
       }
     }
   }
+
+  test("message endpoints: edit / delete / system / invalid type status codes") {
+    withContainers { pg =>
+      val cfg = dbConfig(pg)
+      Backplane.inProcess.flatMap { backplane =>
+        Migrations.run(cfg) >> Database.pool(cfg).use { pool =>
+          val api =
+            ApiRoutes(
+              UserService(pool),
+              ChannelService(pool, backplane),
+              MessageService(pool, backplane),
+            )
+          val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
+          val msgs = "/v1/channels/messaging/room3/messages"
+          def at(path: String, dto: EditMessageRequest) =
+            Signing.signedRequest(PATCH, Uri.unsafeFromString(path), dto, apiKey, secret)
+          def del(path: String) =
+            Signing.signedNoBody(DELETE, Uri.unsafeFromString(path), apiKey, secret)
+          val random = java.util.UUID.randomUUID()
+
+          for
+            _ <- app.run(post("/v1/users", UpsertUserRequest("erin", None, None, None, None)))
+            _ <- app.run(post(
+              "/v1/channels",
+              CreateChannelRequest("messaging", "room3", Some("erin"), None),
+            ))
+            sent <-
+              app.run(post(msgs, SendMessageRequest(Some("erin"), Some("hi"), None, None, None)))
+            _ = assertEquals(sent.status, Status.Created)
+            msg <- sent.as[Message]
+            edited <- app.run(at(s"$msgs/${msg.id}", EditMessageRequest(Some("edited"), None)))
+            _ = assertEquals(edited.status, Status.Ok)
+            editMissing <- app.run(at(s"$msgs/$random", EditMessageRequest(Some("x"), None)))
+            _ = assertEquals(editMissing.status, Status.NotFound)
+            badType <- app.run(post(
+              msgs,
+              SendMessageRequest(Some("erin"), Some("x"), None, None, None, Some("weird")),
+            ))
+            _ = assertEquals(badType.status, Status.BadRequest)
+            system <- app.run(post(
+              msgs,
+              SendMessageRequest(None, Some("erin joined"), None, None, None, Some("system")),
+            ))
+            _ = assertEquals(system.status, Status.Created)
+            deleted <- app.run(del(s"$msgs/${msg.id}"))
+            _ = assertEquals(deleted.status, Status.NoContent)
+            deleteMissing <- app.run(del(s"$msgs/$random"))
+          yield assertEquals(deleteMissing.status, Status.NotFound)
+        }
+      }
+    }
+  }

@@ -1,6 +1,9 @@
 package com.firemoot.service
 
+import java.util.UUID
+
 import cats.effect.{IO, Resource}
+import cats.syntax.all.*
 import com.firemoot.backplane.Backplane
 import com.firemoot.db.SessionSyntax.*
 import com.firemoot.db.{ChannelRepo, EventRepo, MessageRepo}
@@ -8,8 +11,6 @@ import com.firemoot.domain.{Event, Message, UuidV7}
 import io.circe.Json
 import io.circe.syntax.*
 import skunk.Session
-
-import java.util.UUID
 
 /** Why a send was refused. */
 enum SendError:
@@ -19,10 +20,9 @@ final class MessageService(pool: Resource[IO, Session[IO]], backplane: Backplane
 
   /**
    * Sends a message: allocates the next per-channel seq (rejecting frozen,
-   * deleted or absent channels), inserts the message, and writes the
-   * `message.new` event to the replay log - all in one transaction so the three
-   * stay consistent (SPEC.md §3). After commit the event is published to the
-   * backplane for live WebSocket fan-out.
+   * deleted or absent channels), inserts the message, increments the parent's
+   * `reply_count` when it is a thread reply, and writes the `message.new` event -
+   * all in one transaction (SPEC.md §3). Published to the backplane after commit.
    */
   def send(
       cid: String,
@@ -31,6 +31,7 @@ final class MessageService(pool: Resource[IO, Session[IO]], backplane: Backplane
       custom: Json,
       attachments: Json,
       parentMessageId: Option[UUID],
+      messageType: String = "regular",
   ): IO[Either[SendError, Message]] =
     pool
       .use { session =>
@@ -41,9 +42,12 @@ final class MessageService(pool: Resource[IO, Session[IO]], backplane: Backplane
                 id <- UuidV7.next
                 message <- session.runUnique(
                   MessageRepo.insert,
-                  (id, cid, seq, userId, "regular", text, custom, attachments, parentMessageId),
+                  (id, cid, seq, userId, messageType, text, custom, attachments, parentMessageId),
                 )
                 _ <- session.run(EventRepo.insert, (cid, seq, "message.new", message.asJson))
+                _ <- parentMessageId.traverse_(pid =>
+                  session.run(MessageRepo.incrementReplyCount, pid)
+                )
               yield Right(message)
             case None =>
               session.runOption(ChannelRepo.statusOf, cid).map {
@@ -58,3 +62,52 @@ final class MessageService(pool: Resource[IO, Session[IO]], backplane: Backplane
           backplane.publish(Event("message.new", cid, message.seq, message.asJson))
         case Left(_) => IO.unit
       }
+
+  /**
+   * Edits a message's text/custom and emits `message.updated`. None if the
+   * message is missing, in another channel, or already deleted.
+   */
+  def edit(
+      cid: String,
+      messageId: UUID,
+      text: Option[String],
+      custom: Option[Json],
+  ): IO[Option[Message]] =
+    pool
+      .use { session =>
+        session.transaction.use { _ =>
+          session.runOption(MessageRepo.update, (text, custom, messageId, cid)).flatMap {
+            case None => IO.pure((Option.empty[Message], Option.empty[Event]))
+            case Some(message) =>
+              ChannelEvents
+                .persist(session, cid, "message.updated", message.asJson)
+                .map(event => (Some(message), Some(event)))
+          }
+        }
+      }
+      .flatMap((message, event) => event.traverse_(backplane.publish).as(message))
+
+  /**
+   * Soft-deletes a message (scrubbing its text), decrements the parent thread's
+   * `reply_count`, and emits `message.deleted`. False if nothing was deleted.
+   */
+  def delete(cid: String, messageId: UUID): IO[Boolean] =
+    pool
+      .use { session =>
+        session.transaction.use { _ =>
+          session.runOption(MessageRepo.softDelete, (messageId, cid)).flatMap {
+            case None => IO.pure((false, Option.empty[Event]))
+            case Some(parent) =>
+              for
+                _ <- parent.traverse_(pid => session.run(MessageRepo.decrementReplyCount, pid))
+                event <- ChannelEvents.persist(
+                  session,
+                  cid,
+                  "message.deleted",
+                  Json.obj("id" -> messageId.asJson, "cid" -> cid.asJson),
+                )
+              yield (true, Some(event))
+          }
+        }
+      }
+      .flatMap((deleted, event) => event.traverse_(backplane.publish).as(deleted))

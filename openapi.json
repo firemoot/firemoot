@@ -450,6 +450,137 @@
           }
         }
       }
+    },
+    "/v1/channels/{type}/{id}/messages/{messageId}" : {
+      "delete" : {
+        "summary" : "Delete a message (soft)",
+        "operationId" : "deleteV1ChannelsTypeIdMessagesMessageid",
+        "parameters" : [
+          {
+            "name" : "type",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "id",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "messageId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
+          }
+        ],
+        "responses" : {
+          "204" : {
+            "description" : ""
+          },
+          "400" : {
+            "description" : "Invalid value for: path parameter messageId",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch" : {
+        "summary" : "Edit a message",
+        "operationId" : "patchV1ChannelsTypeIdMessagesMessageid",
+        "parameters" : [
+          {
+            "name" : "type",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "id",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "messageId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/EditMessageRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid value for: path parameter messageId, Invalid value for: body",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components" : {
@@ -542,6 +673,18 @@
             "type" : "string"
           },
           "createdBy" : {
+            "type" : "string"
+          },
+          "custom" : {
+            
+          }
+        }
+      },
+      "EditMessageRequest" : {
+        "title" : "EditMessageRequest",
+        "type" : "object",
+        "properties" : {
+          "text" : {
             "type" : "string"
           },
           "custom" : {
@@ -655,6 +798,9 @@
           "parentMessageId" : {
             "type" : "string",
             "format" : "uuid"
+          },
+          "type" : {
+            "type" : "string"
           }
         }
       },

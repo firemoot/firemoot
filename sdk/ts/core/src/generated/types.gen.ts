@@ -41,6 +41,14 @@ export type CreateChannelRequest = {
 };
 
 /**
+ * EditMessageRequest
+ */
+export type EditMessageRequest = {
+    text?: string;
+    custom?: unknown;
+};
+
+/**
  * Message
  */
 export type Message = {
@@ -78,6 +86,7 @@ export type SendMessageRequest = {
     custom?: unknown;
     attachments?: unknown;
     parentMessageId?: string;
+    type?: string;
 };
 
 /**
@@ -326,3 +335,57 @@ export type PostV1ChannelsTypeIdMessagesResponses = {
 };
 
 export type PostV1ChannelsTypeIdMessagesResponse = PostV1ChannelsTypeIdMessagesResponses[keyof PostV1ChannelsTypeIdMessagesResponses];
+
+export type DeleteV1ChannelsTypeIdMessagesMessageidData = {
+    body?: never;
+    path: {
+        type: string;
+        id: string;
+        messageId: string;
+    };
+    query?: never;
+    url: '/v1/channels/{type}/{id}/messages/{messageId}';
+};
+
+export type DeleteV1ChannelsTypeIdMessagesMessageidErrors = {
+    /**
+     * Invalid value for: path parameter messageId
+     */
+    400: string;
+    default: Problem;
+};
+
+export type DeleteV1ChannelsTypeIdMessagesMessageidError = DeleteV1ChannelsTypeIdMessagesMessageidErrors[keyof DeleteV1ChannelsTypeIdMessagesMessageidErrors];
+
+export type DeleteV1ChannelsTypeIdMessagesMessageidResponses = {
+    204: void;
+};
+
+export type DeleteV1ChannelsTypeIdMessagesMessageidResponse = DeleteV1ChannelsTypeIdMessagesMessageidResponses[keyof DeleteV1ChannelsTypeIdMessagesMessageidResponses];
+
+export type PatchV1ChannelsTypeIdMessagesMessageidData = {
+    body: EditMessageRequest;
+    path: {
+        type: string;
+        id: string;
+        messageId: string;
+    };
+    query?: never;
+    url: '/v1/channels/{type}/{id}/messages/{messageId}';
+};
+
+export type PatchV1ChannelsTypeIdMessagesMessageidErrors = {
+    /**
+     * Invalid value for: path parameter messageId, Invalid value for: body
+     */
+    400: string;
+    default: Problem;
+};
+
+export type PatchV1ChannelsTypeIdMessagesMessageidError = PatchV1ChannelsTypeIdMessagesMessageidErrors[keyof PatchV1ChannelsTypeIdMessagesMessageidErrors];
+
+export type PatchV1ChannelsTypeIdMessagesMessageidResponses = {
+    200: Message;
+};
+
+export type PatchV1ChannelsTypeIdMessagesMessageidResponse = PatchV1ChannelsTypeIdMessagesMessageidResponses[keyof PatchV1ChannelsTypeIdMessagesMessageidResponses];

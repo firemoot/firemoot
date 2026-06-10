@@ -52,8 +52,15 @@ final case class SendMessageRequest(
     custom: Option[Json],
     attachments: Option[Json],
     parentMessageId: Option[UUID],
+    `type`: Option[String] = None,
 )
 
 object SendMessageRequest:
   given Codec[SendMessageRequest] = deriveCodec
   given Schema[SendMessageRequest] = Schema.derived
+
+final case class EditMessageRequest(text: Option[String], custom: Option[Json])
+
+object EditMessageRequest:
+  given Codec[EditMessageRequest] = deriveCodec
+  given Schema[EditMessageRequest] = Schema.derived

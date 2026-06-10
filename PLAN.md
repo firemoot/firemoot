@@ -207,10 +207,13 @@ Ordered so each task ships behind a passing protocol/integration suite.
       `removed_from_channel` are **user-targeted** (new `Event.target`; WS live filter
       delivers to the target user or to cid subscribers) - live-only, not persisted.
       Service + endpoint + targeted-delivery tests. 26 green.
-- [ ] **M1.4 Messages, full lifecycle**: edit + soft delete (`message.updated`/
-      `message.deleted`); threads (`parent_message_id`, transactional `reply_count`
-      denorm); system messages; server "send as user"; attachments as opaque JSONB
-      payload (media upload flow is M2).
+- [x] **M1.4 Messages, full lifecycle**: `PATCH`/`DELETE`
+      `/v1/channels/{type}/{id}/messages/{messageId}` -> seq'd `message.updated` /
+      `message.deleted` (soft delete scrubs text). Threads:
+      `reply_count` incremented on reply send and decremented on reply delete, in
+      the send/delete transaction. System messages via `type` (validated
+      regular/system -> 400). Send-as-user (`userId`) and opaque JSONB attachments
+      already plumbed. Service + endpoint tests (incl. reply_count, events). 28 green.
 - [ ] **M1.5 Reactions**: add/remove, `reaction.new`/`reaction.deleted`, per-type
       counts on the message view.
 - [ ] **M1.6 Read state**: `markRead` endpoint advancing `last_read_seq`;

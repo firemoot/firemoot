@@ -32,3 +32,34 @@ object MessageRepo:
 
   val byId: Query[UUID, Message] =
     sql"select $columns from messages where id = $uuid".query(Codecs.message)
+
+  /**
+   * Edits text/custom (COALESCE keeps unspecified fields). Scoped by cid; returns
+   * none if the message is missing, in another channel, or already deleted.
+   */
+  val update: Query[(Option[String], Option[Json], UUID, String), Message] =
+    sql"""
+      update messages set
+        text = coalesce(${text.opt}, text),
+        custom = coalesce(${jsonb[Json].opt}, custom),
+        updated_at = now()
+      where id = $uuid and cid = $text and deleted_at is null
+      returning $columns
+    """.query(Codecs.message)
+
+  /**
+   * Soft-deletes and scrubs the text; returns the message's parent id (if any) so
+   * the caller can decrement the thread's `reply_count`. None = nothing deleted.
+   */
+  val softDelete: Query[(UUID, String), Option[UUID]] =
+    sql"""
+      update messages set deleted_at = now(), text = null
+      where id = $uuid and cid = $text and deleted_at is null
+      returning parent_message_id
+    """.query(uuid.opt)
+
+  val incrementReplyCount: Command[UUID] =
+    sql"update messages set reply_count = reply_count + 1 where id = $uuid".command
+
+  val decrementReplyCount: Command[UUID] =
+    sql"update messages set reply_count = greatest(reply_count - 1, 0) where id = $uuid".command
