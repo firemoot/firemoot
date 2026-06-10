@@ -7,7 +7,13 @@ import com.firemoot.auth.{ApiKeys, ServerHmacAuth}
 import com.firemoot.backplane.Backplane
 import com.firemoot.config.ServerConfig
 import com.firemoot.http.{DemoRoutes, HealthRoutes}
-import com.firemoot.service.{ChannelService, MessageService, ReactionService, UserService}
+import com.firemoot.service.{
+  ChannelService,
+  MessageService,
+  ReactionService,
+  ReadService,
+  UserService,
+}
 import com.firemoot.ws.{ConnectionRegistry, EventReplay, WsRoutes}
 import org.http4s.dsl.io.*
 import org.http4s.headers.`Content-Type`
@@ -35,6 +41,7 @@ object Application:
       ChannelService(pool, backplane),
       MessageService(pool, backplane),
       ReactionService(pool, backplane),
+      ReadService(pool, backplane),
     )
     val securedApi = ServerHmacAuth(ApiKeys.fromConfig(cfg))(api.routes)
     val ws =

@@ -30,6 +30,9 @@ object ChannelRepo:
     sql"select frozen, (deleted_at is not null) from channels where cid = $text"
       .query(bool *: bool)
 
+  val currentSeq: Query[String, Long] =
+    sql"select current_seq from channels where cid = $text and deleted_at is null".query(int8)
+
   /** Partial update via COALESCE; returns the channel, or none if missing/deleted. */
   val update: Query[(Option[Json], Option[Boolean], Option[Boolean], String), Channel] =
     sql"""

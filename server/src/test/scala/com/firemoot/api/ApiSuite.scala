@@ -9,7 +9,13 @@ import com.firemoot.backplane.Backplane
 import com.firemoot.config.{DbConfig, ServerConfig}
 import com.firemoot.db.{Database, Migrations}
 import com.firemoot.domain.{Channel, Message, User}
-import com.firemoot.service.{ChannelService, MessageService, ReactionService, UserService}
+import com.firemoot.service.{
+  ChannelService,
+  MessageService,
+  ReactionService,
+  ReadService,
+  UserService,
+}
 import com.firemoot.testkit.Signing
 import io.circe.Encoder
 import munit.CatsEffectSuite
@@ -52,6 +58,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               ChannelService(pool, backplane),
               MessageService(pool, backplane),
               ReactionService(pool, backplane),
+              ReadService(pool, backplane),
             )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
 
@@ -125,6 +132,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               ChannelService(pool, backplane),
               MessageService(pool, backplane),
               ReactionService(pool, backplane),
+              ReadService(pool, backplane),
             )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val chPath = "/v1/channels/messaging/room2"
@@ -183,6 +191,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               ChannelService(pool, backplane),
               MessageService(pool, backplane),
               ReactionService(pool, backplane),
+              ReadService(pool, backplane),
             )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val msgs = "/v1/channels/messaging/room3/messages"
@@ -235,6 +244,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
             ChannelService(pool, backplane),
             MessageService(pool, backplane),
             ReactionService(pool, backplane),
+            ReadService(pool, backplane),
           )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val msgs = "/v1/channels/messaging/room4/messages"
@@ -272,6 +282,44 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               AddReactionRequest("frank", "like"),
             ))
           yield assertEquals(missing.status, Status.NotFound)
+        }
+      }
+    }
+  }
+
+  test("read endpoint: markRead status codes and membership") {
+    withContainers { pg =>
+      val cfg = dbConfig(pg)
+      Backplane.inProcess.flatMap { backplane =>
+        Migrations.run(cfg) >> Database.pool(cfg).use { pool =>
+          val api = ApiRoutes(
+            UserService(pool),
+            ChannelService(pool, backplane),
+            MessageService(pool, backplane),
+            ReactionService(pool, backplane),
+            ReadService(pool, backplane),
+          )
+          val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
+
+          for
+            _ <- app.run(post("/v1/users", UpsertUserRequest("grace", None, None, None, None)))
+            _ <- app.run(post("/v1/users", UpsertUserRequest("helen", None, None, None, None)))
+            _ <- app.run(post(
+              "/v1/channels",
+              CreateChannelRequest("messaging", "room5", Some("grace"), None),
+            ))
+
+            missingChannel <-
+              app.run(post("/v1/channels/messaging/ghost/read", MarkReadRequest("grace", None)))
+            _ = assertEquals(missingChannel.status, Status.NotFound)
+            nonMember <-
+              app.run(post("/v1/channels/messaging/room5/read", MarkReadRequest("helen", None)))
+            _ = assertEquals(nonMember.status, Status.NotFound)
+
+            ok <- app.run(post("/v1/channels/messaging/room5/read", MarkReadRequest("grace", None)))
+            _ = assertEquals(ok.status, Status.Ok)
+            state <- ok.as[ReadStateResponse]
+          yield assertEquals(state.unreadCount, 0L)
         }
       }
     }

@@ -10,7 +10,7 @@ import cats.syntax.all.*
 import com.firemoot.auth.JwtAuth
 import com.firemoot.backplane.Backplane
 import com.firemoot.db.SessionSyntax.*
-import com.firemoot.db.UserRepo
+import com.firemoot.db.{ReadRepo, UserRepo}
 import com.firemoot.domain.UuidV7
 import fs2.{Pipe, Stream}
 import io.circe.Json
@@ -80,10 +80,11 @@ final class WsRoutes(
       subscribed <- Ref[IO].of(Map.empty[String, Long])
       lastPong <- IO.realTime.flatMap(Ref[IO].of)
       me <- lookupUser(userId)
+      totalUnread <- pool.use(_.runUnique(ReadRepo.totalUnread, userId))
       now <- IO.realTimeInstant.map(_.atOffset(ZoneOffset.UTC))
       _ <- userActive(userId)
       _ <- registry.register(connectionId, userId)
-      _ <- outbound.offer(Some(text(WsFrames.hello(connectionId, now, me))))
+      _ <- outbound.offer(Some(text(WsFrames.hello(connectionId, now, me, totalUnread))))
       response <- build(wsb, connectionId, userId, outbound, subscribed, lastPong)
     yield response
 

@@ -64,6 +64,14 @@ export type MapLong = {
 };
 
 /**
+ * MarkReadRequest
+ */
+export type MarkReadRequest = {
+    userId: string;
+    seq?: number;
+};
+
+/**
  * Message
  */
 export type Message = {
@@ -98,6 +106,15 @@ export type Problem = {
 export type ReactionSummary = {
     messageId: string;
     counts: MapLong;
+};
+
+/**
+ * ReadStateResponse
+ */
+export type ReadStateResponse = {
+    lastReadSeq: number;
+    unreadCount: number;
+    totalUnread: number;
 };
 
 /**
@@ -468,3 +485,29 @@ export type DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridRe
 };
 
 export type DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridResponse = DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridResponses[keyof DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridResponses];
+
+export type PostV1ChannelsTypeIdReadData = {
+    body: MarkReadRequest;
+    path: {
+        type: string;
+        id: string;
+    };
+    query?: never;
+    url: '/v1/channels/{type}/{id}/read';
+};
+
+export type PostV1ChannelsTypeIdReadErrors = {
+    /**
+     * Invalid value for: body
+     */
+    400: string;
+    default: Problem;
+};
+
+export type PostV1ChannelsTypeIdReadError = PostV1ChannelsTypeIdReadErrors[keyof PostV1ChannelsTypeIdReadErrors];
+
+export type PostV1ChannelsTypeIdReadResponses = {
+    200: ReadStateResponse;
+};
+
+export type PostV1ChannelsTypeIdReadResponse = PostV1ChannelsTypeIdReadResponses[keyof PostV1ChannelsTypeIdReadResponses];

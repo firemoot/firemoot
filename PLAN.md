@@ -221,10 +221,15 @@ Ordered so each task ships behind a passing protocol/integration suite.
       endpoints return the updated `ReactionSummary` (per-type counts). 404 if the
       message is absent. The remove user is a path segment (so the HMAC signature,
       which covers the path not the query, binds it). Service + endpoint tests. 30 green.
-- [ ] **M1.6 Read state**: `markRead` endpoint advancing `last_read_seq`;
-      `read.updated` to channel (receipt) + reader's other devices (badge sync);
-      total-unread sum in `hello` and on `read.updated`; unread arithmetic
-      property-tested per §3 invariant.
+- [x] **M1.6 Read state**: `POST /v1/channels/{type}/{id}/read` advances
+      `last_read_seq` (greatest, never rewinds; defaults to current seq).
+      `read.updated` emitted both as a channel broadcast (receipt) and targeted to
+      the reader (badge sync to all their devices); carries per-channel
+      `unreadCount` + `totalUnread`. `hello` now carries `totalUnread`. Unread SQL
+      excludes own/system/deleted (`is distinct from cm.user_id`). Unread arithmetic
+      is a pure `domain.Unread` spec, **scalacheck property-tested** and confirmed
+      against the SQL in an integration test. 404 for missing channel/membership.
+      36 green.
 - [ ] **M1.7 Typing + presence**: `typing.start`/`typing.stop` WS frames with
       server-side throttle and auto-expiry (no seq, never replayed); presence
       online/offline from connection registry + `last_active_at`,

@@ -737,6 +737,72 @@
           }
         }
       }
+    },
+    "/v1/channels/{type}/{id}/read" : {
+      "post" : {
+        "summary" : "Mark a channel read up to a seq (default: latest)",
+        "operationId" : "postV1ChannelsTypeIdRead",
+        "parameters" : [
+          {
+            "name" : "type",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "id",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MarkReadRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ReadStateResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid value for: body",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components" : {
@@ -872,6 +938,22 @@
           "format" : "int64"
         }
       },
+      "MarkReadRequest" : {
+        "title" : "MarkReadRequest",
+        "type" : "object",
+        "required" : [
+          "userId"
+        ],
+        "properties" : {
+          "userId" : {
+            "type" : "string"
+          },
+          "seq" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
       "Message" : {
         "title" : "Message",
         "type" : "object",
@@ -973,6 +1055,29 @@
           },
           "counts" : {
             "$ref" : "#/components/schemas/Map_Long"
+          }
+        }
+      },
+      "ReadStateResponse" : {
+        "title" : "ReadStateResponse",
+        "type" : "object",
+        "required" : [
+          "lastReadSeq",
+          "unreadCount",
+          "totalUnread"
+        ],
+        "properties" : {
+          "lastReadSeq" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "unreadCount" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalUnread" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },

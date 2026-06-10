@@ -77,3 +77,15 @@ final case class ReactionSummary(messageId: UUID, counts: Map[String, Long])
 object ReactionSummary:
   given Codec[ReactionSummary] = deriveCodec
   given Schema[ReactionSummary] = Schema.derived
+
+final case class MarkReadRequest(userId: String, seq: Option[Long])
+
+object MarkReadRequest:
+  given Codec[MarkReadRequest] = deriveCodec
+  given Schema[MarkReadRequest] = Schema.derived
+
+final case class ReadStateResponse(lastReadSeq: Long, unreadCount: Long, totalUnread: Long)
+
+object ReadStateResponse:
+  given Codec[ReadStateResponse] = deriveCodec
+  given Schema[ReadStateResponse] = Schema.derived

@@ -118,6 +118,13 @@ object ApiEndpoints:
       .out(jsonBody[ReactionSummary])
       .summary("Remove a user's reaction from a message")
 
+  val markRead =
+    base.post
+      .in(channelPath / "read")
+      .in(jsonBody[MarkReadRequest])
+      .out(jsonBody[ReadStateResponse])
+      .summary("Mark a channel read up to a seq (default: latest)")
+
   val all: List[AnyEndpoint] = List(
     upsertUser,
     deleteUser,
@@ -132,4 +139,5 @@ object ApiEndpoints:
     deleteMessage,
     addReaction,
     removeReaction,
+    markRead,
   )

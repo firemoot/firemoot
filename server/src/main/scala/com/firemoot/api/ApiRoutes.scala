@@ -5,6 +5,7 @@ import com.firemoot.service.{
   ChannelService,
   MessageService,
   ReactionService,
+  ReadService,
   SendError,
   UserService,
 }
@@ -21,6 +22,7 @@ final class ApiRoutes(
     channels: ChannelService,
     messages: MessageService,
     reactions: ReactionService,
+    reads: ReadService,
 ):
 
   private def cid(channelType: String, id: String): String = s"$channelType:$id"
@@ -163,6 +165,15 @@ final class ApiRoutes(
         }
     }
 
+  private val markReadServer =
+    ApiEndpoints.markRead.serverLogic { case (channelType, id, req) =>
+      reads.markRead(cid(channelType, id), req.userId, req.seq).map {
+        case Some(state) =>
+          Right(ReadStateResponse(state.lastReadSeq, state.unreadCount, state.totalUnread))
+        case None => Left(notFound(s"channel '${cid(channelType, id)}' or membership"))
+      }
+    }
+
   val routes: HttpRoutes[IO] =
     Http4sServerInterpreter[IO]().toRoutes(
       List(
@@ -179,6 +190,7 @@ final class ApiRoutes(
         deleteMessageServer,
         addReactionServer,
         removeReactionServer,
+        markReadServer,
       )
     )
 

@@ -14,12 +14,13 @@ import io.circe.{parser, Json}
 object WsFrames:
 
   // Server -> client
-  def hello(connectionId: String, serverTime: OffsetDateTime, me: Json): Json =
+  def hello(connectionId: String, serverTime: OffsetDateTime, me: Json, totalUnread: Long): Json =
     Json.obj(
       "type" -> "hello".asJson,
       "connectionId" -> connectionId.asJson,
       "serverTime" -> serverTime.asJson,
       "me" -> me,
+      "totalUnread" -> totalUnread.asJson,
     )
 
   def event(e: Event): Json =
