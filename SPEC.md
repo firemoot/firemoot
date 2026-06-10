@@ -340,7 +340,8 @@ over HTTPS), exactly as it would be a client of Stream.
 
 ## 15. Open Questions
 
-1. skunk vs doobie (settle in M0 spike; skunk default).
+1. ~~skunk vs doobie (settle in M0 spike; skunk default).~~ **Resolved 10/06/2026:
+   skunk** (ADR 0001) - native `LISTEN`/`NOTIFY` for the backplane is decisive.
 2. Channel-type permission model: how much of Stream's role/permission matrix to
    replicate vs a simpler owner/moderator/member fixed set (v1 leans simple).
 3. Admin UI auth: local password only, or optional OIDC from day one?

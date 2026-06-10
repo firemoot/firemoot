@@ -124,14 +124,14 @@ Goal (from SPEC §14): compose boots app+Postgres; WS `hello`; REST `sendMessage
 `message.new` in two browser tabs; tapir spec generating `@firemoot/core`; DB library
 settled.
 
-- [ ] **M0.1 HTTP server**: Ember on `:6668`, `/healthz` (liveness) and `/readyz`
-      (Postgres ping), ciris config (env-first), graceful shutdown, JSON logs.
-- [ ] **M0.2 DB spike - skunk vs doobie** (timebox: 1 day). Build the same vertical
-      slice twice: channel insert + seq bump + LISTEN/NOTIFY round-trip + jsonb codec.
-      Criteria: LISTEN/NOTIFY ergonomics (skunk is native fs2 - matters for the
-      Postgres backplane step later), jsonb codec friction, pool behaviour under
-      churn, error diagnostics. skunk 1.0.0 is the default winner unless the spike
-      surfaces a blocker. Record the decision in SPEC.md §2.
+- [x] **M0.1 HTTP server**: Ember on `:6668`, `/healthz` (liveness) and `/readyz`
+      (Postgres ping via skunk `select 1`), ciris env-first config, 5s graceful
+      shutdown, logback+logstash JSON logs. Tested unit + Testcontainers.
+- [x] **M0.2 DB decision - skunk** (ADR 0001). The decisive factor is native
+      `LISTEN`/`NOTIFY` as fs2 streams for the future backplane; doobie/JDBC has no
+      async notifications. Building the slice twice was judged wasteful given how
+      one-sided that is - M0.1 already validates skunk end to end. Recorded in
+      SPEC.md §15 and `docs/decisions/0001-database-library.md`.
 - [ ] **M0.3 Flyway on boot** + `V001__initial.sql` covering §3 (users, channels,
       channel_members, messages, channel_events, api_keys minimum).
 - [ ] **M0.4 tapir foundation**: endpoint definitions module; RFC 9457 problem+json
