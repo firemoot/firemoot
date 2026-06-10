@@ -1,6 +1,7 @@
 package com.firemoot.api
 
 import cats.effect.IO
+import com.firemoot.ratelimit.{RateGuard, RateLimitDecision}
 import com.firemoot.service.{
   ChannelService,
   MessageService,
@@ -29,12 +30,30 @@ final class ApiRoutes(
     queries: QueryService,
     webhooks: WebhookService,
     moderation: ModerationService,
+    rate: RateGuard = RateGuard.unlimited,
 ):
 
   private def cid(channelType: String, id: String): String = s"$channelType:$id"
 
   private def notFound(what: String): Problem =
     Problem.of(404, "Not Found", Some(s"$what does not exist"))
+
+  private def tooManyRequests(retryAfterSeconds: Long): Problem =
+    Problem.of(
+      429,
+      "Too Many Requests",
+      Some(s"rate limit exceeded; retry after ${retryAfterSeconds}s"),
+    )
+
+  /** Per-user send budget. None = allowed; Some(problem) = 429. */
+  private def sendAllowed(userId: Option[String]): IO[Option[Problem]] =
+    userId match
+      case None => IO.pure(None)
+      case Some(user) =>
+        rate.send(user).map {
+          case RateLimitDecision.Allowed => None
+          case RateLimitDecision.Retry(after) => Some(tooManyRequests(after.toSeconds))
+        }
 
   private val validRoles = Set("owner", "moderator", "member")
   private val validMessageTypes = Set("regular", "system")
@@ -116,27 +135,31 @@ final class ApiRoutes(
       if !validMessageTypes(messageType) then
         IO.pure(Left(Problem.of(400, "Bad Request", Some(s"invalid message type '$messageType'"))))
       else
-        messages
-          .send(
-            cid = cid(channelType, id),
-            userId = req.userId,
-            text = req.text,
-            custom = req.custom.getOrElse(Json.obj()),
-            attachments = req.attachments.getOrElse(Json.arr()),
-            parentMessageId = req.parentMessageId,
-            messageType = messageType,
-          )
-          .map {
-            case Right(message) => Right(message)
-            case Left(SendError.ChannelNotFound) =>
-              Left(notFound(s"channel '${cid(channelType, id)}'"))
-            case Left(SendError.ChannelFrozen) =>
-              Left(Problem.of(
-                409,
-                "Conflict",
-                Some(s"channel '${cid(channelType, id)}' is frozen"),
-              ))
-          }
+        sendAllowed(req.userId).flatMap {
+          case Some(limited) => IO.pure(Left(limited))
+          case None =>
+            messages
+              .send(
+                cid = cid(channelType, id),
+                userId = req.userId,
+                text = req.text,
+                custom = req.custom.getOrElse(Json.obj()),
+                attachments = req.attachments.getOrElse(Json.arr()),
+                parentMessageId = req.parentMessageId,
+                messageType = messageType,
+              )
+              .map {
+                case Right(message) => Right(message)
+                case Left(SendError.ChannelNotFound) =>
+                  Left(notFound(s"channel '${cid(channelType, id)}'"))
+                case Left(SendError.ChannelFrozen) =>
+                  Left(Problem.of(
+                    409,
+                    "Conflict",
+                    Some(s"channel '${cid(channelType, id)}' is frozen"),
+                  ))
+              }
+        }
     }
 
   private val editMessageServer =

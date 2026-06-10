@@ -3,6 +3,7 @@ package com.firemoot.auth
 import cats.data.{Kleisli, OptionT}
 import cats.effect.IO
 import com.firemoot.api.Problem
+import com.firemoot.ratelimit.{RateGuard, RateLimitDecision}
 import fs2.Stream
 import io.circe.syntax.*
 import org.http4s.*
@@ -20,12 +21,20 @@ object ServerHmacAuth:
 
   private val maxSkewSeconds = 300L
 
-  def apply(apiKeys: ApiKeys)(routes: HttpRoutes[IO]): HttpRoutes[IO] =
+  def apply(apiKeys: ApiKeys, rate: RateGuard = RateGuard.unlimited)(
+      routes: HttpRoutes[IO]
+  ): HttpRoutes[IO] =
     Kleisli { req =>
       OptionT.liftF(req.body.compile.to(Array)).flatMap { body =>
         OptionT.liftF(authenticate(apiKeys, req, body)).flatMap {
           case Left(problem) => OptionT.pure[IO](problemResponse(problem))
-          case Right(()) => routes(req.withBodyStream(Stream.emits(body).covary[IO]))
+          case Right(keyId) =>
+            OptionT.liftF(rate.apiKey(keyId)).flatMap {
+              case RateLimitDecision.Retry(after) =>
+                OptionT.pure[IO](problemResponse(tooManyRequests(after.toSeconds)))
+              case RateLimitDecision.Allowed =>
+                routes(req.withBodyStream(Stream.emits(body).covary[IO]))
+            }
         }
       }
     }
@@ -37,7 +46,7 @@ object ServerHmacAuth:
       apiKeys: ApiKeys,
       req: Request[IO],
       body: Array[Byte],
-  ): IO[Either[Problem, Unit]] =
+  ): IO[Either[Problem, String]] =
     (
       headerValue(req, "X-Firemoot-Key"),
       headerValue(req, "X-Firemoot-Timestamp"),
@@ -62,7 +71,7 @@ object ServerHmacAuth:
                     )
                     Either.cond(
                       HmacSigner.verify(secret, canonical, signature),
-                      (),
+                      keyId,
                       unauthorized("signature mismatch"),
                     )
                 }
@@ -71,6 +80,13 @@ object ServerHmacAuth:
 
   private def unauthorized(detail: String): Problem =
     Problem.of(401, "Unauthorized", Some(detail))
+
+  private def tooManyRequests(retryAfterSeconds: Long): Problem =
+    Problem.of(
+      429,
+      "Too Many Requests",
+      Some(s"rate limit exceeded; retry after ${retryAfterSeconds}s"),
+    )
 
   private def problemResponse(problem: Problem): Response[IO] =
     Response[IO](Status.fromInt(problem.status).getOrElse(Status.Unauthorized))

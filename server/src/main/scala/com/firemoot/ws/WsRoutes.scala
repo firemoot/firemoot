@@ -12,6 +12,7 @@ import com.firemoot.backplane.Backplane
 import com.firemoot.db.SessionSyntax.*
 import com.firemoot.db.{ReadRepo, UserRepo}
 import com.firemoot.domain.{Event, UuidV7}
+import com.firemoot.ratelimit.{RateGuard, RateLimitDecision}
 import com.firemoot.service.PresenceService
 import fs2.{Pipe, Stream}
 import io.circe.Json
@@ -46,6 +47,7 @@ final class WsRoutes(
     userActive: String => IO[Unit],
     typingThrottle: FiniteDuration,
     typingExpiry: FiniteDuration,
+    rate: RateGuard = RateGuard.unlimited,
 ):
 
   private object TokenParam extends OptionalQueryParamDecoderMatcher[String]("token")
@@ -71,6 +73,11 @@ final class WsRoutes(
       .withEntity("""{"type":"about:blank","title":"Unauthorized","status":401}""")
       .withContentType(`Content-Type`(MediaType.unsafeParse("application/problem+json")))
 
+  private val tooManyRequests: Response[IO] =
+    Response[IO](Status.TooManyRequests)
+      .withEntity("""{"type":"about:blank","title":"Too Many Requests","status":429}""")
+      .withContentType(`Content-Type`(MediaType.unsafeParse("application/problem+json")))
+
   private def text(json: Json): WebSocketFrame = WebSocketFrame.Text(json.noSpaces)
 
   private def lookupUser(userId: String): IO[Json] =
@@ -80,6 +87,12 @@ final class WsRoutes(
     }
 
   private def open(wsb: WebSocketBuilder2[IO], userId: String): IO[Response[IO]] =
+    rate.connect(userId).flatMap {
+      case RateLimitDecision.Retry(_) => IO.pure(tooManyRequests)
+      case RateLimitDecision.Allowed => accept(wsb, userId)
+    }
+
+  private def accept(wsb: WebSocketBuilder2[IO], userId: String): IO[Response[IO]] =
     for
       connectionId <- UuidV7.next.map(_.toString)
       outbound <- Queue.unbounded[IO, Option[WebSocketFrame]]

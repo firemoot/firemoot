@@ -290,9 +290,16 @@ Ordered so each task ships behind a passing protocol/integration suite.
       `GET /v1/moderation/flags?status=` lists the queue (admin UI surfaces it in
       M3). 404 for an absent message. Service + HTTP wiring tests; new endpoints
       regenerated into `@firemoot/core`. 61 green.
-- [ ] **M1.12 Rate limiting**: token-bucket per API key and per user behind a
-      `RateLimiter` trait (in-memory impl); applied to connects, sends, uploads,
-      search.
+- [x] **M1.12 Rate limiting**: a `RateLimiter` trait (seam) with an in-memory
+      token-bucket impl - the bucket config travels with each call, so one limiter
+      serves every category via caller-chosen keys. A `RateGuard` facade names the
+      buckets: a **per-API-key** budget enforced in `ServerHmacAuth` (covers all
+      server REST, including search) and **per-user** budgets on sends
+      (`ApiRoutes`) and WebSocket connects (`WsRoutes`); uploads join in M2.
+      Exceeding a budget yields `429` application/problem+json (WS connect returns
+      a 429 instead of upgrading). Wired generously by default; limits are opt-in
+      (`Main` enables them). Tested: bucket burst/limit/refill + key isolation, and
+      per-key + per-user 429s through the real auth/routing stack. 65 green.
 - [ ] **M1.13 Protocol test suite**: raw-frame WS tests - handshake, heartbeat
       reaping, resume-after-gap, multi-device read sync, subscribe/replay ordering.
       This suite is the protocol's executable spec; grow it with every event type.

@@ -8,6 +8,7 @@ import com.firemoot.config.AppConfig
 import com.firemoot.db.SessionSyntax.*
 import com.firemoot.db.{Database, Migrations, UserRepo}
 import com.firemoot.http.HttpServer
+import com.firemoot.ratelimit.RateGuard
 import com.firemoot.service.{LastActiveTracker, WebhookService}
 import com.firemoot.webhook.{WebhookConfig, WebhookDispatcher}
 import com.firemoot.ws.ConnectionRegistry
@@ -31,6 +32,7 @@ object Main extends IOApp.Simple:
             lastActive <- LastActiveTracker.create(60.seconds) { userId =>
               pool.use(_.run(UserRepo.touchLastActive, userId))
             }
+            rate <- RateGuard.inMemory()
             webhooks = WebhookService(pool)
             dispatcher = WebhookDispatcher(pool, httpClient, WebhookConfig.default)
             // Persisted channel events fan out to registered webhook endpoints.
@@ -45,6 +47,7 @@ object Main extends IOApp.Simple:
               registry,
               cfg.devDemo,
               lastActive.touch,
+              rate,
             )
             _ <- HttpServer
               .resource(cfg.http, app)
