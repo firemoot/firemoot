@@ -1,0 +1,27 @@
+{
+  "name": "@firemoot/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Generated OpenAPI transport, types and REST client for Firemoot. Source under src/generated is machine-written (see PLAN.md M0.8) - do not hand-edit.",
+  "license": "Apache-2.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "@firemoot/monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Firemoot TypeScript SDK workspace (@firemoot/core, @firemoot/client, @firemoot/test).",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@11.5.3",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "prettier": "^3.8.4",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
+  }
+}

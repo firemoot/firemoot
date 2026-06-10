@@ -34,6 +34,8 @@ and skip-gate bypasses with a local Firemoot instance.
 | Decision | Choice | Why |
 |---|---|---|
 | Language | Scala 3 (LTS line) | Maintainer fluency and preference; JVM/Netty handles 100k+ idle WS connections; accepted trade-offs: smaller contributor pool, ~300-400MB JVM RSS (GraalVM native-image is a stretch goal) |
+| JDK | Temurin 25 LTS (added 10/06/2026) | Runs Scala 3.3 LTS fine; Compact Object Headers (JEP 519) cut ~10-22% heap, partly mitigating the RSS trade-off above, via `-XX:+UseCompactObjectHeaders` on G1 (not ZGC). 21 was the alternative; 24 is dead (non-LTS, EOL) |
+| Toolchain | mise (`mise.toml`); pinned JDK/sbt/node/pnpm (added 10/06/2026) | One file drives local + CI (via `jdx/mise-action`), eliminating version drift |
 | Effect stack | Typelevel: http4s + fs2 + cats-effect | Best WS/streaming ergonomics; tapir compatibility. Reversible until first code; revisit only if maintainer's muscle memory says ZIO |
 | API definition | tapir, OpenAPI-first | The OpenAPI spec is the source of truth; TS SDK transport is generated from it. Client SDKs are the moat in this category; codegen keeps them honest |
 | Database | PostgreSQL (only required dependency) | Boring, universal, handles messages + search + metrics rollups in v1 |

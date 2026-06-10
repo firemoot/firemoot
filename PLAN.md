@@ -18,42 +18,51 @@ during that task and recorded in SPEC.md's Decisions Log.
 
 | Component | Pin | Notes |
 |---|---|---|
+| Toolchain mgr | mise (`mise.toml`) | Single source of truth for JDK/sbt/node/pnpm; CI consumes the same file via `jdx/mise-action`, so local and CI never drift. pnpm uses the `npm:` backend - the aqua registry mis-packages its linux-x64 asset |
 | Scala | 3.3.7 (LTS) | Scala 3.9 becomes the next LTS imminently (JDK 17 floor). Start on 3.3.x; schedule a 3.9 upgrade task at M2 once http4s/tapir/skunk publish for it. Do not adopt Next (3.8.x) |
-| JDK | Temurin 21 LTS | Build and runtime baseline. Temurin 25 LTS revisited with the GraalVM stretch goal |
-| sbt | 1.12.x | sbt 2.0 is only just graduating RC; plugin ecosystem (native-packager et al.) not ready. Revisit post-v1 |
+| JDK | Temurin 25 LTS (25.0.3) | Runs Scala 3.3 LTS (3.3.6+) and sbt 1.12 fine. Compact Object Headers (JEP 519) trim ~10-22% heap - directly serving the RSS/$7-VPS pitch - via `-XX:+UseCompactObjectHeaders` with **G1, not ZGC**. 3.3 LTS emits JDK 8 bytecode; we never need 25-targeted output (which 3.3 LTS can't emit anyway) |
+| sbt | 1.12.11 | >=1.12.7 fixes CVE-2026-32948. sbt 2.0 only just graduating RC; plugin ecosystem (native-packager et al.) not ready. Revisit post-v1 |
 | http4s | 0.23.34 (Ember) | 1.0 milestones still pre-release; 0.23 is the stable line |
-| cats-effect / fs2 | latest 3.x (transitive via http4s/skunk) | |
-| tapir | 1.13.x | OpenAPI 3.1 docs + http4s server interpreter |
+| cats-effect / fs2 | 3.7.0 / 3.13.0 (also transitive) | |
+| tapir | 1.13.19 | OpenAPI 3.1 docs + http4s server interpreter; openapi-circe (sttp-apispec 0.11.10) serialises the spec |
 | skunk | 1.0.0 | Went final (strengthens the spec's "skunk default" - see M0.3 spike) |
-| Flyway | latest community (11.x) | JDBC-based: needs the pg JDBC driver *for migrations only*, even if skunk wins |
-| munit / scalacheck | munit 1.x, scalacheck 1.18.x | + munit-cats-effect |
-| Testcontainers | testcontainers-scala latest | Postgres + MinIO modules |
+| Flyway | 12.8.1 (community) | flyway-core + flyway-database-postgresql; needs the pg JDBC driver *for migrations only*, even though skunk is the app driver |
+| munit / scalacheck | munit 1.3.3, scalacheck 1.19.0 | + munit-cats-effect 2.2.0 |
+| Testcontainers | testcontainers-scala 0.44.1 | munit + postgresql modules (MinIO via GenericContainer at M2) |
 | PostgreSQL | 17 (compose pin `postgres:17`) | Per spec. PG18 exists; no feature need, stay boring |
-| Node (SDK dev) | 22 LTS floor | Spec said "Node 20+" but Node 20 went EOL Apr 2026. SDK supports Node 22+; document this as a spec amendment |
-| TS codegen | @hey-api/openapi-ts (pin exact version) | The 2026 standard for OpenAPI→TS SDKs (fetch client). Pre-1.0: pin exact, snapshot-test the output |
-| SDK workspace | pnpm workspaces + TypeScript 5.x + Vitest | ESM only |
+| Node (SDK dev) | 22.22.3 (22 LTS floor) | Spec said "Node 20+" but Node 20 went EOL Apr 2026. SDK supports Node 22+ (spec amended §10) |
+| TS codegen | @hey-api/openapi-ts 0.98.2 (exact) | The 2026 standard for OpenAPI→TS SDKs (fetch client). Pre-1.0: pin exact, snapshot-test the output. Added at M0.8 |
+| SDK workspace | pnpm 11 workspaces + TypeScript 6.0.3 + Vitest 4 + Prettier | ESM only (NodeNext resolution); prettier owns code formatting (markdown excluded - hand-maintained) |
 | Admin SPA | Vite + TS | Chart lib decided in M3 (uPlot vs Chart.js) |
-| Config | ciris | Typelevel-native, no reflection (GraalVM-friendly) |
-| Logging | structured JSON via logback + logstash-encoder (or scribe) | decide M0.2 |
-| Docker base | eclipse-temurin:21-jre | via sbt-native-packager |
+| Config | ciris 3.15.0 | Typelevel-native, no reflection (GraalVM-friendly) |
+| Logging | log4cats-slf4j + logback + logstash-encoder | JSON structured logs (M0.2 decision settled: log4cats over scribe for cats-effect integration) |
+| Docker base | eclipse-temurin:25-jre | via sbt-native-packager; runtime flags `-XX:+UseCompactObjectHeaders -XX:+UseG1GC -XX:MaxRAMPercentage=75` |
 
 ---
 
 ## 2. Phase 0 - repo scaffolding (pre-M0, half a day)
 
-- [ ] **0.1 sbt skeleton**: single `server` module compiling on Scala 3.3.7; scalafmt
-      (`.scalafmt.conf`) + scalafix basics; `.editorconfig`; `project/Dependencies.scala`
-      with the §1 pins.
-- [ ] **0.2 pnpm workspace skeleton**: `sdk/ts/core`, `sdk/ts/client`, `sdk/test`
-      placeholder packages (private, `@firemoot/*` names reserved in package.json but
-      not published).
-- [ ] **0.3 CI workflow** (`.github/workflows/ci.yml`): jobs for `scala` (compile +
-      test), `sdk` (typecheck + test), both cached. Runs on PR + main.
+- [x] **0.1 sbt skeleton**: `server` module compiling on Scala 3.3.7 (JDK 25);
+      `.scalafmt.conf` (with the meta-build dialect override - see note below),
+      `.editorconfig`, `project/Dependencies.scala` with the §1 pins, trivial
+      `Main` + passing `SmokeSuite`. Whole M0 dependency graph resolves on JDK 25.
+- [x] **0.2 pnpm workspace skeleton**: `sdk/ts/core`, `sdk/ts/client`, `sdk/test`
+      placeholder packages (private, `@firemoot/*` names reserved, not published);
+      TS 6 / NodeNext, Vitest smoke test per package, typecheck + build green.
+- [x] **0.3 CI workflow** (`.github/workflows/ci.yml`): `scala` job (scalafmt check
+      + test) and `sdk` job (prettier + typecheck + test + build), both via
+      `jdx/mise-action` with Coursier and pnpm-store caches. Runs on PR + main.
 - [x] **0.4 Branch protection on `main`**: force pushes and deletion blocked
-      (done 10/06/2026); extend with required status checks once 0.3's CI workflow
-      exists and reports.
+      (done 10/06/2026); extend with required status checks once the CI workflow
+      has reported once on a PR.
 
 Acceptance: a PR with a trivial change runs both jobs green.
+
+> **Gotcha banked (0.1):** scalafmt's `rewrite.scala3.removeOptionalBraces` will
+> rewrite `project/*.scala` and `*.sbt` into brace-less Scala 3 syntax, which the
+> sbt **meta-build** (compiled as Scala 2.13/source3) cannot parse - the build then
+> fails to load. `.scalafmt.conf` pins those paths to the `scala213source3` dialect
+> with the rewrite disabled via `fileOverride`. Don't remove that override.
 
 ---
 

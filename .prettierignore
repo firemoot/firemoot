@@ -1,0 +1,10 @@
+**/dist/
+**/node_modules/
+**/target/
+**/generated/
+pnpm-lock.yaml
+LICENSE
+
+# Prose docs are hand-maintained (tables, deliberate wrapping); keep prettier off them.
+*.md
+**/*.md
