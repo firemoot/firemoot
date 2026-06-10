@@ -14,6 +14,23 @@ services:
       retries: 30
     # No host port published by default; the app reaches Postgres over the compose network.
 
+  # Reference S3-compatible media store (SPEC.md §7). Pinned by digest; the
+  # generic-S3 code path means Garage/SeaweedFS/Tigris/AWS swap in unchanged.
+  # Enable media by setting the FIREMOOT_S3_* vars on the firemoot service below.
+  minio:
+    image: pgsty/minio@sha256:83885c27b3b5b673049e33ddf4029afe2c134fd51ce4309e65e4f39d3b9ca282
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: firemoot
+      MINIO_ROOT_PASSWORD: firemoot-secret
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || curl -fsS http://localhost:9000/minio/health/ready"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    # No host port by default; the app reaches MinIO over the compose network.
+    # Create the 'firemoot' bucket once (mc mb local/firemoot) before first use.
+
   firemoot:
     image: firemoot:latest
     depends_on:
@@ -32,5 +49,11 @@ services:
       FIREMOOT_API_SECRET: change-me
       # Set FIREMOOT_DEV_DEMO=true to serve the dev demo page at /demo (never in prod).
       FIREMOOT_DEV_DEMO: ${FIREMOOT_DEV_DEMO:-false}
+      # Media is off unless an S3 endpoint is set. Point at the minio service to enable:
+      #   FIREMOOT_S3_ENDPOINT: http://minio:9000
+      #   FIREMOOT_S3_BUCKET: firemoot
+      #   FIREMOOT_S3_ACCESS_KEY: firemoot
+      #   FIREMOOT_S3_SECRET_KEY: firemoot-secret
+      FIREMOOT_S3_ENDPOINT: ${FIREMOOT_S3_ENDPOINT:-}
     ports:
       - "6668:6668"

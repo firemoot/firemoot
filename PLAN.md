@@ -340,12 +340,24 @@ queries/FTS, webhooks, moderation and rate limiting.
       in-memory store (the real S3 store is M2.5). 79 green.
 - [x] **M2.4 Per-user upload rate limit**: an `upload` bucket on the M1.12
       `RateGuard`, checked per user in the uploads endpoint -> `429`. Tested.
-- [ ] **M2.5 Compose adds `pgsty/minio`**; Testcontainers S3 integration suite runs
-      the full presign→PUT→thumbnail→message.updated loop.
-- [ ] **M2.6 Tigris verification on Fly** (manual checklist + docs note) - proves the
-      generic-S3 claim against a second implementation.
-- [ ] **M2.7 Scala 3.9 LTS upgrade check** (scheduled here deliberately): if
-      http4s/tapir/skunk publish for 3.9, take the upgrade; else re-check at M4.
+- [x] **M2.5 Compose adds `pgsty/minio`** (pinned by digest, `server /data`,
+      health-gated); `MinioMediaSuite` runs the full loop against a real MinIO via
+      Testcontainers: presign -> HTTP PUT to the presigned URL -> `markStored` ->
+      worker downloads/resizes/writes-back through the live S3 `ObjectStore` ->
+      `thumbnailed` + a real 512px thumbnail object + the patched `message.updated`.
+      This covers the one seam the in-memory M2.3 test could not. 80 green.
+- [~] **M2.6 Tigris verification on Fly**: the generic-S3 path is now proven against
+      a real second implementation (MinIO, M2.5) - the app only ever does
+      presign/get/put, never vendor admin APIs. The Tigris-on-Fly run itself needs
+      live Fly + Tigris accounts, so it stays a **manual user checklist** (compose
+      documents the swap); not a code task.
+- [~] **M2.7 Scala 3.9 LTS upgrade check** (done 10/06/2026): Scala 3.9 LTS targets
+      Q2 2026 and is *feature-frozen* (identical to 3.8) with a JDK 17 baseline;
+      3.3.7 LTS is supported to ~Q2 2027. Decision: **stay on 3.3.7, re-check at M4**
+      (per this task's fallback). 3.9 is days-old, brings no feature we need, and a
+      compiler bump risks the CI gate (tpolecat warnings-as-errors, scalafmt
+      dialect) for no gain; Scala 3 forward binary-compat means the 3.3-built
+      http4s/tapir/skunk will keep working when we do upgrade. Recorded in SPEC §2.
 
 ---
 
