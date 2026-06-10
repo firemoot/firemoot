@@ -12,6 +12,7 @@ import com.firemoot.domain.{Channel, Message, User}
 import com.firemoot.service.{
   ChannelService,
   MessageService,
+  ModerationService,
   QueryService,
   ReactionService,
   ReadService,
@@ -63,6 +64,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               ReadService(pool, backplane),
               QueryService(pool),
               WebhookService(pool),
+              ModerationService(pool, WebhookService(pool)),
             )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
 
@@ -139,6 +141,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               ReadService(pool, backplane),
               QueryService(pool),
               WebhookService(pool),
+              ModerationService(pool, WebhookService(pool)),
             )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val chPath = "/v1/channels/messaging/room2"
@@ -200,6 +203,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               ReadService(pool, backplane),
               QueryService(pool),
               WebhookService(pool),
+              ModerationService(pool, WebhookService(pool)),
             )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val msgs = "/v1/channels/messaging/room3/messages"
@@ -255,6 +259,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
             ReadService(pool, backplane),
             QueryService(pool),
             WebhookService(pool),
+            ModerationService(pool, WebhookService(pool)),
           )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val msgs = "/v1/channels/messaging/room4/messages"
@@ -310,6 +315,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
             ReadService(pool, backplane),
             QueryService(pool),
             WebhookService(pool),
+            ModerationService(pool, WebhookService(pool)),
           )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
 
@@ -350,6 +356,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
             ReadService(pool, backplane),
             QueryService(pool),
             WebhookService(pool),
+            ModerationService(pool, WebhookService(pool)),
           )
           val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val msgs = "/v1/channels/qt/qroom/messages"
@@ -360,10 +367,11 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
             _ <- app.run(post("/v1/users", UpsertUserRequest("ivy", None, None, None, None)))
             _ <-
               app.run(post("/v1/channels", CreateChannelRequest("qt", "qroom", Some("ivy"), None)))
-            _ <- app.run(post(
+            m1Res <- app.run(post(
               msgs,
               SendMessageRequest(Some("ivy"), Some("hello world"), None, None, None),
             ))
+            m1 <- m1Res.as[Message]
             _ <- app.run(post(
               msgs,
               SendMessageRequest(Some("ivy"), Some("second message"), None, None, None),
@@ -386,7 +394,17 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
             searchRes <- app.run(post("/v1/search", SearchRequest("hello", Some("qt:qroom"), None)))
             _ = assertEquals(searchRes.status, Status.Ok)
             hits <- searchRes.as[SearchPage]
-          yield assertEquals(hits.hits.map(_.message.text), List(Some("hello world")))
+            _ = assertEquals(hits.hits.map(_.message.text), List(Some("hello world")))
+
+            flagRes <-
+              app.run(post(s"$msgs/${m1.id}/flag", FlagMessageRequest("ivy", Some("spam"))))
+            _ = assertEquals(flagRes.status, Status.Created)
+            flag <- flagRes.as[Flag]
+            _ = assertEquals(flag.flaggedUser, Some("ivy"))
+            flagsRes <- app.run(get("/v1/moderation/flags"))
+            _ = assertEquals(flagsRes.status, Status.Ok)
+            flags <- flagsRes.as[List[Flag]]
+          yield assertEquals(flags.map(_.messageId), List(m1.id))
         }
       }
     }

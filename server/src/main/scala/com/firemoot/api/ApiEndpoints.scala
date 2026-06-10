@@ -172,6 +172,21 @@ object ApiEndpoints:
       .out(statusCode(StatusCode.NoContent))
       .summary("Delete a webhook endpoint")
 
+  val flagMessage =
+    base.post
+      .in(messagePath / "flag")
+      .in(jsonBody[FlagMessageRequest])
+      .out(statusCode(StatusCode.Created))
+      .out(jsonBody[Flag])
+      .summary("Flag a message for moderation")
+
+  val listFlags =
+    base.get
+      .in("moderation" / "flags")
+      .in(query[Option[String]]("status"))
+      .out(jsonBody[List[Flag]])
+      .summary("List moderation flags (default: open)")
+
   val all: List[AnyEndpoint] = List(
     upsertUser,
     deleteUser,
@@ -193,4 +208,6 @@ object ApiEndpoints:
     createWebhook,
     listWebhooks,
     deleteWebhook,
+    flagMessage,
+    listFlags,
   )

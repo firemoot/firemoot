@@ -95,6 +95,28 @@ export type EditMessageRequest = {
 };
 
 /**
+ * Flag
+ */
+export type Flag = {
+    id: string;
+    messageId: string;
+    cid: string;
+    flaggedUser?: string;
+    flaggedBy: string;
+    reason?: string;
+    status: string;
+    createdAt: string;
+};
+
+/**
+ * FlagMessageRequest
+ */
+export type FlagMessageRequest = {
+    userId: string;
+    reason?: string;
+};
+
+/**
  * Map_Long
  */
 export type MapLong = {
@@ -739,3 +761,51 @@ export type DeleteV1WebhooksIdResponses = {
 };
 
 export type DeleteV1WebhooksIdResponse = DeleteV1WebhooksIdResponses[keyof DeleteV1WebhooksIdResponses];
+
+export type PostV1ChannelsTypeIdMessagesMessageidFlagData = {
+    body: FlagMessageRequest;
+    path: {
+        type: string;
+        id: string;
+        messageId: string;
+    };
+    query?: never;
+    url: '/v1/channels/{type}/{id}/messages/{messageId}/flag';
+};
+
+export type PostV1ChannelsTypeIdMessagesMessageidFlagErrors = {
+    /**
+     * Invalid value for: path parameter messageId, Invalid value for: body
+     */
+    400: string;
+    default: Problem;
+};
+
+export type PostV1ChannelsTypeIdMessagesMessageidFlagError = PostV1ChannelsTypeIdMessagesMessageidFlagErrors[keyof PostV1ChannelsTypeIdMessagesMessageidFlagErrors];
+
+export type PostV1ChannelsTypeIdMessagesMessageidFlagResponses = {
+    201: Flag;
+};
+
+export type PostV1ChannelsTypeIdMessagesMessageidFlagResponse = PostV1ChannelsTypeIdMessagesMessageidFlagResponses[keyof PostV1ChannelsTypeIdMessagesMessageidFlagResponses];
+
+export type GetV1ModerationFlagsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        status?: string;
+    };
+    url: '/v1/moderation/flags';
+};
+
+export type GetV1ModerationFlagsErrors = {
+    default: Problem;
+};
+
+export type GetV1ModerationFlagsError = GetV1ModerationFlagsErrors[keyof GetV1ModerationFlagsErrors];
+
+export type GetV1ModerationFlagsResponses = {
+    200: Array<Flag>;
+};
+
+export type GetV1ModerationFlagsResponse = GetV1ModerationFlagsResponses[keyof GetV1ModerationFlagsResponses];

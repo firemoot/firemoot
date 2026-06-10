@@ -1080,6 +1080,122 @@
           }
         }
       }
+    },
+    "/v1/channels/{type}/{id}/messages/{messageId}/flag" : {
+      "post" : {
+        "summary" : "Flag a message for moderation",
+        "operationId" : "postV1ChannelsTypeIdMessagesMessageidFlag",
+        "parameters" : [
+          {
+            "name" : "type",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "id",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "messageId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/FlagMessageRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Flag"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid value for: path parameter messageId, Invalid value for: body",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/moderation/flags" : {
+      "get" : {
+        "summary" : "List moderation flags (default: open)",
+        "operationId" : "getV1ModerationFlags",
+        "parameters" : [
+          {
+            "name" : "status",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/Flag"
+                  }
+                }
+              }
+            }
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components" : {
@@ -1288,6 +1404,62 @@
           },
           "custom" : {
             
+          }
+        }
+      },
+      "Flag" : {
+        "title" : "Flag",
+        "type" : "object",
+        "required" : [
+          "id",
+          "messageId",
+          "cid",
+          "flaggedBy",
+          "status",
+          "createdAt"
+        ],
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "messageId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "cid" : {
+            "type" : "string"
+          },
+          "flaggedUser" : {
+            "type" : "string"
+          },
+          "flaggedBy" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "FlagMessageRequest" : {
+        "title" : "FlagMessageRequest",
+        "type" : "object",
+        "required" : [
+          "userId"
+        ],
+        "properties" : {
+          "userId" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
           }
         }
       },

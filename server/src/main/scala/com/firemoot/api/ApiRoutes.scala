@@ -4,6 +4,7 @@ import cats.effect.IO
 import com.firemoot.service.{
   ChannelService,
   MessageService,
+  ModerationService,
   QueryService,
   ReactionService,
   ReadService,
@@ -27,6 +28,7 @@ final class ApiRoutes(
     reads: ReadService,
     queries: QueryService,
     webhooks: WebhookService,
+    moderation: ModerationService,
 ):
 
   private def cid(channelType: String, id: String): String = s"$channelType:$id"
@@ -203,6 +205,19 @@ final class ApiRoutes(
       }
     }
 
+  private val flagMessageServer =
+    ApiEndpoints.flagMessage.serverLogic { case (channelType, id, messageId, req) =>
+      moderation.flag(cid(channelType, id), messageId, req.userId, req.reason).map {
+        case Some(flag) => Right(flag)
+        case None => Left(notFound(s"message '$messageId'"))
+      }
+    }
+
+  private val listFlagsServer =
+    ApiEndpoints.listFlags.serverLogic { status =>
+      moderation.listFlags(status.getOrElse("open")).map(Right(_))
+    }
+
   val routes: HttpRoutes[IO] =
     Http4sServerInterpreter[IO]().toRoutes(
       List(
@@ -226,6 +241,8 @@ final class ApiRoutes(
         createWebhookServer,
         listWebhooksServer,
         deleteWebhookServer,
+        flagMessageServer,
+        listFlagsServer,
       )
     )
 

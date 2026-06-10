@@ -12,6 +12,7 @@ import com.firemoot.http.{DemoRoutes, HealthRoutes}
 import com.firemoot.service.{
   ChannelService,
   MessageService,
+  ModerationService,
   PresenceService,
   QueryService,
   ReactionService,
@@ -41,6 +42,7 @@ object Application:
       devDemo: Boolean = false,
       onUserActive: String => IO[Unit] = _ => IO.unit,
   ): WebSocketBuilder2[IO] => HttpApp[IO] =
+    val webhooks = WebhookService(pool)
     val api = ApiRoutes(
       UserService(pool),
       ChannelService(pool, backplane),
@@ -48,7 +50,8 @@ object Application:
       ReactionService(pool, backplane),
       ReadService(pool, backplane),
       QueryService(pool),
-      WebhookService(pool),
+      webhooks,
+      ModerationService(pool, webhooks),
     )
     val securedApi = ServerHmacAuth(ApiKeys.fromConfig(cfg))(api.routes)
     val ws =

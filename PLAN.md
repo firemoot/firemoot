@@ -282,8 +282,14 @@ Ordered so each task ships behind a passing protocol/integration suite.
       delivery, and retry-then-dead-letter on a failing endpoint. `user.flagged`
       enqueues for free once moderation publishes it (M1.11). New endpoints
       regenerated into `@firemoot/core`. 60 green.
-- [ ] **M1.11 Moderation**: message flagging endpoint + queue table, `user.flagged`
-      webhook event.
+- [x] **M1.11 Moderation**: `POST /v1/channels/{type}/{id}/messages/{messageId}/flag`
+      records a flag in the `message_flags` queue (V003 migration), capturing the
+      message's author, and enqueues a `user.flagged` webhook event directly (so
+      external moderation tooling is notified) - deliberately **not** broadcast
+      over WebSockets, keeping moderation off the member-facing timeline.
+      `GET /v1/moderation/flags?status=` lists the queue (admin UI surfaces it in
+      M3). 404 for an absent message. Service + HTTP wiring tests; new endpoints
+      regenerated into `@firemoot/core`. 61 green.
 - [ ] **M1.12 Rate limiting**: token-bucket per API key and per user behind a
       `RateLimiter` trait (in-memory impl); applied to connects, sends, uploads,
       search.

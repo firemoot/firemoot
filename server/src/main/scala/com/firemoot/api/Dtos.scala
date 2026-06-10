@@ -177,3 +177,25 @@ final case class WebhookEndpoint(
 object WebhookEndpoint:
   given Codec[WebhookEndpoint] = deriveCodec
   given Schema[WebhookEndpoint] = Schema.derived
+
+final case class FlagMessageRequest(userId: String, reason: Option[String])
+
+object FlagMessageRequest:
+  given Codec[FlagMessageRequest] = deriveCodec
+  given Schema[FlagMessageRequest] = Schema.derived
+
+/** A moderation flag against a message. `flaggedUser` is the message's author. */
+final case class Flag(
+    id: UUID,
+    messageId: UUID,
+    cid: String,
+    flaggedUser: Option[String],
+    flaggedBy: String,
+    reason: Option[String],
+    status: String,
+    createdAt: OffsetDateTime,
+)
+
+object Flag:
+  given Codec[Flag] = deriveCodec
+  given Schema[Flag] = Schema.derived
