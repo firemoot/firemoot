@@ -4,6 +4,7 @@ import java.security.SecureRandom
 import java.time.ZoneOffset
 
 import cats.effect.IO
+import com.firemoot.auth.ApiKeyService
 import com.firemoot.metrics.MetricsService
 import com.firemoot.service.WebhookService
 import io.circe.generic.semiauto.deriveCodec
@@ -30,6 +31,7 @@ final class AdminRoutes(
     admin: AdminService,
     metrics: MetricsService,
     webhooks: WebhookService,
+    apiKeys: ApiKeyService,
     ccuNow: IO[Int],
     secureCookies: Boolean,
 ):
@@ -80,6 +82,20 @@ final class AdminRoutes(
       withSession(req) {
         webhooks.replay(id).flatMap {
           case true => Ok(Json.obj("replayed" -> true.asJson))
+          case false => IO.pure(Response[IO](Status.NotFound))
+        }
+      }
+
+    case req @ GET -> Root / "admin" / "api-keys" =>
+      withSession(req)(apiKeys.list.flatMap(keys => Ok(keys.asJson)))
+
+    case req @ POST -> Root / "admin" / "api-keys" =>
+      withSession(req)(apiKeys.create.flatMap(created => Created(created.asJson)))
+
+    case req @ POST -> Root / "admin" / "api-keys" / id / "revoke" =>
+      withSession(req) {
+        apiKeys.revoke(id).flatMap {
+          case true => Ok(Json.obj("revoked" -> true.asJson))
           case false => IO.pure(Response[IO](Status.NotFound))
         }
       }

@@ -389,14 +389,17 @@ queries/FTS, webhooks, moderation and rate limiting.
       (double-submit) - the M3.5 admin data routes build on it. Local password only
       in v1 (OIDC is v1.x). Tested: hasher, service (no-default/login/session), and
       the login->cookie->session route flow. 87 green.
-- [~] **M3.5 Admin SPA** (backend data API started): `GET /admin/metrics` (live
-      tiles) and `GET /admin/metrics/daily?metric=&days=` (90-day default series)
-      are wired behind `AdminRoutes.withSession`. **Still to do:** webhook
-      dead-letter list + replay endpoint (closes the M1.10 loop), DB-backed API key
-      rotation (the `api_keys` table exists; `ApiKeys` is config-only today - M1.1
-      deferred DB keys here), and the Vite + TS SPA itself (charts: MAU/DAU/WAU,
-      CCU p95/max + live, messages/day stacked by type, storage) baked into binary
-      resources at `/admin`. Chart lib still to decide (uPlot vs Chart.js).
+- [~] **M3.5 Admin SPA** (**backend complete**; SPA frontend remains): behind
+      `AdminRoutes.withSession` (+ CSRF on mutations) - `GET /admin/metrics` (live
+      tiles), `GET /admin/metrics/daily?metric=&days=` (90-day series),
+      `GET/POST /admin/webhooks/dead-letters[/{id}/replay]` (closes the M1.10 loop),
+      and DB-backed API key rotation: `GET/POST /admin/api-keys` +
+      `POST /admin/api-keys/{id}/revoke`. `ApiKeys.fromConfigAndDb` now resolves the
+      config bootstrap key **and** live `api_keys` rows, so a created key
+      authenticates immediately and a revoked one stops - no restart. **Still to
+      do:** the Vite + TS SPA itself (charts: MAU/DAU/WAU, CCU p95/max + live,
+      messages/day stacked by type, storage) baked into binary resources at
+      `/admin`; chart lib decision (uPlot vs Chart.js). 89 green.
 - [ ] **M3.6 Soak baseline**: k6 WS scenario (N idle + M msg/s) running nightly;
       record memory and p99 delivery latency thresholds as CI regression gates
       (SPEC §12).

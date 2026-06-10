@@ -5,6 +5,7 @@ import ciris.Secret
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import com.firemoot.api.CreateWebhookRequest
+import com.firemoot.auth.ApiKeyService
 import com.firemoot.config.DbConfig
 import com.firemoot.db.{Database, Migrations}
 import com.firemoot.domain.Event
@@ -46,6 +47,7 @@ class AdminRoutesSuite extends CatsEffectSuite, TestContainerForAll:
             service,
             MetricsService(pool),
             WebhookService(pool),
+            ApiKeyService(pool),
             IO.pure(3),
             secureCookies = false,
           ).routes.orNotFound
@@ -101,6 +103,7 @@ class AdminRoutesSuite extends CatsEffectSuite, TestContainerForAll:
           service,
           MetricsService(pool),
           webhooks,
+          ApiKeyService(pool),
           IO.pure(0),
           secureCookies = false,
         ).routes.orNotFound
