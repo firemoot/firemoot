@@ -49,8 +49,9 @@ during that task and recorded in SPEC.md's Decisions Log.
       not published).
 - [ ] **0.3 CI workflow** (`.github/workflows/ci.yml`): jobs for `scala` (compile +
       test), `sdk` (typecheck + test), both cached. Runs on PR + main.
-- [ ] **0.4 Branch protection on `main`** - *user task, needs admin*: require CI green,
-      no force push.
+- [x] **0.4 Branch protection on `main`**: force pushes and deletion blocked
+      (done 10/06/2026); extend with required status checks once 0.3's CI workflow
+      exists and reports.
 
 Acceptance: a PR with a trivial change runs both jobs green.
 
@@ -328,13 +329,14 @@ docs generator, Node floor) get recorded in SPEC.md §2 in the same PR.
 
 ---
 
-## 12. Operational checklist (user tasks, before public launch)
+## 12. Operational checklist (user tasks - deferred until the product is built
+and tested locally, but completed before the public flip)
 
 - [ ] npm org `@firemoot`
 - [ ] Docker Hub org `firemoot`
-- [ ] Domains: firemoot.com / .io / .dev / .chat (at minimum .dev for docs +
-      security contact)
-- [ ] Real disclosure mailbox behind SECURITY.md address
+- [ ] Domains: **firemoot.com is canonical** (docs, security contact, everything);
+      .io / .dev / .chat as defensive registrations
+- [ ] Real mailbox behind security@firemoot.com (SECURITY.md address)
 - [ ] Branch protection on `firemoot/firemoot` main (Phase 0.4)
 - [ ] Trademark decision (SPEC open question 5 - £170 UK filing, user's call)
 

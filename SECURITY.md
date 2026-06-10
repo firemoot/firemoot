@@ -2,8 +2,7 @@
 
 ## Reporting a vulnerability
 
-Please report suspected vulnerabilities privately to **security@firemoot.dev**
-<!-- TODO: replace with the real monitored disclosure address before the repo goes public -->
+Please report suspected vulnerabilities privately to **security@firemoot.com**
 or via GitHub's private vulnerability reporting on this repository.
 
 Please do not open public issues for security reports.

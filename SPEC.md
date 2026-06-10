@@ -264,7 +264,8 @@ Two packages, npm scope `@firemoot`:
 - Server-side usage (token mint, server API) works in any Node runtime including
   serverless (it is plain HTTPS + JWT signing); only the realtime client needs a
   socket.
-- Browser + Node 20+; ESM; zero runtime deps beyond a WS shim for Node.
+- Browser + Node 22+ (amended 10/06/2026: Node 20 reached EOL Apr 2026); ESM; zero
+  runtime deps beyond a WS shim for Node.
 
 Scala server SDK comes free (the domain client is the server's own); other languages
 are post-v1, community-driven via the OpenAPI spec.
@@ -346,8 +347,9 @@ over HTTPS), exactly as it would be a client of Stream.
 
 ## 16. Assets Checklist (all verified free 10/06/2026 - register before public code)
 
-- [ ] firemoot.com / firemoot.io / firemoot.dev / firemoot.chat (RDAP-clear; .com via
-      Verisign authoritative)
+- [ ] firemoot.com (canonical - used throughout for docs and security contact) /
+      firemoot.io / firemoot.dev / firemoot.chat (RDAP-clear; .com via Verisign
+      authoritative)
 - [ ] GitHub org `firemoot`
 - [ ] npm org `@firemoot`
 - [ ] Docker Hub org `firemoot`
