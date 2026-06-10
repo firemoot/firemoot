@@ -1,27 +1,23 @@
 package com.firemoot.api
 
 import cats.effect.IO
-import com.firemoot.config.ServerConfig
 import com.firemoot.service.{ChannelService, MessageService, UserService}
 import io.circe.Json
 import org.http4s.HttpRoutes
 import sttp.tapir.server.http4s.Http4sServerInterpreter
 
+/**
+ * The unauthenticated REST routes; the [[com.firemoot.auth.ServerHmacAuth]]
+ * middleware wraps them in [[com.firemoot.Application]].
+ */
 final class ApiRoutes(
-    cfg: ServerConfig,
     users: UserService,
     channels: ChannelService,
     messages: MessageService,
 ):
 
-  private def authenticate(key: String): IO[Either[Problem, ServerPrincipal]] =
-    IO.pure(
-      if key == cfg.apiKeyId then Right(ServerPrincipal(key))
-      else Left(Problem.of(401, "Unauthorized", Some("Invalid or missing API key")))
-    )
-
   private val upsertUserServer =
-    ApiEndpoints.upsertUser.serverSecurityLogic(authenticate).serverLogic { _ => req =>
+    ApiEndpoints.upsertUser.serverLogic { req =>
       users
         .upsert(
           req.id,
@@ -34,26 +30,24 @@ final class ApiRoutes(
     }
 
   private val createChannelServer =
-    ApiEndpoints.createChannel.serverSecurityLogic(authenticate).serverLogic { _ => req =>
+    ApiEndpoints.createChannel.serverLogic { req =>
       channels
         .create(req.`type`, req.id, req.createdBy, req.custom.getOrElse(Json.obj()))
         .map(Right(_))
     }
 
   private val sendMessageServer =
-    ApiEndpoints.sendMessage.serverSecurityLogic(authenticate).serverLogic { _ =>
-      { case (channelType, id, req) =>
-        messages
-          .send(
-            cid = s"$channelType:$id",
-            userId = req.userId,
-            text = req.text,
-            custom = req.custom.getOrElse(Json.obj()),
-            attachments = req.attachments.getOrElse(Json.arr()),
-            parentMessageId = req.parentMessageId,
-          )
-          .map(Right(_))
-      }
+    ApiEndpoints.sendMessage.serverLogic { case (channelType, id, req) =>
+      messages
+        .send(
+          cid = s"$channelType:$id",
+          userId = req.userId,
+          text = req.text,
+          custom = req.custom.getOrElse(Json.obj()),
+          attachments = req.attachments.getOrElse(Json.arr()),
+          parentMessageId = req.parentMessageId,
+        )
+        .map(Right(_))
     }
 
   val routes: HttpRoutes[IO] =

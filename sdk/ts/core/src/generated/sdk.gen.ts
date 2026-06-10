@@ -22,7 +22,6 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
  * Create or update a user
  */
 export const postV1Users = <ThrowOnError extends boolean = false>(options: Options<PostV1UsersData, ThrowOnError>): RequestResult<PostV1UsersResponses, PostV1UsersErrors, ThrowOnError> => (options.client ?? client).post<PostV1UsersResponses, PostV1UsersErrors, ThrowOnError>({
-    security: [{ name: 'X-Firemoot-Key', type: 'apiKey' }],
     url: '/v1/users',
     ...options,
     headers: {
@@ -35,7 +34,6 @@ export const postV1Users = <ThrowOnError extends boolean = false>(options: Optio
  * Create a channel
  */
 export const postV1Channels = <ThrowOnError extends boolean = false>(options: Options<PostV1ChannelsData, ThrowOnError>): RequestResult<PostV1ChannelsResponses, PostV1ChannelsErrors, ThrowOnError> => (options.client ?? client).post<PostV1ChannelsResponses, PostV1ChannelsErrors, ThrowOnError>({
-    security: [{ name: 'X-Firemoot-Key', type: 'apiKey' }],
     url: '/v1/channels',
     ...options,
     headers: {
@@ -48,7 +46,6 @@ export const postV1Channels = <ThrowOnError extends boolean = false>(options: Op
  * Send a message to a channel
  */
 export const postV1ChannelsTypeIdMessages = <ThrowOnError extends boolean = false>(options: Options<PostV1ChannelsTypeIdMessagesData, ThrowOnError>): RequestResult<PostV1ChannelsTypeIdMessagesResponses, PostV1ChannelsTypeIdMessagesErrors, ThrowOnError> => (options.client ?? client).post<PostV1ChannelsTypeIdMessagesResponses, PostV1ChannelsTypeIdMessagesErrors, ThrowOnError>({
-    security: [{ name: 'X-Firemoot-Key', type: 'apiKey' }],
     url: '/v1/channels/{type}/{id}/messages',
     ...options,
     headers: {

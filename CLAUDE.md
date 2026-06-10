@@ -43,6 +43,10 @@ After editing `mise.toml`, run `mise trust && mise install`.
   RSS/$7-VPS pitch.
 - **pnpm via mise** uses the `npm:` backend (`"npm:pnpm"` in `mise.toml`); the aqua
   registry mis-packages pnpm's linux-x64 asset.
+- **Auth middleware ordering:** an http4s auth middleware (e.g. `ServerHmacAuth`)
+  short-circuits the whole request before the inner route's path is checked, so it
+  must be composed **last** in the `<+>` chain - otherwise it 401s sibling routes
+  like `/v1/ws` and `/healthz`. Don't run inner routes before auth (side effects).
 
 ## Conventions
 

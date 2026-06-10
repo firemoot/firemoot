@@ -43,20 +43,14 @@
           "default" : {
             "description" : "",
             "content" : {
-              "application/json" : {
+              "application/problem+json" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/Problem"
                 }
               }
             }
           }
-        },
-        "security" : [
-          {
-            "apiKeyAuth" : [
-            ]
-          }
-        ]
+        }
       }
     },
     "/v1/channels" : {
@@ -97,20 +91,14 @@
           "default" : {
             "description" : "",
             "content" : {
-              "application/json" : {
+              "application/problem+json" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/Problem"
                 }
               }
             }
           }
-        },
-        "security" : [
-          {
-            "apiKeyAuth" : [
-            ]
-          }
-        ]
+        }
       }
     },
     "/v1/channels/{type}/{id}/messages" : {
@@ -169,20 +157,14 @@
           "default" : {
             "description" : "",
             "content" : {
-              "application/json" : {
+              "application/problem+json" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/Problem"
                 }
               }
             }
           }
-        },
-        "security" : [
-          {
-            "apiKeyAuth" : [
-            ]
-          }
-        ]
+        }
       }
     }
   },
@@ -444,13 +426,6 @@
             "format" : "date-time"
           }
         }
-      }
-    },
-    "securitySchemes" : {
-      "apiKeyAuth" : {
-        "type" : "apiKey",
-        "name" : "X-Firemoot-Key",
-        "in" : "header"
       }
     }
   }

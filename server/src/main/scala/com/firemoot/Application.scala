@@ -3,6 +3,7 @@ package com.firemoot
 import cats.effect.{IO, Resource}
 import cats.syntax.semigroupk.*
 import com.firemoot.api.ApiRoutes
+import com.firemoot.auth.{ApiKeys, ServerHmacAuth}
 import com.firemoot.backplane.Backplane
 import com.firemoot.config.ServerConfig
 import com.firemoot.http.{DemoRoutes, HealthRoutes}
@@ -28,20 +29,18 @@ object Application:
       registry: ConnectionRegistry,
       devDemo: Boolean = false,
   ): WebSocketBuilder2[IO] => HttpApp[IO] =
-    val api = ApiRoutes(
-      cfg,
-      UserService(pool),
-      ChannelService(pool),
-      MessageService(pool, backplane),
-    )
-    val ws = WsRoutes(backplane, registry, EventReplay(pool), pool)
+    val api = ApiRoutes(UserService(pool), ChannelService(pool), MessageService(pool, backplane))
+    val securedApi = ServerHmacAuth(ApiKeys.fromConfig(cfg))(api.routes)
+    val ws = WsRoutes(backplane, registry, EventReplay(pool), pool, cfg.apiSecret.value, devDemo)
     val openApi = HttpRoutes.of[IO] { case GET -> Root / "v1" / "openapi.json" =>
       Ok(api.openApiJson).map(_.withContentType(`Content-Type`(MediaType.application.json)))
     }
     val demo = if devDemo then DemoRoutes.routes else HttpRoutes.empty[IO]
 
+    // securedApi is last: health, openapi, demo and ws own their paths and must not
+    // be intercepted by the HMAC middleware (which would 401 the WS handshake).
     wsb =>
       Logger.httpApp(logHeaders = true, logBody = false)(
-        (HealthRoutes(pool).routes <+> api.routes <+> openApi <+> demo <+>
-          ws.routes(wsb)).orNotFound
+        (HealthRoutes(pool).routes <+> openApi <+> demo <+>
+          ws.routes(wsb) <+> securedApi).orNotFound
       )

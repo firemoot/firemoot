@@ -182,10 +182,15 @@ complete** - tapir->codegen and fs2 WS fan-out, the two riskiest seams, both pro
 
 Ordered so each task ships behind a passing protocol/integration suite.
 
-- [ ] **M1.1 Auth, properly**: HS256 JWT verification (constant-time HMAC, required
-      `exp`, ±60s skew), `sub`/`role` claims; server API HMAC request signing
-      (key id + signature header, canonical request); per-endpoint authz middleware
-      (membership/role checks server-side, no client-asserted identity).
+- [x] **M1.1 Auth, properly**: `JwtAuth` HS256 verification (jwt-scala's
+      constant-time compare, required `exp`, ±60s leeway), `sub`/`role` claims -
+      used by the WS gateway (`?user=` now dev-only). `HmacSigner` + `ServerHmacAuth`
+      middleware sign+verify server requests over a canonical
+      `method\npath\ntimestamp\nsha256(body)` (constant-time, ±300s window), keyed
+      by `ApiKeys` (config bootstrap key; DB keys in M3). Errors are
+      `application/problem+json` (RFC 9457). Membership/role authz isn't needed yet
+      (current surface is all server-trusted); it lands with client-authenticated
+      endpoints. Unit + integration tested; tapir `securityIn` removed (SDK regenerated).
 - [ ] **M1.2 Users**: upsert/delete (GDPR hard-delete: erase user row + authored
       message text/custom → tombstone, cascade reactions/memberships; document
       exactly what survives); `last_active_at` debounced writes.

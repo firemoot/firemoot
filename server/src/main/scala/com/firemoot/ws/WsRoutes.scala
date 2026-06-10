@@ -7,6 +7,7 @@ import scala.concurrent.duration.*
 import cats.effect.std.Queue
 import cats.effect.{IO, Ref, Resource}
 import cats.syntax.all.*
+import com.firemoot.auth.JwtAuth
 import com.firemoot.backplane.Backplane
 import com.firemoot.db.SessionSyntax.*
 import com.firemoot.db.UserRepo
@@ -15,9 +16,10 @@ import fs2.{Pipe, Stream}
 import io.circe.Json
 import io.circe.syntax.*
 import org.http4s.dsl.io.*
+import org.http4s.headers.`Content-Type`
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.http4s.websocket.WebSocketFrame
-import org.http4s.{HttpRoutes, Response}
+import org.http4s.{HttpRoutes, MediaType, Response, Status}
 import skunk.Session
 
 /**
@@ -35,6 +37,8 @@ final class WsRoutes(
     registry: ConnectionRegistry,
     replay: EventReplay,
     pool: Resource[IO, Session[IO]],
+    jwtSecret: String,
+    devDemo: Boolean,
 ):
 
   private object TokenParam extends OptionalQueryParamDecoderMatcher[String]("token")
@@ -42,9 +46,23 @@ final class WsRoutes(
 
   def routes(wsb: WebSocketBuilder2[IO]): HttpRoutes[IO] = HttpRoutes.of[IO] {
     case GET -> Root / "v1" / "ws" :? TokenParam(token) +& UserParam(userParam) =>
-      val userId = token.flatMap(TokenAuth.subject).orElse(userParam).getOrElse("anonymous")
-      open(wsb, userId)
+      resolveUser(token, userParam) match
+        case Some(userId) => open(wsb, userId)
+        case None => IO.pure(unauthorized)
   }
+
+  /**
+   * A verified JWT `sub` wins; the `?user=` shortcut is honoured only in dev mode
+   * (until token minting in the SDK). No valid credential -> rejected.
+   */
+  private def resolveUser(token: Option[String], userParam: Option[String]): Option[String] =
+    token.flatMap(t => JwtAuth.verify(jwtSecret, t).toOption.map(_.sub))
+      .orElse(Option.when(devDemo)(userParam).flatten)
+
+  private val unauthorized: Response[IO] =
+    Response[IO](Status.Unauthorized)
+      .withEntity("""{"type":"about:blank","title":"Unauthorized","status":401}""")
+      .withContentType(`Content-Type`(MediaType.unsafeParse("application/problem+json")))
 
   private def text(json: Json): WebSocketFrame = WebSocketFrame.Text(json.noSpaces)
 
