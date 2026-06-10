@@ -2,6 +2,7 @@ package com.firemoot.ws
 
 import cats.effect.{IO, Resource}
 import com.firemoot.db.EventRepo
+import com.firemoot.db.SessionSyntax.*
 import com.firemoot.domain.Event
 import skunk.Session
 
@@ -12,11 +13,6 @@ import skunk.Session
 final class EventReplay(pool: Resource[IO, Session[IO]]):
 
   def since(cid: String, lastSeenSeq: Long): IO[List[Event]] =
-    pool.use { session =>
-      session.prepare(EventRepo.since).flatMap { pq =>
-        pq.stream((cid, lastSeenSeq), 64)
-          .map((seq, eventType, payload) => Event(eventType, cid, seq, payload))
-          .compile
-          .toList
-      }
-    }
+    pool
+      .use(_.runList(EventRepo.since, (cid, lastSeenSeq)))
+      .map(_.map((seq, eventType, payload) => Event(eventType, cid, seq, payload)))

@@ -8,6 +8,7 @@ import cats.effect.std.Queue
 import cats.effect.{IO, Ref, Resource}
 import cats.syntax.all.*
 import com.firemoot.backplane.Backplane
+import com.firemoot.db.SessionSyntax.*
 import com.firemoot.db.UserRepo
 import com.firemoot.domain.UuidV7
 import fs2.{Pipe, Stream}
@@ -48,7 +49,7 @@ final class WsRoutes(
   private def text(json: Json): WebSocketFrame = WebSocketFrame.Text(json.noSpaces)
 
   private def lookupUser(userId: String): IO[Json] =
-    pool.use(_.prepare(UserRepo.byId).flatMap(_.option(userId))).map {
+    pool.use(_.runOption(UserRepo.byId, userId)).map {
       case Some(user) => user.asJson
       case None => Json.obj("id" -> userId.asJson)
     }

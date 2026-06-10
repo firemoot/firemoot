@@ -1,6 +1,7 @@
 package com.firemoot.service
 
 import cats.effect.{IO, Resource}
+import com.firemoot.db.SessionSyntax.*
 import com.firemoot.db.UserRepo
 import com.firemoot.domain.User
 import io.circe.Json
@@ -15,4 +16,4 @@ final class UserService(pool: Resource[IO, Session[IO]]):
       role: String,
       custom: Json,
   ): IO[User] =
-    pool.use(_.prepare(UserRepo.upsert).flatMap(_.unique((id, name, image, role, custom))))
+    pool.use(_.runUnique(UserRepo.upsert, (id, name, image, role, custom)))

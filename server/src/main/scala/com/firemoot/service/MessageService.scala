@@ -4,6 +4,7 @@ import java.util.UUID
 
 import cats.effect.{IO, Resource}
 import com.firemoot.backplane.Backplane
+import com.firemoot.db.SessionSyntax.*
 import com.firemoot.db.{ChannelRepo, EventRepo, MessageRepo}
 import com.firemoot.domain.{Event, Message, UuidV7}
 import io.circe.Json
@@ -29,26 +30,13 @@ final class MessageService(pool: Resource[IO, Session[IO]], backplane: Backplane
     pool.use { session =>
       session.transaction.use { _ =>
         for
-          seq <- session.prepare(ChannelRepo.bumpSeq).flatMap(_.unique(cid))
+          seq <- session.runUnique(ChannelRepo.bumpSeq, cid)
           id <- UuidV7.next
-          message <- session
-            .prepare(MessageRepo.insert)
-            .flatMap(
-              _.unique((
-                id,
-                cid,
-                seq,
-                userId,
-                "regular",
-                text,
-                custom,
-                attachments,
-                parentMessageId,
-              ))
-            )
-          _ <- session
-            .prepare(EventRepo.insert)
-            .flatMap(_.execute((cid, seq, "message.new", message.asJson)))
+          message <- session.runUnique(
+            MessageRepo.insert,
+            (id, cid, seq, userId, "regular", text, custom, attachments, parentMessageId),
+          )
+          _ <- session.run(EventRepo.insert, (cid, seq, "message.new", message.asJson))
         yield message
       }
     }.flatTap(message => backplane.publish(Event("message.new", cid, message.seq, message.asJson)))

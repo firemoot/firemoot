@@ -3,6 +3,7 @@ package com.firemoot.service
 import cats.effect.{IO, Resource}
 import cats.syntax.all.*
 import com.firemoot.db.ChannelRepo
+import com.firemoot.db.SessionSyntax.*
 import com.firemoot.domain.Channel
 import io.circe.Json
 import skunk.Session
@@ -23,12 +24,9 @@ final class ChannelService(pool: Resource[IO, Session[IO]]):
     pool.use { session =>
       session.transaction.use { _ =>
         for
-          channel <- session
-            .prepare(ChannelRepo.insert)
-            .flatMap(_.unique((cid, channelType, id, createdBy, custom)))
-          _ <- createdBy.traverse_ { uid =>
-            session.prepare(ChannelRepo.addMember).flatMap(_.execute((cid, uid, "owner")))
-          }
+          channel <-
+            session.runUnique(ChannelRepo.insert, (cid, channelType, id, createdBy, custom))
+          _ <- createdBy.traverse_(uid => session.run(ChannelRepo.addMember, (cid, uid, "owner")))
         yield channel
       }
     }
