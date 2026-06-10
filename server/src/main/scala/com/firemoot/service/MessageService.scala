@@ -3,19 +3,20 @@ package com.firemoot.service
 import java.util.UUID
 
 import cats.effect.{IO, Resource}
+import com.firemoot.backplane.Backplane
 import com.firemoot.db.{ChannelRepo, EventRepo, MessageRepo}
-import com.firemoot.domain.{Message, UuidV7}
+import com.firemoot.domain.{Event, Message, UuidV7}
 import io.circe.Json
 import io.circe.syntax.*
 import skunk.Session
 
-final class MessageService(pool: Resource[IO, Session[IO]]):
+final class MessageService(pool: Resource[IO, Session[IO]], backplane: Backplane):
 
   /**
    * Sends a message: allocates the next per-channel seq, inserts the message,
    * and writes the `message.new` event to the replay log - all in one
-   * transaction so the three stay consistent (SPEC.md §3). Backplane fan-out is
-   * wired in M0.7.
+   * transaction so the three stay consistent (SPEC.md §3). After commit the
+   * event is published to the backplane for live WebSocket fan-out (M0.7).
    */
   def send(
       cid: String,
@@ -50,4 +51,4 @@ final class MessageService(pool: Resource[IO, Session[IO]]):
             .flatMap(_.execute((cid, seq, "message.new", message.asJson)))
         yield message
       }
-    }
+    }.flatTap(message => backplane.publish(Event("message.new", cid, message.seq, message.asJson)))

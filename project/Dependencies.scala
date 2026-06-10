@@ -30,6 +30,7 @@ object Dependencies {
     val munitCatsEffect = "2.2.0"
     val scalacheck = "1.19.0"
     val testcontainers = "0.44.1"
+    val jdkHttpClient = "0.9.2"
   }
 
   val runtime: Seq[ModuleID] = Seq(
@@ -87,6 +88,7 @@ object Dependencies {
     "org.scalacheck" %% "scalacheck" % V.scalacheck,
     "com.dimafeng" %% "testcontainers-scala-munit" % V.testcontainers,
     "com.dimafeng" %% "testcontainers-scala-postgresql" % V.testcontainers,
+    "org.http4s" %% "http4s-jdk-http-client" % V.jdkHttpClient,
   ).map(_ % Test)
 
   val all: Seq[ModuleID] =

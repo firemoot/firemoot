@@ -1,0 +1,128 @@
+package com.firemoot.ws
+
+import java.time.ZoneOffset
+
+import scala.concurrent.duration.*
+
+import cats.effect.std.Queue
+import cats.effect.{IO, Ref, Resource}
+import cats.syntax.all.*
+import com.firemoot.backplane.Backplane
+import com.firemoot.db.UserRepo
+import com.firemoot.domain.UuidV7
+import fs2.{Pipe, Stream}
+import io.circe.Json
+import io.circe.syntax.*
+import org.http4s.dsl.io.*
+import org.http4s.server.websocket.WebSocketBuilder2
+import org.http4s.websocket.WebSocketFrame
+import org.http4s.{HttpRoutes, Response}
+import skunk.Session
+
+/**
+ * The WebSocket gateway (SPEC.md §5). One endpoint, plain HTTP upgrade:
+ *   - first frame is `hello` (connection id, server time, the user);
+ *   - `subscribe` replays persisted events past `last_seen_seq` then live-streams;
+ *   - server pings every 25s and reaps a connection that misses ~2 pongs.
+ *
+ * The replay-then-live splice has a small race (an event arriving between the
+ * replay read and joining the live set could duplicate); the client dedupes by
+ * seq, and M1.8 hardens this with buffer-then-dedupe.
+ */
+final class WsRoutes(
+    backplane: Backplane,
+    registry: ConnectionRegistry,
+    replay: EventReplay,
+    pool: Resource[IO, Session[IO]],
+):
+
+  private object TokenParam extends OptionalQueryParamDecoderMatcher[String]("token")
+  private object UserParam extends OptionalQueryParamDecoderMatcher[String]("user")
+
+  def routes(wsb: WebSocketBuilder2[IO]): HttpRoutes[IO] = HttpRoutes.of[IO] {
+    case GET -> Root / "v1" / "ws" :? TokenParam(token) +& UserParam(userParam) =>
+      val userId = token.flatMap(TokenAuth.subject).orElse(userParam).getOrElse("anonymous")
+      open(wsb, userId)
+  }
+
+  private def text(json: Json): WebSocketFrame = WebSocketFrame.Text(json.noSpaces)
+
+  private def lookupUser(userId: String): IO[Json] =
+    pool.use(_.prepare(UserRepo.byId).flatMap(_.option(userId))).map {
+      case Some(user) => user.asJson
+      case None => Json.obj("id" -> userId.asJson)
+    }
+
+  private def open(wsb: WebSocketBuilder2[IO], userId: String): IO[Response[IO]] =
+    for
+      connectionId <- UuidV7.next.map(_.toString)
+      outbound <- Queue.unbounded[IO, Option[WebSocketFrame]]
+      subscribed <- Ref[IO].of(Map.empty[String, Long])
+      lastPong <- IO.realTime.flatMap(Ref[IO].of)
+      me <- lookupUser(userId)
+      now <- IO.realTimeInstant.map(_.atOffset(ZoneOffset.UTC))
+      _ <- registry.register(connectionId, userId)
+      _ <- outbound.offer(Some(text(WsFrames.hello(connectionId, now, me))))
+      response <- build(wsb, connectionId, outbound, subscribed, lastPong)
+    yield response
+
+  private def build(
+      wsb: WebSocketBuilder2[IO],
+      connectionId: String,
+      outbound: Queue[IO, Option[WebSocketFrame]],
+      subscribed: Ref[IO, Map[String, Long]],
+      lastPong: Ref[IO, FiniteDuration],
+  ): IO[Response[IO]] =
+    val send: Stream[IO, WebSocketFrame] =
+      Stream.fromQueueNoneTerminated(outbound).onFinalize(registry.unregister(connectionId))
+
+    val live: Stream[IO, Nothing] =
+      backplane.subscribe.evalMap { event =>
+        subscribed.get.flatMap { subs =>
+          if subs.contains(event.cid) then outbound.offer(Some(text(WsFrames.event(event))))
+          else IO.unit
+        }
+      }.drain
+
+    val pings: Stream[IO, Nothing] =
+      Stream
+        .awakeEvery[IO](25.seconds)
+        .evalMap(_ => outbound.offer(Some(WebSocketFrame.Ping())))
+        .drain
+
+    val watchdog: Stream[IO, Nothing] =
+      Stream
+        .awakeEvery[IO](25.seconds)
+        .evalMap { _ =>
+          (IO.realTime, lastPong.get).flatMapN { (now, last) =>
+            if now - last > 55.seconds then outbound.offer(None) else IO.unit
+          }
+        }
+        .drain
+
+    val receive: Pipe[IO, WebSocketFrame, Unit] = _.evalMap {
+      case WebSocketFrame.Text(body, _) => onClientFrame(body, subscribed, outbound)
+      case _: WebSocketFrame.Pong => IO.realTime.flatMap(lastPong.set)
+      case _ => IO.unit
+    }
+
+    wsb.build(send.concurrently(live).concurrently(pings).concurrently(watchdog), receive)
+
+  private def onClientFrame(
+      body: String,
+      subscribed: Ref[IO, Map[String, Long]],
+      outbound: Queue[IO, Option[WebSocketFrame]],
+  ): IO[Unit] =
+    WsFrames.parse(body) match
+      case WsFrames.ClientFrame.Subscribe(channels) =>
+        channels.toList.traverse_ { (cid, lastSeen) =>
+          replay
+            .since(cid, lastSeen)
+            .flatMap(_.traverse_(event => outbound.offer(Some(text(WsFrames.event(event)))))) >>
+            subscribed.update(_ + (cid -> lastSeen))
+        }
+      case WsFrames.ClientFrame.Ping =>
+        IO.realTimeInstant.flatMap(i =>
+          outbound.offer(Some(text(WsFrames.pong(i.atOffset(ZoneOffset.UTC)))))
+        )
+      case WsFrames.ClientFrame.Unknown => IO.unit

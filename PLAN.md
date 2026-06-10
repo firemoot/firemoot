@@ -141,17 +141,21 @@ settled.
       (seq + message + `channel_events` in one commit). Server-key auth via
       `X-Firemoot-Key` header (stub: key-id equality; HMAC in M1.1). Testcontainers
       suite covers the happy path, seq increment and 401.
-- [ ] **M0.5 WS gateway**: `GET /v1/ws?token=` upgrade; JWT parse (full verification
-      lands M1.1); `hello` frame with `connection_id`, server time, user; server ping
-      every 25s, reap after 2 missed pongs; connection registry (in-memory).
+- [x] **M0.5 WS gateway**: `GET /v1/ws?token=` upgrade (with `?user=` dev fallback
+      until token minting in M1.1); JWT `sub` parsed without verification (M1.1);
+      `hello` frame with connection id, server time, user; protocol ping every 25s
+      and a watchdog that reaps after ~2 missed pongs; JSON ping→pong; in-memory
+      `ConnectionRegistry`.
 - [x] **M0.6 Backplane trait + in-proc impl**: `Backplane` trait
       (`publish`/`subscribe`); in-process `Topic[IO, Event]` impl. Per-connection
       filtering by subscribed cid happens in the WS handler (M0.5/M0.7). Tested:
       published events reach an active subscriber in order.
-- [ ] **M0.7 The golden path**: `sendMessage` REST → txn (message + seq + event) →
-      backplane publish → subscribed WS connections receive `message.new`.
-      `subscribe` client frame accepted with `{cid: last_seen_seq}`; replay from
-      `channel_events` then live-stream (full resume semantics hardened in M1.8).
+- [x] **M0.7 The golden path**: `sendMessage` REST → txn (message + seq + event) →
+      `backplane.publish` after commit → subscribed WS connections receive
+      `message.new`. `subscribe` frame with `{cid: last_seen_seq}`; replays
+      `channel_events` then live-streams (full resume hardened in M1.8). Proven by
+      an end-to-end Testcontainers suite: real Ember server + JDK WS client, REST
+      send arrives as a `message.new` frame.
 - [ ] **M0.8 TS codegen pipeline**: `@firemoot/core` generated from
       `/v1/openapi.json` via @hey-api/openapi-ts (fetch client); committed to the
       repo; CI job regenerates and fails on `git diff --exit-code` (the drift gate
