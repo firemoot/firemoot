@@ -1,0 +1,116 @@
+name: Soak
+
+# Nightly WebSocket soak (PLAN.md M3.6, SPEC.md §12): N idle subscribers + M
+# msg/s through the real auth paths, gated on p99 delivery latency (k6) and the
+# firemoot container's peak RSS under a "$7 VPS" 1g memory cap. Also runnable on
+# demand with custom load via the Run workflow button.
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+    inputs:
+      vus:
+        description: "Idle WS subscribers"
+        default: "50"
+      rate:
+        description: "Messages per second"
+        default: "10"
+      seconds:
+        description: "Soak duration (seconds)"
+        default: "60"
+
+permissions:
+  contents: read
+
+jobs:
+  ws-soak:
+    name: WS soak (RSS + p99 gates)
+    runs-on: ubuntu-latest
+    env:
+      K6_VERSION: "2.0.0"
+      RSS_LIMIT_MB: "800"
+      SOAK_LAT_P99_MS: "1000"
+      SOAK_API_KEY: firemoot
+      SOAK_API_SECRET: change-me
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
+        with:
+          cache: true
+
+      - name: Cache Coursier and sbt
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/coursier
+            ~/.sbt
+          key: sbt-${{ runner.os }}-${{ hashFiles('build.sbt', 'project/**', '.scalafmt.conf') }}
+          restore-keys: sbt-${{ runner.os }}-
+
+      - name: Install k6
+        run: |
+          curl -fsSL "https://github.com/grafana/k6/releases/download/v${K6_VERSION}/k6-v${K6_VERSION}-linux-amd64.tar.gz" -o /tmp/k6.tgz
+          tar -xzf /tmp/k6.tgz -C /tmp
+          sudo install "/tmp/k6-v${K6_VERSION}-linux-amd64/k6" /usr/local/bin/k6
+          k6 version
+
+      - name: Build Docker image
+        run: sbt -batch "server/Docker/publishLocal"
+
+      - name: Boot the memory-capped stack
+        working-directory: deploy/compose
+        run: |
+          docker pull postgres:17
+          docker compose -f docker-compose.yml -f docker-compose.soak.yml up -d
+          for _ in $(seq 1 150); do
+            if curl -fsS localhost:6668/healthz >/dev/null 2>&1; then ok=1; break; fi
+            sleep 0.2
+          done
+          if [ "${ok:-0}" != "1" ]; then
+            echo "::error::stack never became healthy"
+            docker compose -f docker-compose.yml -f docker-compose.soak.yml logs firemoot
+            exit 1
+          fi
+
+      - name: Run soak and assert p99 latency + RSS
+        working-directory: deploy/compose
+        env:
+          SOAK_VUS: ${{ github.event.inputs.vus || '50' }}
+          SOAK_RATE: ${{ github.event.inputs.rate || '10' }}
+          SOAK_SECONDS: ${{ github.event.inputs.seconds || '60' }}
+        run: |
+          set -uo pipefail
+          container=$(docker compose -f docker-compose.yml -f docker-compose.soak.yml ps -q firemoot)
+
+          : > /tmp/rss.txt
+          ( while true; do
+              docker stats --no-stream --format '{{.MemUsage}}' "$container" 2>/dev/null | awk '{print $1}' >> /tmp/rss.txt
+              sleep 1
+            done ) &
+          sampler=$!
+
+          set +e
+          k6 run ../soak/ws-soak.js
+          k6_exit=$?
+          set -e
+          kill "$sampler" 2>/dev/null || true
+
+          oom=$(docker inspect -f '{{.State.OOMKilled}}' "$container")
+          status=$(docker inspect -f '{{.State.Status}}' "$container")
+          peak=$(awk '/GiB/{gsub(/GiB/,"");v=$0*1024} /MiB/{gsub(/MiB/,"");v=$0} /KiB/{gsub(/KiB/,"");v=$0/1024} {if(v>max)max=v} END{printf "%.0f", max}' /tmp/rss.txt)
+          echo "k6 exit=$k6_exit  status=$status  oomKilled=$oom  peak RSS=${peak}MiB (limit ${RSS_LIMIT_MB})"
+          docker compose -f docker-compose.yml -f docker-compose.soak.yml logs firemoot | tail -30
+
+          fail=0
+          [ "$k6_exit" = "0" ] || { echo "::error::k6 thresholds failed (p99 latency / delivery / connect errors)"; fail=1; }
+          [ "$oom" = "false" ] || { echo "::error::firemoot was OOM-killed under the ${RSS_LIMIT_MB}MiB envelope"; fail=1; }
+          [ "$status" = "running" ] || { echo "::error::firemoot not running after the soak"; fail=1; }
+          awk -v p="$peak" -v lim="$RSS_LIMIT_MB" 'BEGIN { exit (p + 0 <= lim + 0) ? 0 : 1 }' || { echo "::error::peak RSS ${peak}MiB exceeded ${RSS_LIMIT_MB}MiB"; fail=1; }
+          exit $fail
+
+      - name: Tear down
+        if: always()
+        working-directory: deploy/compose
+        run: docker compose -f docker-compose.yml -f docker-compose.soak.yml down -v

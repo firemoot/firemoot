@@ -405,9 +405,25 @@ queries/FTS, webhooks, moderation and rate limiting.
       `AdminSpaRoutes` at `/admin`, classpath-resourced like `demo.html`); the
       committed build output is CI drift-gated exactly like the generated SDK, so
       the JVM/Docker build stays node-free. 92 green.
-- [ ] **M3.6 Soak baseline**: k6 WS scenario (N idle + M msg/s) running nightly;
-      record memory and p99 delivery latency thresholds as CI regression gates
-      (SPEC §12).
+- [x] **M3.6 Soak baseline**: `deploy/soak/ws-soak.js` is a k6 (v2.0, stable
+      `k6/websockets`) scenario - N idle WS subscribers + M msg/s from a REST
+      sender, each message carrying `custom.sentAtMs` so a subscriber records true
+      end-to-end **delivery latency** (p99 is a k6 threshold). Auth is minted
+      in-script (HS256 JWT for WS, FIREMOOT-HMAC-SHA256 signature for REST), so the
+      soak drives the real auth paths; `setup()` makes a **fresh channel per run**
+      so seq-0 subscribe replays nothing (a stale-event replay would otherwise
+      pollute the metric - found and fixed during validation). The nightly
+      `.github/workflows/soak.yml` (cron + manual dispatch) builds the image, boots
+      a **1g memory-capped** stack (`docker-compose.soak.yml`, the "$7 VPS"
+      envelope), runs the soak, and gates on p99 latency **and** peak container RSS
+      (+ no OOM). Validated locally end-to-end: 100% checks, 0 connect errors, p95
+      ~18ms, peak RSS 366MiB; the latency gate was confirmed to fail (k6 exit 99) on
+      stale data. Defaults (tunable): 50 subs, 10 msg/s, 60s, p99<1000ms, RSS<800MiB.
+
+Exit criteria (met 11/06/2026): rollups + admin dashboard SPA + Prometheus + the
+nightly soak gates are all in place. **M3 complete** - the dashboard reads the
+rollup tables behind a CSRF-protected session, and CI guards both cold-boot and
+soak regressions.
 
 ---
 

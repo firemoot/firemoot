@@ -1,0 +1,10 @@
+# Soak override (PLAN.md M3.6): cap the firemoot container to a "$7 VPS" memory
+# envelope so the nightly RSS regression gate is meaningful. The image already
+# bakes -XX:MaxRAMPercentage=75 on G1 with compact object headers, and the JVM is
+# container-aware, so it sizes the heap against this cap (~768m of 1g), not the
+# host's RAM. Used as:
+#   docker compose -f docker-compose.yml -f docker-compose.soak.yml up -d
+services:
+  firemoot:
+    mem_limit: 1g
+    memswap_limit: 1g # no swap: an over-budget run OOM-fails fast rather than thrashing
