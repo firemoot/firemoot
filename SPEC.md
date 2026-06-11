@@ -52,6 +52,7 @@ and skip-gate bypasses with a local Firemoot instance.
 | Admin dashboard chart library (added 11/06/2026, M3.5) | uPlot, not Chart.js | uPlot (~45KB, zero-dep, MIT) over Chart.js (~5x larger, canvas/animation-oriented) keeps the minimal-footprint/$7-VPS pitch honest for a self-hosted admin panel. Renders the §8 charts (DAU/WAU/MAU, hourly CCU p95/max, messages/day stacked by channel type, storage) |
 | Admin SPA build integration (added 11/06/2026, M3.5) | Vite + TS app at `admin/`, built into `server/src/main/resources/admin`, committed and CI drift-gated | The build emits stable, unminified filenames the server serves from the classpath via `AdminSpaRoutes` (mirrors `demo.html`). The output is committed and diff-checked in CI exactly like the generated SDK, so the JVM/Docker build stays node-free while CI guarantees freshness. CSRF is double-submit: the SPA reads the `firemoot_csrf` cookie back into an `X-CSRF-Token` header on mutations |
 | Soak harness (added 11/06/2026, M3.6) | k6 (v2.0, stable `k6/websockets`); nightly, memory-capped | `deploy/soak/ws-soak.js` mints HS256 JWTs + HMAC request signatures in-script so it drives the real auth paths; latency is measured end-to-end via `custom.sentAtMs`. Each run uses a fresh channel so seq-0 subscribe replays nothing (else stale-timestamp replays pollute the metric). The nightly workflow caps firemoot at 1g (the "$7 VPS" envelope, making the RSS gate meaningful against the MaxRAMPercentage heap sizing) and gates on p99 latency + peak RSS + no-OOM |
+| Client-authenticated REST (added 11/06/2026, M4 plan review) | v1 ships JWT-bearer client endpoints with per-op membership/role authz (M4.3) | The downstream audit showed Frented's browser sends messages **directly** with the user's JWT (Stream's model); HMAC must stay server-only, so without client auth the v1.0 gate fails or forces proxy routes into the customer app. This closes the M1.1 authz deferral and makes the §13 "authorise every channel op server-side" posture enforceable. The end-user JWT already described in §5 simply gains a REST bearer surface alongside the WS one |
 
 ## 3. Scope
 
@@ -349,9 +350,13 @@ over HTTPS), exactly as it would be a client of Stream.
 
 1. ~~skunk vs doobie (settle in M0 spike; skunk default).~~ **Resolved 10/06/2026:
    skunk** (ADR 0001) - native `LISTEN`/`NOTIFY` for the backplane is decisive.
-2. Channel-type permission model: how much of Stream's role/permission matrix to
-   replicate vs a simpler owner/moderator/member fixed set (v1 leans simple).
-3. Admin UI auth: local password only, or optional OIDC from day one?
+2. ~~Channel-type permission model: how much of Stream's role/permission matrix to
+   replicate vs a simpler owner/moderator/member fixed set (v1 leans simple).~~
+   **Resolved 10/06/2026 (M1.3): the simple fixed set** - owner/moderator/member,
+   validated server-side; client-auth REST (M4.3) enforces it per operation.
+3. ~~Admin UI auth: local password only, or optional OIDC from day one?~~
+   **Resolved 10/06/2026 (M3.4): local password only in v1** (Argon2id, no
+   default - locked until set); OIDC is v1.x.
 4. Message retention/pruning policy knobs - v1 or v1.x?
 5. Trademark registration for "Firemoot" - worth £170 (UK) early, or wait for traction?
 

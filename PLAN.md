@@ -358,6 +358,8 @@ queries/FTS, webhooks, moderation and rate limiting.
       compiler bump risks the CI gate (tpolecat warnings-as-errors, scalafmt
       dialect) for no gain; Scala 3 forward binary-compat means the 3.3-built
       http4s/tapir/skunk will keep working when we do upgrade. Recorded in SPEC §2.
+      *Re-checked 11/06/2026 at M4 start (as scheduled): 3.9.0 is weeks old with
+      no patch releases - unchanged, stay on 3.3.7 through v1.0, revisit in v1.x.*
 
 ---
 
@@ -443,22 +445,59 @@ soak regressions.
       `@firemoot/core` via a pluggable `RestApi` (auth interceptor injectable). 29
       client unit tests (emitter, reducer, outbox, FSM, channel optimistic flow,
       client routing/resubscribe) - no real server needed.
-- [ ] **M4.2 Reconnect chaos tests**: TCP proxy (toxiproxy or hand-rolled) dropping/
-      delaying mid-stream; assert zero message loss/duplication across reconnects -
-      this is the SDK's headline credibility test.
-- [ ] **M4.3 `@firemoot/test`**: starts Firemoot (Docker or binary), waits healthy,
-      seeds users/channels/messages via server API, returns URLs + tokens; consumed
-      first by Firemoot's own SDK test suite (dogfood gate 1).
-- [ ] **M4.4 npm publishing**: changesets-based release flow for the three packages;
-      `@firemoot/core` regeneration remains a CI drift gate.
-- [ ] **M4.5 Fly.io first-class**: `deploy/fly/fly.toml`
+> **M4 reshape (11/06/2026 plan review).** Auditing Frented revealed the v1.0
+> gate's hidden dependency: Frented's browser sends messages **directly** to
+> Stream with the user's JWT (`lib/stream.ts` is client-side-only), but
+> Firemoot's REST is HMAC-server-only - and the M1.1 authz deferral ("lands with
+> client-authenticated endpoints") was never owned by any milestone. Decision:
+> client-authenticated REST joins v1 (M4.3). Good news from the same audit:
+> `stream-chat-react` is an **unused** dependency (zero imports - Frented's UI is
+> hand-built on the core client), and the used Stream surface is ~15 methods,
+> mostly already covered by `@firemoot/client`. Also reordered: `@firemoot/test`
+> now precedes the chaos tests, which become its first dogfood consumer.
+
+- [ ] **M4.2 Frented compat audit**: structured pass over every `stream-chat`
+      call site in Frented (28 files). Output: `docs/frented-compat-audit.md`
+      mapping each used Stream API to its Firemoot equivalent or gap; confirms
+      what `e2e/messaging-core.spec.ts` itself touches (incl. the
+      `window.StreamChat` test hook). Drives M4.3/M4.4 scope and the eventual
+      Frented migration PR.
+- [ ] **M4.3 Client-authenticated REST**: accept `Authorization: Bearer <user JWT>`
+      (HS256 - the same tokens the WS gateway verifies) on the client-safe subset:
+      send message, edit/delete **own** message, react, markRead, message history,
+      queryChannels (scoped to the caller's membership). Per-op authz: membership
+      required; role checks for others' content (moderator/owner); frozen-channel
+      rules; 401/403 problem+json. Per-user rate limits already exist (M1.12).
+      Closes the M1.1 deferral and makes SPEC §13's "all channel operations
+      authorise against membership/role server-side" enforceable. Regenerate the
+      SDK; decision recorded in SPEC §2.
+- [ ] **M4.4 SDK gap-close** (from the audit): `FiremootClient.queryChannels`,
+      expose `removeReaction` on `Channel`, server-side helpers
+      `createToken(userId)` (HS256 mint, pairing with `createHmacAuthorizer`) and
+      `upsertUser`; map Frented's `channel.sendEvent` usage to system messages or
+      document the alternative. Keep Stream-compatible naming where free
+      (`keystroke`/`stopTyping`/`markRead` already match).
+- [ ] **M4.5 `@firemoot/test`**: starts Firemoot (Docker image + postgres - decide
+      compose vs testcontainers-node here), waits healthy, seeds
+      users/channels/messages via server API, returns URLs + tokens (minted JWTs);
+      consumed first by Firemoot's own SDK test suite (dogfood gate 1).
+- [ ] **M4.6 Reconnect chaos tests**: a hand-rolled Node TCP proxy (decision: not
+      toxiproxy - no new deps, full control of drop/delay timing) between
+      `@firemoot/client` and a real server booted by `@firemoot/test`; drop and
+      delay mid-stream; assert zero message loss/duplication across reconnects -
+      the SDK's headline credibility test.
+- [ ] **M4.7 npm publishing**: changesets-based release flow for the three packages
+      (dry-run until the npm org exists - §12 user task); `@firemoot/core`
+      regeneration remains a CI drift gate.
+- [ ] **M4.8 Fly.io first-class**: `deploy/fly/fly.toml`
       (`min_machines_running = 1`, auto-stop disabled), Fly Postgres/Neon + Tigris
       walkthrough, the idle-stop gotcha documented prominently.
-- [ ] **M4.6 Docs site**: docs/ as the source; static site (decide generator here -
-      lean default: VitePress); covers quickstart (compose in 5 minutes), auth model,
-      protocol reference (generated event list), Stream→Firemoot migration notes,
-      sizing guidance, unsupported-hosts framing (serverless apps are *clients*).
-- [ ] **M4.7 Caddy reference config** in compose docs (one-stanza TLS + WS upgrade).
+- [ ] **M4.9 Docs site**: docs/ as the source; static site (decide generator here -
+      lean default: VitePress); covers quickstart (compose in 5 minutes), the auth
+      model (server HMAC vs client JWT), protocol reference (generated event list),
+      Stream→Firemoot migration notes (seeded by the M4.2 audit), sizing guidance,
+      unsupported-hosts framing (serverless apps are *clients*).
+- [ ] **M4.10 Caddy reference config** in compose docs (one-stanza TLS + WS upgrade).
 
 ---
 
@@ -478,7 +517,7 @@ soak regressions.
 **Testing pyramid** (SPEC §12): pure domain core → munit+scalacheck property tests
 (seq allocation, unread arithmetic, filter DSL, resume splice); Testcontainers
 integration per endpoint/event; raw-WS protocol suite (M1.13); k6 soak (M3.6);
-SDK chaos (M4.2); downstream dogfood (M4.3 → v1 gate).
+SDK chaos (M4.6); downstream dogfood (M4.5 → v1 gate).
 
 **Security posture** (SPEC §13): every milestone PR review checks - authz on every
 channel op, constant-time comparisons, generic prod errors behind dev flag, rate
@@ -502,7 +541,8 @@ docs generator, Node floor) get recorded in SPEC.md §2 in the same PR.
 | sbt 2.0 ecosystem churn | Stay on 1.12.x for v1 |
 | pgsty/minio bus-factor / rename | Generic-S3-only code (M2.1 hard rule); Tigris verification (M2.6) proves swappability; compose pin by digest |
 | JVM RSS vs "$7 VPS" pitch | `-XX:MaxRAMPercentage` defaults in compose; soak job tracks RSS from M3.6; GraalVM native-image remains stretch |
-| FTS fidelity expectations | Documented as lower-fidelity from day one (docs task M4.6) |
+| FTS fidelity expectations | Documented as lower-fidelity from day one (docs task M4.9) |
+| Frented's browser sends directly to the chat backend (v1.0 gate dependency, found 11/06/2026) | Client-authenticated REST + per-op authz is now a v1 milestone (M4.3), scoped precisely by the M4.2 compat audit before any server work starts |
 | Single-maintainer scope creep | SPEC §3 "v1 Out" list is contractual; new ideas go to a v1.x backlog section in SPEC, not the milestones |
 | Name squatting before launch | §12 asset registration happens *before* the repo goes public |
 
