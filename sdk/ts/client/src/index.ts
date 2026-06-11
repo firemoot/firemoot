@@ -11,5 +11,6 @@ export * from "./state.js";
 export * from "./outbox.js";
 export * from "./connection.js";
 export * from "./rest.js";
+export * from "./auth.js";
 export * from "./channel.js";
 export * from "./client.js";
