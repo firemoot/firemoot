@@ -78,9 +78,18 @@ object AppConfig:
   private val devDemo: ConfigValue[Effect, Boolean] =
     env("FIREMOOT_DEV_DEMO").as[Boolean].default(false)
 
+  /**
+   * Treats a present-but-blank env var as absent. Compose's `${VAR:-}` default
+   * passes an empty string rather than leaving the variable unset, so without this
+   * an "unset" optional like the S3 endpoint would look configured and then fail
+   * fast on the missing siblings.
+   */
+  private[config] def blankToNone(value: Option[String]): Option[String] =
+    value.map(_.trim).filter(_.nonEmpty)
+
   // Set at install to enable the admin dashboard; no default (admin stays locked).
   private val adminPassword: ConfigValue[Effect, Option[String]] =
-    env("FIREMOOT_ADMIN_PASSWORD").option
+    env("FIREMOOT_ADMIN_PASSWORD").option.map(blankToNone)
 
   private val defaultMime =
     "image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain"
@@ -88,7 +97,7 @@ object AppConfig:
   // Media is enabled iff an S3 endpoint is configured; the rest then load (the
   // access key/secret being required, so a half-configured store fails fast).
   private val media: ConfigValue[Effect, Option[MediaConfig]] =
-    env("FIREMOOT_S3_ENDPOINT").option.flatMap {
+    env("FIREMOOT_S3_ENDPOINT").option.map(blankToNone).flatMap {
       case None => default(Option.empty[MediaConfig])
       case Some(endpoint) =>
         (
