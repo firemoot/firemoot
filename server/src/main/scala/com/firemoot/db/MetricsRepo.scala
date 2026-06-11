@@ -82,6 +82,14 @@ object MetricsRepo:
       order by day
     """.query(date *: jsonb[Json] *: float8)
 
+  /** A metric's hourly series since `from` (the CCU max/p95 rollups). */
+  val hourlySeries: Query[(String, OffsetDateTime), (OffsetDateTime, Json, Double)] =
+    sql"""
+      select ts, labels, value from metrics_hourly
+      where metric = $text and ts >= $timestamptz
+      order by ts
+    """.query(timestamptz *: jsonb[Json] *: float8)
+
   // --- retention ---
 
   val pruneFactsBefore: Command[LocalDate] =

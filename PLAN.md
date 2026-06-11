@@ -389,17 +389,22 @@ queries/FTS, webhooks, moderation and rate limiting.
       (double-submit) - the M3.5 admin data routes build on it. Local password only
       in v1 (OIDC is v1.x). Tested: hasher, service (no-default/login/session), and
       the login->cookie->session route flow. 87 green.
-- [~] **M3.5 Admin SPA** (**backend complete**; SPA frontend remains): behind
-      `AdminRoutes.withSession` (+ CSRF on mutations) - `GET /admin/metrics` (live
-      tiles), `GET /admin/metrics/daily?metric=&days=` (90-day series),
-      `GET/POST /admin/webhooks/dead-letters[/{id}/replay]` (closes the M1.10 loop),
-      and DB-backed API key rotation: `GET/POST /admin/api-keys` +
-      `POST /admin/api-keys/{id}/revoke`. `ApiKeys.fromConfigAndDb` now resolves the
-      config bootstrap key **and** live `api_keys` rows, so a created key
-      authenticates immediately and a revoked one stops - no restart. **Still to
-      do:** the Vite + TS SPA itself (charts: MAU/DAU/WAU, CCU p95/max + live,
-      messages/day stacked by type, storage) baked into binary resources at
-      `/admin`; chart lib decision (uPlot vs Chart.js). 89 green.
+- [x] **M3.5 Admin SPA**: behind `AdminRoutes.withSession` (+ CSRF on mutations) -
+      `GET /admin/metrics` (live tiles), `GET /admin/metrics/daily?metric=&days=`
+      (90-day series), `GET /admin/metrics/hourly?metric=&hours=` (the CCU p95/max
+      rollups for the chart), `GET/POST /admin/webhooks/dead-letters[/{id}/replay]`
+      (closes the M1.10 loop), and DB-backed API key rotation: `GET/POST
+      /admin/api-keys` + `POST /admin/api-keys/{id}/revoke`. `ApiKeys.fromConfigAndDb`
+      resolves the config bootstrap key **and** live `api_keys` rows, so a created
+      key authenticates immediately and a revoked one stops - no restart. The
+      dashboard SPA itself is **Vite + TypeScript with uPlot** (decision: uPlot over
+      Chart.js, SPEC §2): a login gate then live tiles (online/DAU/WAU/MAU/messages/
+      media/db) and four charts (DAU/WAU/MAU, messages/day stacked by channel type,
+      hourly CCU p95/max, storage), plus the webhook dead-letter replay and API-key
+      management tables. It builds to `server/src/main/resources/admin` (served by
+      `AdminSpaRoutes` at `/admin`, classpath-resourced like `demo.html`); the
+      committed build output is CI drift-gated exactly like the generated SDK, so
+      the JVM/Docker build stays node-free. 92 green.
 - [ ] **M3.6 Soak baseline**: k6 WS scenario (N idle + M msg/s) running nightly;
       record memory and p99 delivery latency thresholds as CI regression gates
       (SPEC §12).

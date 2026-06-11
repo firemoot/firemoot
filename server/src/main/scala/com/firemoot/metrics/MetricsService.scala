@@ -97,3 +97,6 @@ final class MetricsService(pool: Resource[IO, Session[IO]]):
 
   def dailySeries(metric: String, from: LocalDate): IO[List[(LocalDate, Json, Double)]] =
     pool.use(_.runList(MetricsRepo.dailySeries, (metric, from)))
+
+  def hourlySeries(metric: String, from: OffsetDateTime): IO[List[(OffsetDateTime, Json, Double)]] =
+    pool.use(_.runList(MetricsRepo.hourlySeries, (metric, from)))

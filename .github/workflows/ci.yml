@@ -69,6 +69,14 @@ jobs:
       - name: Build
         run: pnpm -r build
 
+      - name: Fail on admin SPA drift
+        run: |
+          git add -A -- server/src/main/resources/admin
+          if ! git diff --cached --exit-code -- server/src/main/resources/admin; then
+            echo "::error::Admin SPA build output is stale. Run 'pnpm --filter @firemoot/admin build' and commit the result."
+            exit 1
+          fi
+
   codegen:
     name: SDK codegen drift
     runs-on: ubuntu-latest

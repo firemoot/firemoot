@@ -41,6 +41,7 @@ final class AdminRoutes(
 
   private object MetricParam extends QueryParamDecoderMatcher[String]("metric")
   private object DaysParam extends OptionalQueryParamDecoderMatcher[Int]("days")
+  private object HoursParam extends OptionalQueryParamDecoderMatcher[Int]("hours")
 
   val routes: HttpRoutes[IO] = HttpRoutes.of[IO] {
     case req @ POST -> Root / "admin" / "login" =>
@@ -71,6 +72,20 @@ final class AdminRoutes(
               Json.obj("day" -> day.toString.asJson, "labels" -> labels, "value" -> value.asJson)
             }
             Ok(Json.obj("metric" -> metric.asJson, "series" -> series.asJson))
+          }
+        }
+      }
+
+    case req @ GET -> Root / "admin" / "metrics" / "hourly" :?
+        MetricParam(metric) +& HoursParam(hours) =>
+      withSession(req) {
+        IO.realTimeInstant.map(_.atOffset(ZoneOffset.UTC)).flatMap { now =>
+          metrics.hourlySeries(metric, now.minusHours(hours.getOrElse(168).toLong)).flatMap {
+            rows =>
+              val series = rows.map { (ts, labels, value) =>
+                Json.obj("ts" -> ts.toString.asJson, "labels" -> labels, "value" -> value.asJson)
+              }
+              Ok(Json.obj("metric" -> metric.asJson, "series" -> series.asJson))
           }
         }
       }

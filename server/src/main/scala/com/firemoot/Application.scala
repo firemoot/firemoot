@@ -9,7 +9,7 @@ import com.firemoot.api.ApiRoutes
 import com.firemoot.auth.{ApiKeys, ApiKeyService, ServerHmacAuth}
 import com.firemoot.backplane.Backplane
 import com.firemoot.config.ServerConfig
-import com.firemoot.http.{DemoRoutes, HealthRoutes}
+import com.firemoot.http.{AdminSpaRoutes, DemoRoutes, HealthRoutes}
 import com.firemoot.media.MediaService
 import com.firemoot.metrics.{MetricsRoutes, MetricsService}
 import com.firemoot.ratelimit.RateGuard
@@ -96,6 +96,6 @@ object Application:
     // paths and must not be intercepted by the HMAC middleware (which 401s them).
     wsb =>
       Logger.httpApp(logHeaders = true, logBody = false)(
-        (HealthRoutes(pool).routes <+> metrics <+> admin <+> openApi <+> demo <+>
-          ws.routes(wsb) <+> securedApi).orNotFound
+        (HealthRoutes(pool).routes <+> metrics <+> admin <+> AdminSpaRoutes.routes <+>
+          openApi <+> demo <+> ws.routes(wsb) <+> securedApi).orNotFound
       )

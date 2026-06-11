@@ -75,6 +75,7 @@ class MetricsServiceSuite extends CatsEffectSuite, TestContainerForAll:
             _ <- metrics.sampleCcu(hourStart.plusMinutes(20), 3)
             _ <- metrics.rollupHour(hourStart, hourStart.plusHours(1))
             ccuMax <- pool.use(_.runUnique(hourlyValue, ("ccu_max", hourStart)))
+            ccuMaxSeries <- metrics.hourlySeries("ccu_max", hourStart.minusHours(1))
 
             _ <- metrics.snapshotDay(today)
             mauSeries <- metrics.dailySeries("mau", today)
@@ -96,6 +97,7 @@ class MetricsServiceSuite extends CatsEffectSuite, TestContainerForAll:
             assertEquals(live.ccuNow, 4)
 
             assertEquals(ccuMax, 5.0, "hourly CCU max")
+            assertEquals(ccuMaxSeries.map(_._3), List(5.0), "hourly CCU max reads back as a series")
 
             assertEquals(mauSeries.map(_._3), List(3.0), "the day's MAU is snapshotted")
             val messagesByType = messageSeries.map { (_, labels, value) =>

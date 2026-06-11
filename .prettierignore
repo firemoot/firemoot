@@ -2,6 +2,7 @@
 **/node_modules/
 **/target/
 **/generated/
+server/src/main/resources/admin/
 pnpm-lock.yaml
 LICENSE
 openapi.json
