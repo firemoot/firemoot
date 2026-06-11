@@ -101,6 +101,8 @@ object Dependencies {
     "org.scalameta" %% "munit" % V.munit,
     "org.scalameta" %% "munit-scalacheck" % V.munitScalacheck,
     "org.typelevel" %% "munit-cats-effect" % V.munitCatsEffect,
+    // TestControl: deterministic virtual time for timer-driven code (typing expiry).
+    "org.typelevel" %% "cats-effect-testkit" % V.catsEffect,
     "org.scalacheck" %% "scalacheck" % V.scalacheck,
     "com.dimafeng" %% "testcontainers-scala-munit" % V.testcontainers,
     "com.dimafeng" %% "testcontainers-scala-postgresql" % V.testcontainers,

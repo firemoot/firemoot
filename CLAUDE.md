@@ -47,6 +47,16 @@ After editing `mise.toml`, run `mise trust && mise install`.
   short-circuits the whole request before the inner route's path is checked, so it
   must be composed **last** in the `<+>` chain - otherwise it 401s sibling routes
   like `/v1/ws` and `/healthz`. Don't run inner routes before auth (side effects).
+- **Timer assertions in tests:** never assert against the wall clock that a timer
+  *has* or *hasn't yet* fired (it flakes on contended CI runners - bit us in
+  `TypingTrackerSuite`). Pure timer logic gets `cats.effect.testkit.TestControl`
+  virtual time (`TestControl.executeEmbed { ... }` - deterministic and instant).
+  Integration suites may still sleep, but only in the generous direction
+  ("wait, then assert something arrived"), never "assert it hasn't happened yet".
+- **CI verification:** `gh run watch` exit codes lie when chained with other
+  commands; always read per-job conclusions:
+  `gh run view <id> --json conclusion,jobs`. The Cold-boot gate and sdk jobs have
+  both gone red while the run "looked" green from a wrapper's exit code.
 
 ## Conventions
 
