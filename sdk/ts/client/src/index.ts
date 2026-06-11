@@ -1,7 +1,12 @@
 /**
- * @firemoot/client - the value layer over @firemoot/core.
+ * @firemoot/client - the hand-written value layer over @firemoot/core.
  *
- * `FiremootClient`, `Channel`, and the typed event emitter are implemented in
- * PLAN.md M4.1. This placeholder reserves the package surface.
+ * The connection lifecycle, channel-state reducer, optimistic outbox and typed
+ * event vocabulary (PLAN.md M4.1). `FiremootClient` and `Channel` compose these
+ * into the high-level API.
  */
-export const CLIENT_PACKAGE = "@firemoot/client" as const;
+export * from "./events.js";
+export * from "./emitter.js";
+export * from "./state.js";
+export * from "./outbox.js";
+export * from "./connection.js";
