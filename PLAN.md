@@ -456,27 +456,37 @@ soak regressions.
 > mostly already covered by `@firemoot/client`. Also reordered: `@firemoot/test`
 > now precedes the chaos tests, which become its first dogfood consumer.
 
-- [ ] **M4.2 Frented compat audit**: structured pass over every `stream-chat`
-      call site in Frented (28 files). Output: `docs/frented-compat-audit.md`
-      mapping each used Stream API to its Firemoot equivalent or gap; confirms
-      what `e2e/messaging-core.spec.ts` itself touches (incl. the
-      `window.StreamChat` test hook). Drives M4.3/M4.4 scope and the eventual
-      Frented migration PR.
-- [ ] **M4.3 Client-authenticated REST**: accept `Authorization: Bearer <user JWT>`
-      (HS256 - the same tokens the WS gateway verifies) on the client-safe subset:
-      send message, edit/delete **own** message, react, markRead, message history,
-      queryChannels (scoped to the caller's membership). Per-op authz: membership
-      required; role checks for others' content (moderator/owner); frozen-channel
-      rules; 401/403 problem+json. Per-user rate limits already exist (M1.12).
-      Closes the M1.1 deferral and makes SPEC §13's "all channel operations
-      authorise against membership/role server-side" enforceable. Regenerate the
-      SDK; decision recorded in SPEC §2.
-- [ ] **M4.4 SDK gap-close** (from the audit): `FiremootClient.queryChannels`,
-      expose `removeReaction` on `Channel`, server-side helpers
-      `createToken(userId)` (HS256 mint, pairing with `createHmacAuthorizer`) and
-      `upsertUser`; map Frented's `channel.sendEvent` usage to system messages or
-      document the alternative. Keep Stream-compatible naming where free
-      (`keystroke`/`stopTyping`/`markRead` already match).
+- [x] **M4.2 Frented compat audit** (done 11/06/2026): structured pass over every
+      `stream-chat` call site in Frented (28 files) → `docs/frented-compat-audit.md`.
+      Confirmed: the browser sends/reads/reacts/queries/uploads/flags/**searches**
+      directly with the user JWT (M4.3 list now exact); `stream-chat-react` is an
+      unused dep (zero imports); the Playwright gate spec never touches the SDK
+      (drives UI + Frented's `testApi` only - the `window.StreamChat` hook is dead
+      Cypress legacy); the biggest non-auth server gap is **channel-state
+      hydration** (members + caller read state + others' lastReadSeq + latest
+      message in query/get responses); the only consumed webhook without an
+      equivalent is `user.unread_message_reminder` (not gate-blocking, v1.x or
+      Frented-side cron).
+- [ ] **M4.3 Client-authenticated REST + state hydration**: accept
+      `Authorization: Bearer <user JWT>` (HS256 - the same tokens the WS gateway
+      verifies) on the audited subset: send, message history, get channel,
+      queryChannels (filter forcibly scoped to caller membership), markRead,
+      add/remove reaction (remove self-only), **search** (scoped server-side),
+      **uploads**, **flag** (flaggedBy forced to token sub), edit/delete own
+      message (author-only, moderator/owner override). Per-op authz: membership
+      required; frozen ⇒ 409; identity fields forced to the token sub; 401/403
+      problem+json; `Retry-After` on 429. The client-auth `get channel` /
+      `channels/query` responses are **hydrated**: members (userId, role,
+      lastReadSeq), the caller's {lastReadSeq, unreadCount}, and the latest
+      message. Closes the M1.1 deferral; makes SPEC §13 enforceable. Regenerate
+      the SDK.
+- [ ] **M4.4 SDK gap-close** (audit-confirmed list): `FiremootClient.queryChannels`
+      with `watch: true` (subscribes each result), expose `removeReaction` on
+      `Channel`, reducer keeps **other** members' lastReadSeq (read receipts),
+      `Channel.sendFileMessage` (presign → PUT → attach), server helpers
+      `createToken(userId, expiresAt)` + `upsertUser` + create-channel-with-members
+      / `addMembers`. Keep Stream-compatible naming where free
+      (`keystroke`/`stopTyping`/`markRead`/`watch` already match).
 - [ ] **M4.5 `@firemoot/test`**: starts Firemoot (Docker image + postgres - decide
       compose vs testcontainers-node here), waits healthy, seeds
       users/channels/messages via server API, returns URLs + tokens (minted JWTs);
