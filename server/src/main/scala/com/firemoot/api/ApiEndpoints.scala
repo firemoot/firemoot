@@ -10,7 +10,7 @@ import sttp.tapir.json.circe.*
 /**
  * tapir endpoint definitions - the source of truth for both the http4s routes
  * and the generated `@firemoot/core` TypeScript SDK (M0.8). Server-SDK
- * authentication is enforced by [[com.firemoot.auth.ServerHmacAuth]] middleware,
+ * authentication is enforced by [[com.firemoot.auth.ApiAuth]] middleware,
  * not here, so the signature can cover the request body.
  */
 object ApiEndpoints:

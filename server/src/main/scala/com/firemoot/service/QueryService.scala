@@ -60,6 +60,13 @@ final class QueryService(pool: Resource[IO, Session[IO]]):
       SearchPage(rows.map((message, score) => SearchHit(message, score.toDouble)))
     }
 
+  /** As [[search]], restricted to channels `userId` is a member of (client auth). */
+  def searchAsMember(req: SearchRequest, userId: String): IO[SearchPage] =
+    val lim = clamp(req.limit)
+    pool.use(_.runList(QueryRepo.searchAsMember, (req.query, req.cid, userId, lim))).map { rows =>
+      SearchPage(rows.map((message, score) => SearchHit(message, score.toDouble)))
+    }
+
 object QueryService:
   private val DefaultLimit = 25
   private val MaxLimit = 100

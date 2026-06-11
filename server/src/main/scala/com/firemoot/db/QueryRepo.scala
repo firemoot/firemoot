@@ -112,3 +112,25 @@ object QueryRepo:
       order by rank desc, m.seq desc
       limit $int4
     """.query(Codecs.message *: float4)
+
+  /**
+   * Member-scoped search: as [[search]], but results are restricted to channels
+   * the member belongs to (the client-authenticated surface). Params: query, cid
+   * filter, member, limit.
+   */
+  val searchAsMember: Query[(String, Option[String], String, Int), (Message, Float)] =
+    sql"""
+      with q as (
+        select websearch_to_tsquery('simple', $text) as tsq,
+               ${text.opt} as f_cid, $text as f_member
+      )
+      select $messageColumns, ts_rank(m.text_search, q.tsq) as rank
+      from messages m, q
+      where m.deleted_at is null and m.type = 'regular'
+        and m.text_search @@ q.tsq
+        and (q.f_cid is null or m.cid = q.f_cid)
+        and exists (select 1 from channel_members cm
+                    where cm.cid = m.cid and cm.user_id = q.f_member)
+      order by rank desc, m.seq desc
+      limit $int4
+    """.query(Codecs.message *: float4)

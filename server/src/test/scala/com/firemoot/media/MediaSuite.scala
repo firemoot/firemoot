@@ -8,7 +8,7 @@ import ciris.Secret
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import com.firemoot.api.*
-import com.firemoot.auth.{ApiKeys, ServerHmacAuth}
+import com.firemoot.auth.{ApiAuth, ApiKeys}
 import com.firemoot.backplane.Backplane
 import com.firemoot.config.{DbConfig, MediaConfig, ServerConfig}
 import com.firemoot.db.SessionSyntax.*
@@ -80,7 +80,7 @@ class MediaSuite extends CatsEffectSuite, TestContainerForAll:
       rate,
       media,
     )
-    ServerHmacAuth(ApiKeys.fromConfig(serverCfg), rate)(api.routes).orNotFound
+    ApiAuth(ApiKeys.fromConfig(serverCfg), rate)(api.routes).orNotFound
 
   test("presigns a valid upload, records it pending, and builds the object url") {
     withContainers { pg =>

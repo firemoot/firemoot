@@ -69,6 +69,14 @@ object MessageRepo:
     sql"select id from messages where id = $uuid and cid = $text and deleted_at is null".query(uuid)
 
   /**
+   * The author of a live message in the channel: outer none = no such message,
+   * inner none = author scrubbed (GDPR). Used to authorise edit/delete.
+   */
+  val authorInChannel: Query[(UUID, String), Option[String]] =
+    sql"select user_id from messages where id = $uuid and cid = $text and deleted_at is null"
+      .query(text.opt)
+
+  /**
    * Live messages whose attachments contain (jsonb `@>`) the given fragment -
    * used to find the message(s) referencing a freshly-thumbnailed upload.
    */

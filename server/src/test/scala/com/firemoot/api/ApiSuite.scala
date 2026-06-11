@@ -4,7 +4,7 @@ import cats.effect.IO
 import ciris.Secret
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
-import com.firemoot.auth.{ApiKeys, ServerHmacAuth}
+import com.firemoot.auth.{ApiAuth, ApiKeys}
 import com.firemoot.backplane.Backplane
 import com.firemoot.config.{DbConfig, ServerConfig}
 import com.firemoot.db.{Database, Migrations}
@@ -66,7 +66,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               WebhookService(pool),
               ModerationService(pool, WebhookService(pool)),
             )
-          val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
+          val app = ApiAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
 
           for
             userRes <- app.run(post(
@@ -143,7 +143,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               WebhookService(pool),
               ModerationService(pool, WebhookService(pool)),
             )
-          val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
+          val app = ApiAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val chPath = "/v1/channels/messaging/room2"
           def get(path: String) =
             Signing.signedNoBody(GET, Uri.unsafeFromString(path), apiKey, secret)
@@ -205,7 +205,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               WebhookService(pool),
               ModerationService(pool, WebhookService(pool)),
             )
-          val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
+          val app = ApiAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val msgs = "/v1/channels/messaging/room3/messages"
           def at(path: String, dto: EditMessageRequest) =
             Signing.signedRequest(PATCH, Uri.unsafeFromString(path), dto, apiKey, secret)
@@ -261,7 +261,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
             WebhookService(pool),
             ModerationService(pool, WebhookService(pool)),
           )
-          val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
+          val app = ApiAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val msgs = "/v1/channels/messaging/room4/messages"
 
           for
@@ -317,7 +317,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
             WebhookService(pool),
             ModerationService(pool, WebhookService(pool)),
           )
-          val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
+          val app = ApiAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
 
           for
             _ <- app.run(post("/v1/users", UpsertUserRequest("grace", None, None, None, None)))
@@ -358,7 +358,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
             WebhookService(pool),
             ModerationService(pool, WebhookService(pool)),
           )
-          val app = ServerHmacAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
+          val app = ApiAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val msgs = "/v1/channels/qt/qroom/messages"
           def get(path: String) =
             Signing.signedNoBody(GET, Uri.unsafeFromString(path), apiKey, secret)

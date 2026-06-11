@@ -467,19 +467,24 @@ soak regressions.
       message in query/get responses); the only consumed webhook without an
       equivalent is `user.unread_message_reminder` (not gate-blocking, v1.x or
       Frented-side cron).
-- [ ] **M4.3 Client-authenticated REST + state hydration**: accept
-      `Authorization: Bearer <user JWT>` (HS256 - the same tokens the WS gateway
-      verifies) on the audited subset: send, message history, get channel,
-      queryChannels (filter forcibly scoped to caller membership), markRead,
-      add/remove reaction (remove self-only), **search** (scoped server-side),
-      **uploads**, **flag** (flaggedBy forced to token sub), edit/delete own
-      message (author-only, moderator/owner override). Per-op authz: membership
-      required; frozen ⇒ 409; identity fields forced to the token sub; 401/403
-      problem+json; `Retry-After` on 429. The client-auth `get channel` /
-      `channels/query` responses are **hydrated**: members (userId, role,
-      lastReadSeq), the caller's {lastReadSeq, unreadCount}, and the latest
-      message. Closes the M1.1 deferral; makes SPEC §13 enforceable. Regenerate
-      the SDK.
+- [~] **M4.3 Client-authenticated REST** (**auth + authz + scoping done**;
+      response hydration remains): `Authorization: Bearer <user JWT>` (HS256 - the
+      same tokens the WS gateway verifies) is resolved by the unified `ApiAuth`
+      middleware into a `Principal` (`Server` for HMAC, `User` for a JWT, attached
+      to the request and read in the routes via tapir `extractFromRequest`). The
+      audited subset is authorised per operation against channel membership/role:
+      send, message history, get channel, markRead, add/remove reaction (remove
+      self-only), search (member-scoped query), uploads, flag, edit/delete (author
+      or moderator/owner). Identity fields are forced to the token subject (no
+      send/flag/react-as-another), `queryChannels` is forcibly scoped to the
+      caller's membership, and the server-only endpoints (user/channel admin,
+      webhooks) 403 an end-user token. 401/403 problem+json; frozen ⇒ 409. The
+      OpenAPI doc is unchanged (the principal is a non-documented extraction), so
+      no SDK drift. Closes the M1.1 authz deferral; makes SPEC §13 enforceable.
+      `ClientAuthSuite` covers the matrix. **Remaining:** hydrate the client-auth
+      `get channel` / `channels/query` responses with members (userId, role,
+      lastReadSeq), the caller's {lastReadSeq, unreadCount} and the latest message
+      (changes those response DTOs → SDK regen).
 - [ ] **M4.4 SDK gap-close** (audit-confirmed list): `FiremootClient.queryChannels`
       with `watch: true` (subscribes each result), expose `removeReaction` on
       `Channel`, reducer keeps **other** members' lastReadSeq (read receipts),

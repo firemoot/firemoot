@@ -65,6 +65,10 @@ object ChannelRepo:
     sql"delete from channel_members where cid = $text and user_id = $text returning user_id"
       .query(text)
 
+  /** The member's role in the channel, or none if they are not a member. */
+  val memberRole: Query[(String, String), String] =
+    sql"select role from channel_members where cid = $text and user_id = $text".query(text)
+
   /**
    * Allocates the next per-channel seq for a message and advances
    * `last_message_at`. Returns none when the channel is frozen, deleted or absent

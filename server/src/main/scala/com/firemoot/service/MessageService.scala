@@ -88,6 +88,13 @@ final class MessageService(pool: Resource[IO, Session[IO]], backplane: Backplane
       .flatMap((message, event) => event.traverse_(backplane.publish).as(message))
 
   /**
+   * The author of a live message in the channel, for edit/delete authorisation:
+   * outer none = no such message, inner none = author scrubbed.
+   */
+  def authorInChannel(cid: String, messageId: UUID): IO[Option[Option[String]]] =
+    pool.use(_.runOption(MessageRepo.authorInChannel, (messageId, cid)))
+
+  /**
    * Patches the `thumbUrl` onto every attachment referencing `originalUrl` and
    * re-emits `message.updated` for each affected message (M2.3 thumbnailing).
    */

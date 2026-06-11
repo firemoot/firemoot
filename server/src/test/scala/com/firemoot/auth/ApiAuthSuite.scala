@@ -13,13 +13,13 @@ import org.http4s.dsl.io.*
 import org.http4s.implicits.*
 import org.http4s.{MediaType, Request, Status}
 
-class ServerHmacAuthSuite extends CatsEffectSuite:
+class ApiAuthSuite extends CatsEffectSuite:
 
   private val cfg = ServerConfig("key-1", Secret("sekret"))
   private val inner = org.http4s.HttpRoutes.of[IO] { case POST -> Root / "v1" / "users" =>
     Ok("ok")
   }
-  private val app = ServerHmacAuth(ApiKeys.fromConfig(cfg))(inner).orNotFound
+  private val app = ApiAuth(ApiKeys.fromConfig(cfg))(inner).orNotFound
 
   private val payload = Json.obj("id" -> Json.fromString("alice"))
 

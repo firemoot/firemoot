@@ -38,6 +38,10 @@ final class ChannelService(pool: Resource[IO, Session[IO]], backplane: Backplane
   def get(cid: String): IO[Option[Channel]] =
     pool.use(_.runOption(ChannelRepo.byCid, cid))
 
+  /** The user's role in the channel, or none if they are not a member. */
+  def memberRole(cid: String, userId: String): IO[Option[String]] =
+    pool.use(_.runOption(ChannelRepo.memberRole, (cid, userId)))
+
   def update(
       cid: String,
       custom: Option[Json],

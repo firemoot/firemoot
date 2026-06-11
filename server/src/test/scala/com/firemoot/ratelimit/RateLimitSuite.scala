@@ -5,7 +5,7 @@ import ciris.Secret
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import com.firemoot.api.*
-import com.firemoot.auth.{ApiKeys, ServerHmacAuth}
+import com.firemoot.auth.{ApiAuth, ApiKeys}
 import com.firemoot.backplane.Backplane
 import com.firemoot.config.{DbConfig, ServerConfig}
 import com.firemoot.db.{Database, Migrations}
@@ -60,7 +60,7 @@ class RateLimitSuite extends CatsEffectSuite, TestContainerForAll:
       ModerationService(pool, webhooks),
       rate,
     )
-    ServerHmacAuth(ApiKeys.fromConfig(serverCfg), rate)(api.routes).orNotFound
+    ApiAuth(ApiKeys.fromConfig(serverCfg), rate)(api.routes).orNotFound
 
   test("per-API-key budget returns 429 once exhausted") {
     withContainers { pg =>

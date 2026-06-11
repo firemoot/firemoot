@@ -6,7 +6,7 @@ import cats.effect.{IO, Resource}
 import cats.syntax.semigroupk.*
 import com.firemoot.admin.{AdminRoutes, AdminService}
 import com.firemoot.api.ApiRoutes
-import com.firemoot.auth.{ApiKeys, ApiKeyService, ServerHmacAuth}
+import com.firemoot.auth.{ApiAuth, ApiKeys, ApiKeyService}
 import com.firemoot.backplane.Backplane
 import com.firemoot.config.ServerConfig
 import com.firemoot.http.{AdminSpaRoutes, DemoRoutes, HealthRoutes}
@@ -61,7 +61,10 @@ object Application:
       rate,
       media,
     )
-    val securedApi = ServerHmacAuth(ApiKeys.fromConfigAndDb(cfg, pool), rate)(api.routes)
+    val securedApi =
+      ApiAuth(ApiKeys.fromConfigAndDb(cfg, pool), rate, jwtSecret = Some(cfg.apiSecret.value))(
+        api.routes
+      )
     val ws =
       WsRoutes(
         backplane,
