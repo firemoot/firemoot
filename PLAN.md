@@ -429,10 +429,20 @@ soak regressions.
 
 ## 8. M4 - SDK polish, test helper, docs, Fly
 
-- [ ] **M4.1 `@firemoot/client` state layer**: `FiremootClient` (connect lifecycle,
-      auto-reconnect with seq resume, token-refresh hook), `Channel` handle (state
-      cache, optimistic send with rollback, watch/subscribe, typing throttle,
-      read-state tracking), typed event emitter for the §5 event list.
+- [x] **M4.1 `@firemoot/client` state layer**: `FiremootClient` (connect lifecycle,
+      auto-reconnect with seq resume, `tokenProvider` refreshed each attempt) owns
+      the WS `Connection` (a reconnect FSM over an injectable socket: hello,
+      resubscribe-with-resume-seq, exponential backoff + jitter) and routes the
+      event stream to `Channel` handles by cid. `Channel` holds a pure-reducer state
+      cache (messages by seq, reactions, typing, self-scoped read badge, channel
+      meta), does **optimistic send** with nonce reconciliation (the REST response
+      and the `message.new` event reconcile order-independently and never
+      duplicate; a failure is retained as `failed`), `watch`/`resync`,
+      throttled typing and read tracking. The typed event vocabulary (`events.ts`)
+      is built against the server's **exact** per-type `data` payloads. REST rides
+      `@firemoot/core` via a pluggable `RestApi` (auth interceptor injectable). 29
+      client unit tests (emitter, reducer, outbox, FSM, channel optimistic flow,
+      client routing/resubscribe) - no real server needed.
 - [ ] **M4.2 Reconnect chaos tests**: TCP proxy (toxiproxy or hand-rolled) dropping/
       delaying mid-stream; assert zero message loss/duplication across reconnects -
       this is the SDK's headline credibility test.
