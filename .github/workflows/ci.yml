@@ -60,14 +60,16 @@ jobs:
       - name: Format check
         run: pnpm run format:check
 
+      # Build first: @firemoot/client/@firemoot/test resolve @firemoot/core via its
+      # built dist (.d.ts + .js), so typecheck and test need it compiled.
+      - name: Build
+        run: pnpm -r build
+
       - name: Typecheck
         run: pnpm -r typecheck
 
       - name: Test
         run: pnpm -r test
-
-      - name: Build
-        run: pnpm -r build
 
       - name: Fail on admin SPA drift
         run: |
