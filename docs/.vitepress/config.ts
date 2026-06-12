@@ -7,7 +7,7 @@ export default defineConfig({
   description: "Self-hosted, single-binary realtime chat backend on Postgres.",
   cleanUrls: true,
   lastUpdated: true,
-  srcExclude: ["frented-compat-audit.md", "decisions/**", "README.md"],
+  srcExclude: ["frented-compat-audit.md", "frented-migration-plan.md", "decisions/**", "README.md"],
   themeConfig: {
     nav: [
       { text: "Guide", link: "/guide/quickstart" },
