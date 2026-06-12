@@ -1,10 +1,26 @@
 {
   "name": "@firemoot/test",
   "version": "0.0.0",
-  "private": true,
   "type": "module",
   "description": "Downstream-CI helper: boots a Firemoot (Docker via testcontainers), waits healthy, seeds users/channels/messages, returns URLs + tokens (see PLAN.md M4.5).",
   "license": "Apache-2.0",
+  "author": "Firemoot",
+  "homepage": "https://firemoot.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/firemoot/firemoot.git",
+    "directory": "sdk/test"
+  },
+  "bugs": "https://github.com/firemoot/firemoot/issues",
+  "keywords": [
+    "firemoot",
+    "chat",
+    "testing",
+    "testcontainers"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

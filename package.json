@@ -15,9 +15,13 @@
     "test": "pnpm -r test",
     "codegen": "sbt -batch \"server/runMain com.firemoot.OpenApiExport openapi.json\" && pnpm --filter @firemoot/core run generate",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "pnpm -r build && changeset publish"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
     "@types/node": "^22.15.0",
     "prettier": "^3.8.4",
     "typescript": "^6.0.3",

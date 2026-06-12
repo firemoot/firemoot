@@ -528,9 +528,17 @@ soak regressions.
       resume end-to-end through a genuine network cut - the SDK's headline
       credibility test. Runs in the CI `dogfood` job (opt-in via `FIREMOOT_DOGFOOD`,
       its own container); `TcpProxy` is exported so consumers can build their own.
-- [ ] **M4.7 npm publishing**: changesets-based release flow for the three packages
-      (dry-run until the npm org exists - §12 user task); `@firemoot/core`
-      regeneration remains a CI drift gate.
+- [x] **M4.7 npm publishing**: changesets release flow for `@firemoot/core`/
+      `client`/`test` (admin ignored). `.changeset/config.json` (public access,
+      base `main`); root `changeset`/`version-packages`/`release` scripts; a gated
+      `Release` workflow (`changesets/action`) that opens a "Version Packages" PR
+      and publishes on merge. The packages are now publishable (private flag
+      dropped, npm metadata + `publishConfig.access: public` added);
+      `pnpm publish --dry-run` confirms each tarball ships `dist` with `workspace:*`
+      resolved to a concrete version. **Inert until launch:** the release job only
+      runs when the `RELEASE_ENABLED` repo variable is `true` and an `NPM_TOKEN`
+      secret exists - creating the npm `@firemoot` org is the §12 user step.
+      `@firemoot/core` regeneration stays a CI drift gate (unchanged).
 - [ ] **M4.8 Fly.io first-class**: `deploy/fly/fly.toml`
       (`min_machines_running = 1`, auto-stop disabled), Fly Postgres/Neon + Tigris
       walkthrough, the idle-stop gotcha documented prominently.

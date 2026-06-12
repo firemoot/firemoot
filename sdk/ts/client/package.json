@@ -1,10 +1,28 @@
 {
   "name": "@firemoot/client",
   "version": "0.0.0",
-  "private": true,
   "type": "module",
   "description": "Hand-written Firemoot client: connection lifecycle, auto-reconnect with seq resume, Channel state, typed events (see PLAN.md M4.1).",
   "license": "Apache-2.0",
+  "author": "Firemoot",
+  "homepage": "https://firemoot.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/firemoot/firemoot.git",
+    "directory": "sdk/ts/client"
+  },
+  "bugs": "https://github.com/firemoot/firemoot/issues",
+  "keywords": [
+    "firemoot",
+    "chat",
+    "sdk",
+    "websocket",
+    "realtime",
+    "typescript"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
