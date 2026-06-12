@@ -1,8 +1,9 @@
 /**
- * @firemoot/test - boots and seeds a Firemoot instance for downstream CI.
- *
- * The lifecycle helper (start container, wait healthy, seed, hand back URLs +
- * tokens) is implemented in PLAN.md M4.3. This placeholder reserves the package
- * surface.
+ * @firemoot/test - boots and seeds a Firemoot instance for downstream CI
+ * (PLAN.md M4.5). `startFiremoot()` runs the Docker image + Postgres via
+ * Testcontainers, waits healthy, and returns a driver (`baseUrl`/`wsUrl`,
+ * server-trusted SDK, `createToken`, `seed`, `stop`). Firemoot's own SDK suite
+ * is the first consumer (dogfood gate); the M4.6 reconnect-chaos tests are next.
  */
-export const TEST_HELPER_PACKAGE = "@firemoot/test" as const;
+export * from "./instance.js";
+export * from "./seed.js";

@@ -57,6 +57,20 @@ After editing `mise.toml`, run `mise trust && mise install`.
   commands; always read per-job conclusions:
   `gh run view <id> --json conclusion,jobs`. The Cold-boot gate and sdk jobs have
   both gone red while the run "looked" green from a wrapper's exit code.
+- **SDK connection tests count microtasks.** The `Connection`/`FiremootClient`
+  tests flush a fixed number of microtasks (`await Promise.resolve()`) before
+  delivering `hello`, so they depend on the exact number of `await` ticks before
+  the socket is created in `openSocket`. Adding an `await` to the hot path (e.g.
+  `wsUrl()`/token resolution) shifts socket creation a tick later and the tests
+  time out. Keep the static-token path await-free (the `tokenProvider ? await … :
+  config.token` ternary's else-branch has no await on purpose); don't "DRY" it
+  into a `Promise.resolve(...)` wrapper.
+- **pnpm 11 + ignored native builds:** testcontainers pulls `ssh2`/`cpu-features`/
+  `protobufjs`, whose postinstall builds pnpm refuses by default - and pnpm 11
+  *exits non-zero* on that, breaking the deps-status precheck before every `pnpm
+  run`. They're declared `false` under `allowBuilds:` in `pnpm-workspace.yaml`
+  (we talk to a local Docker socket, so none need native code). Don't flip them to
+  `true` (needs a compiler in CI for no gain).
 
 ## Conventions
 

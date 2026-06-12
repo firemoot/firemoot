@@ -56,7 +56,8 @@ export class FiremootClient {
   private readonly emitter = new TypedEmitter<ClientEvents>();
 
   constructor(private readonly config: FiremootClientConfig) {
-    this.rest = config.rest ?? coreRestApi({ baseUrl: config.baseUrl });
+    this.rest =
+      config.rest ?? coreRestApi({ baseUrl: config.baseUrl, authorize: () => this.authHeaders() });
     this.connection = new Connection({
       urlProvider: () => this.wsUrl(),
       subscriptions: () => this.subscriptions(),
@@ -136,6 +137,12 @@ export class FiremootClient {
       if (channel.isWatching) subscriptions[channel.cid] = channel.lastSeq;
     }
     return subscriptions;
+  }
+
+  /** Bearer-auth headers for the default REST adapter (the connected user's JWT). */
+  private async authHeaders(): Promise<Record<string, string>> {
+    const token = this.config.tokenProvider ? await this.config.tokenProvider() : this.config.token;
+    return token !== undefined ? { Authorization: `Bearer ${token}` } : {};
   }
 
   private async wsUrl(): Promise<string> {

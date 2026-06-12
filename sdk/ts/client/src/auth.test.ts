@@ -1,7 +1,7 @@
 import { createHash, createHmac } from "node:crypto";
 import { describe, expect, test } from "vitest";
 
-import { createHmacAuthorizer } from "./auth.js";
+import { createBearerAuthorizer, createHmacAuthorizer } from "./auth.js";
 
 // Independent reference using Node's crypto, which produces the same HMAC-SHA256
 // the server's JVM HmacSigner does - so this pins the WebCrypto implementation to
@@ -61,5 +61,21 @@ describe("createHmacAuthorizer", () => {
     const lower = await authorize({ method: "post", path: "/p" });
     const upper = await authorize({ method: "POST", path: "/p" });
     expect(lower["X-Firemoot-Signature"]).toBe(upper["X-Firemoot-Signature"]);
+  });
+});
+
+describe("createBearerAuthorizer", () => {
+  test("sends the user JWT as a Bearer header", async () => {
+    const authorize = createBearerAuthorizer("jwt-123");
+    expect(await authorize({ method: "GET", path: "/v1/channels/messaging/general" })).toEqual({
+      Authorization: "Bearer jwt-123",
+    });
+  });
+
+  test("resolves a token provider on every request (refresh)", async () => {
+    let n = 0;
+    const authorize = createBearerAuthorizer(() => `t${++n}`);
+    expect(await authorize({ method: "GET", path: "/p" })).toEqual({ Authorization: "Bearer t1" });
+    expect(await authorize({ method: "GET", path: "/p" })).toEqual({ Authorization: "Bearer t2" });
   });
 });

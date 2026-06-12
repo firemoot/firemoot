@@ -50,6 +50,21 @@ async function hmacSha256Hex(secret: string, message: string): Promise<string> {
  * exact bytes sent, so the body is serialised here the same way the transport
  * serialises it (`JSON.stringify`); pass-through string bodies are hashed as-is.
  */
+/**
+ * Builds an `authorize` hook that sends `Authorization: Bearer <user JWT>` - the
+ * client-authenticated REST surface (M4.3), the same HS256 tokens the WS gateway
+ * verifies. `token` may be a string or a provider resolved on every request (so
+ * it can refresh), mirroring `FiremootClient`'s `tokenProvider`.
+ */
+export function createBearerAuthorizer(
+  token: string | (() => string | Promise<string>),
+): NonNullable<CoreRestConfig["authorize"]> {
+  return async () => {
+    const value = typeof token === "function" ? await token() : token;
+    return { Authorization: `Bearer ${value}` };
+  };
+}
+
 export function createHmacAuthorizer(
   config: HmacAuthorizerConfig,
 ): NonNullable<CoreRestConfig["authorize"]> {

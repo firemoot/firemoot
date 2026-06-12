@@ -168,3 +168,49 @@ jobs:
             echo "::error::cold start to healthy exceeded 15s (or never became healthy)"
             exit 1
           fi
+
+  dogfood:
+    name: SDK dogfood (real server)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
+        with:
+          cache: true
+
+      - name: Cache Coursier and sbt
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/coursier
+            ~/.sbt
+          key: sbt-${{ runner.os }}-${{ hashFiles('build.sbt', 'project/**', '.scalafmt.conf') }}
+          restore-keys: sbt-${{ runner.os }}-
+
+      - name: Cache pnpm store
+        uses: actions/cache@v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Build Docker image
+        run: sbt -batch "server/Docker/publishLocal"
+
+      - name: Pre-pull base images for Testcontainers
+        run: docker pull postgres:17
+
+      - name: Install SDK dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build SDK packages
+        run: pnpm -r build
+
+      # @firemoot/test boots firemoot:latest + Postgres via Testcontainers, seeds
+      # it, and drives it with @firemoot/client - the dogfood gate (PLAN.md M4.5).
+      - name: Run the dogfood suite against a real Firemoot
+        env:
+          FIREMOOT_DOGFOOD: "1"
+        run: pnpm --filter @firemoot/test test

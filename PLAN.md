@@ -502,10 +502,22 @@ soak regressions.
       `createChannel(req, members?)` / `addMembers` over HMAC-signed REST, with an
       injectable `ServerRestApi` seam for tests. Stream-compatible names kept
       (`keystroke`/`stopTyping`/`markRead`/`watch`). 44 client tests green.
-- [ ] **M4.5 `@firemoot/test`**: starts Firemoot (Docker image + postgres - decide
-      compose vs testcontainers-node here), waits healthy, seeds
-      users/channels/messages via server API, returns URLs + tokens (minted JWTs);
-      consumed first by Firemoot's own SDK test suite (dogfood gate 1).
+- [x] **M4.5 `@firemoot/test`** (decision: **testcontainers-node**, not compose -
+      a programmatic helper wants random mapped ports + auto-reaping, not a fixed
+      compose file): `startFiremoot()` boots `firemoot:latest` + Postgres on a
+      private Testcontainers network, waits on `/healthz`, and returns a driver
+      (`baseUrl`/`wsUrl`, a server-trusted `FiremootServer`/`rest`, `createToken`,
+      `seed`, `stop`). `seed(spec)` provisions users → channels(+members) →
+      messages in order (server-key authed). The dogfood gate (`dogfood.test.ts`,
+      opt-in via `FIREMOOT_DOGFOOD=1`, a new CI `dogfood` job that builds the image
+      then runs it) drives the real server with `@firemoot/client`: connect, send
+      over REST, receive `message.new` over WS, and `queryChannels` hydration with
+      members. **The gate immediately earned its keep:** it caught that
+      `FiremootClient` sent its REST calls *unauthenticated* (M4.1 predated the
+      M4.3 client-auth surface) - fixed by a `createBearerAuthorizer` and wiring the
+      default REST adapter to send `Authorization: Bearer <user JWT>`. Seed
+      orchestration is unit-tested with an injectable backend; the container path is
+      the opt-in dogfood. 50 SDK tests green (+ 4 dogfood).
 - [ ] **M4.6 Reconnect chaos tests**: a hand-rolled Node TCP proxy (decision: not
       toxiproxy - no new deps, full control of drop/delay timing) between
       `@firemoot/client` and a real server booted by `@firemoot/test`; drop and

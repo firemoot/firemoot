@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Downstream-CI helper: boots a Firemoot (Docker or binary), waits healthy, seeds users/channels/messages, returns URLs + tokens (see PLAN.md M4.3).",
+  "description": "Downstream-CI helper: boots a Firemoot (Docker via testcontainers), waits healthy, seeds users/channels/messages, returns URLs + tokens (see PLAN.md M4.5).",
   "license": "Apache-2.0",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -25,6 +25,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@firemoot/core": "workspace:*"
+    "@firemoot/client": "workspace:*",
+    "@firemoot/core": "workspace:*",
+    "testcontainers": "^12.0.1"
   }
 }

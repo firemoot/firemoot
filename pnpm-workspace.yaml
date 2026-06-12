@@ -2,3 +2,10 @@ packages:
   - "sdk/ts/*"
   - "sdk/test"
   - "admin"
+# testcontainers' transitive native deps. We talk to a local Docker socket, so
+# ssh2/cpu-features (docker-over-SSH) never load native code, and protobufjs runs
+# pure-JS - none need their postinstall build step.
+allowBuilds:
+  cpu-features: false
+  protobufjs: false
+  ssh2: false
