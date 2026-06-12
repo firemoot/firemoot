@@ -539,15 +539,24 @@ soak regressions.
       runs when the `RELEASE_ENABLED` repo variable is `true` and an `NPM_TOKEN`
       secret exists - creating the npm `@firemoot` org is the §12 user step.
       `@firemoot/core` regeneration stays a CI drift gate (unchanged).
-- [ ] **M4.8 Fly.io first-class**: `deploy/fly/fly.toml`
-      (`min_machines_running = 1`, auto-stop disabled), Fly Postgres/Neon + Tigris
-      walkthrough, the idle-stop gotcha documented prominently.
+- [x] **M4.8 Fly.io first-class**: `deploy/fly/fly.toml` (`auto_stop_machines =
+      "off"`, `auto_start_machines = false`, `min_machines_running = 1`,
+      connection-based concurrency, `/healthz` check, 1GB shared VM) +
+      `deploy/fly/README.md` walkthrough: Fly Postgres or Neon, Tigris media
+      (zero code change), `fly secrets` for the API secret/admin password, and the
+      interim registry-push path until the Docker Hub image exists (§12). The
+      idle-stop gotcha is the lead of both files: a stateful WS node must never be
+      auto-stopped.
 - [ ] **M4.9 Docs site**: docs/ as the source; static site (decide generator here -
       lean default: VitePress); covers quickstart (compose in 5 minutes), the auth
       model (server HMAC vs client JWT), protocol reference (generated event list),
       Stream→Firemoot migration notes (seeded by the M4.2 audit), sizing guidance,
       unsupported-hosts framing (serverless apps are *clients*).
-- [ ] **M4.10 Caddy reference config** in compose docs (one-stanza TLS + WS upgrade).
+- [x] **M4.10 Caddy reference config**: `deploy/caddy/Caddyfile` (the one-stanza
+      `reverse_proxy localhost:6668` - Caddy auto-TLS and transparent WS upgrade,
+      no special directive) plus a compose-network variant, surfaced in the new
+      `deploy/compose/README.md` (5-minute quickstart, the RSS runtime flags, media
+      enablement, the serverless-is-a-client framing, and a link to the Fly guide).
 
 ---
 

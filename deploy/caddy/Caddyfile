@@ -1,0 +1,19 @@
+# Reference reverse proxy for Firemoot (SPEC.md §11, PLAN.md M4.10).
+#
+# This is the whole thing. Caddy obtains and renews a TLS certificate
+# automatically (Let's Encrypt / ZeroSSL) and proxies the WebSocket upgrade on
+# /v1/ws transparently - there is no special WebSocket stanza to add.
+#
+# Replace chat.example.com with your domain (its A/AAAA record must point here),
+# then `caddy run --config ./Caddyfile`. Firemoot listens on :6668.
+
+chat.example.com {
+	reverse_proxy localhost:6668
+}
+
+# Running Caddy as its own service inside the compose network instead? Proxy to
+# the service name rather than localhost:
+#
+#   chat.example.com {
+#   	reverse_proxy firemoot:6668
+#   }
