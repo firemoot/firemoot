@@ -1,3 +1,5 @@
+import type { ChannelQuery } from "@firemoot/core";
+
 import { Channel } from "./channel.js";
 import {
   Connection,
@@ -106,6 +108,26 @@ export class FiremootClient {
     });
     this.channels.set(cid, channel);
     return channel;
+  }
+
+  /**
+   * Queries channels (server-side authorised to the connected user) and returns
+   * a `Channel` handle per result, each seeded from the hydrated response
+   * (members, read state, latest message). With `{ watch: true }` each handle is
+   * subscribed over the WS connection (Stream's `queryChannels({watch:true})`
+   * semantics) and re-subscribed automatically across reconnects.
+   */
+  async queryChannels(
+    query: ChannelQuery = {},
+    opts: { watch?: boolean } = {},
+  ): Promise<Channel[]> {
+    const page = await this.rest.queryChannels(query);
+    return (page.channels ?? []).map((cs) => {
+      const channel = this.channel(cs.channel.type, cs.channel.id);
+      channel.hydrate(cs);
+      if (opts.watch) channel.watchFromHydrated();
+      return channel;
+    });
   }
 
   private subscriptions(): Record<string, number> {

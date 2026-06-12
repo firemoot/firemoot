@@ -1,6 +1,9 @@
 import {
   type AddReactionRequest,
   type Channel,
+  type ChannelQuery,
+  type ChannelStatePage,
+  type CreateUploadRequest,
   deleteV1ChannelsTypeIdMessagesMessageid,
   deleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUserid,
   type EditMessageRequest,
@@ -10,12 +13,15 @@ import {
   type Message,
   type MessagePage,
   patchV1ChannelsTypeIdMessagesMessageid,
+  postV1ChannelsQuery,
   postV1ChannelsTypeIdMessages,
   postV1ChannelsTypeIdMessagesMessageidReactions,
   postV1ChannelsTypeIdRead,
+  postV1Uploads,
   type ReactionSummary,
   type ReadStateResponse,
   type SendMessageRequest,
+  type UploadTicket,
 } from "@firemoot/core";
 
 /** The REST surface the value layer needs, abstracted so it can be faked in tests. */
@@ -48,6 +54,8 @@ export interface RestApi {
     userId: string,
   ): Promise<ReactionSummary>;
   markRead(type: string, id: string, body: MarkReadRequest): Promise<ReadStateResponse>;
+  queryChannels(query: ChannelQuery): Promise<ChannelStatePage>;
+  createUpload(body: CreateUploadRequest): Promise<UploadTicket>;
 }
 
 export interface CoreRestConfig {
@@ -150,6 +158,24 @@ export function coreRestApi(config: CoreRestConfig): RestApi {
         path: { type, id },
         body,
         headers: await auth("POST", `/v1/channels/${type}/${id}/read`, body),
+      });
+      return data;
+    },
+    async queryChannels(query) {
+      const { data } = await postV1ChannelsQuery({
+        baseUrl: config.baseUrl,
+        throwOnError: true,
+        body: query,
+        headers: await auth("POST", `/v1/channels/query`, query),
+      });
+      return data;
+    },
+    async createUpload(body) {
+      const { data } = await postV1Uploads({
+        baseUrl: config.baseUrl,
+        throwOnError: true,
+        body,
+        headers: await auth("POST", `/v1/uploads`, body),
       });
       return data;
     },

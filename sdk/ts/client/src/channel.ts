@@ -1,4 +1,4 @@
-import type { Message } from "@firemoot/core";
+import type { ChannelState as HydratedChannel, Message } from "@firemoot/core";
 
 import { TypedEmitter, type Handler } from "./emitter.js";
 import {
@@ -9,7 +9,13 @@ import {
 } from "./events.js";
 import { NONCE_KEY, type OptimisticMessage, Outbox } from "./outbox.js";
 import type { RestApi } from "./rest.js";
-import { applyEvent, type ChannelState, emptyChannelState, type ReadState } from "./state.js";
+import {
+  applyEvent,
+  type ChannelState,
+  emptyChannelState,
+  type Member,
+  type ReadState,
+} from "./state.js";
 
 export interface SendMessageInput {
   text?: string;
@@ -17,6 +23,16 @@ export interface SendMessageInput {
   attachments?: unknown;
   parentMessageId?: string;
   type?: string;
+}
+
+/** A file to upload and attach (browser `File` satisfies this shape). */
+export interface FiremootFile {
+  name: string;
+  /** MIME type; `image/*` becomes an `image` attachment, otherwise `file`. */
+  type: string;
+  size: number;
+  /** The bytes to PUT to the presigned URL. */
+  body: BodyInit;
 }
 
 export interface ChannelDeps {
@@ -27,6 +43,8 @@ export interface ChannelDeps {
   typingThrottleMs?: number;
   now?: () => number;
   randomNonce?: () => string;
+  /** PUTs upload bytes to the presigned URL; injectable for tests. */
+  putFile?: (url: string, body: BodyInit, contentType: string) => Promise<void>;
 }
 
 export type ChannelEvents = { [K in ServerEventType]: FiremootEvent<K> } & {
@@ -95,6 +113,16 @@ export class Channel {
     return this.state.read;
   }
 
+  /** The channel's members (userId, role), as hydrated and kept by member.* events. */
+  get members(): Member[] {
+    return this.state.members;
+  }
+
+  /** Read receipts: userId -> lastReadSeq for every member. */
+  get readReceipts(): Record<string, number> {
+    return this.state.reads;
+  }
+
   on<K extends keyof ChannelEvents>(type: K, handler: Handler<ChannelEvents[K]>): () => void {
     return this.emitter.on(type, handler);
   }
@@ -114,6 +142,45 @@ export class Channel {
   async resync(limit = 50): Promise<void> {
     await this.loadInitial(limit);
     if (this.watching) this.subscribe();
+  }
+
+  /**
+   * Seeds this channel from a hydrated `channels/query` (or get-channel) result:
+   * channel meta, members and their read positions, the caller's read state and
+   * the latest message (a conversation preview). `lastSeq` becomes the channel's
+   * current seq, so a subsequent `watchFromHydrated()` goes straight to live
+   * without replaying history.
+   */
+  hydrate(dto: HydratedChannel): void {
+    const members: Member[] = (dto.members ?? []).map((m) => ({
+      userId: m.userId,
+      role: m.role,
+    }));
+    const reads: Record<string, number> = {};
+    for (const m of dto.members ?? []) reads[m.userId] = m.lastReadSeq;
+    const latest = dto.latestMessage;
+    this.state = {
+      ...emptyChannelState(this.cid),
+      channel: dto.channel,
+      messages: latest ? [latest] : [],
+      members,
+      reads,
+      read: dto.read
+        ? {
+            lastReadSeq: dto.read.lastReadSeq,
+            unreadCount: dto.read.unreadCount,
+            totalUnread: this.state.read?.totalUnread ?? 0,
+          }
+        : null,
+      lastSeq: dto.channel.currentSeq,
+    };
+    this.emitter.emit("change", undefined);
+  }
+
+  /** Marks the (already hydrated) channel watched and subscribes from `lastSeq`. */
+  watchFromHydrated(): void {
+    this.watching = true;
+    this.subscribe();
   }
 
   private async loadInitial(limit: number): Promise<void> {
@@ -179,6 +246,38 @@ export class Channel {
     }
   }
 
+  /**
+   * Uploads a file (presign -> PUT -> attach) then sends it as a message. The
+   * attachment carries `url` (the object URL); the server's thumbnailer patches
+   * `thumbUrl` onto it asynchronously via a later `message.updated`.
+   */
+  async sendFileMessage(
+    file: FiremootFile,
+    input: { text?: string; custom?: Record<string, unknown> } = {},
+  ): Promise<Message> {
+    if (this.deps.selfUserId === undefined) throw new Error("a userId is required to upload");
+    const ticket = await this.deps.rest.createUpload({
+      userId: this.deps.selfUserId,
+      filename: file.name,
+      mime: file.type,
+      sizeBytes: file.size,
+    });
+    const put = this.deps.putFile ?? defaultPutFile;
+    await put(ticket.uploadUrl, file.body, file.type);
+    const attachment = {
+      type: file.type.startsWith("image/") ? "image" : "file",
+      url: ticket.objectUrl,
+      name: file.name,
+      mime: file.type,
+      size: file.size,
+    };
+    return this.sendMessage({
+      attachments: [attachment],
+      ...(input.text !== undefined ? { text: input.text } : {}),
+      ...(input.custom !== undefined ? { custom: input.custom } : {}),
+    });
+  }
+
   editMessage(messageId: string, text: string, custom?: Record<string, unknown>): Promise<Message> {
     return this.deps.rest.editMessage(this.type, this.id, messageId, {
       text,
@@ -196,6 +295,19 @@ export class Channel {
       userId: this.deps.selfUserId,
       type: reactionType,
     });
+  }
+
+  /** Removes the connected user's own reaction (the server forbids removing others'). */
+  async removeReaction(messageId: string, reactionType: string): Promise<void> {
+    if (this.deps.selfUserId === undefined)
+      throw new Error("a userId is required to remove a reaction");
+    await this.deps.rest.removeReaction(
+      this.type,
+      this.id,
+      messageId,
+      reactionType,
+      this.deps.selfUserId,
+    );
   }
 
   async markRead(seq?: number): Promise<void> {
@@ -255,4 +367,14 @@ export class Channel {
       ...(input.parentMessageId !== undefined ? { parentMessageId: input.parentMessageId } : {}),
     };
   }
+}
+
+/** The default upload transport: a plain `PUT` of the bytes to the presigned URL. */
+async function defaultPutFile(url: string, body: BodyInit, contentType: string): Promise<void> {
+  const response = await fetch(url, {
+    method: "PUT",
+    body,
+    headers: { "Content-Type": contentType },
+  });
+  if (!response.ok) throw new Error(`upload PUT failed: ${response.status}`);
 }

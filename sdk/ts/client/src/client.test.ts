@@ -73,6 +73,8 @@ const rest: RestApi = {
   addReaction: () => Promise.reject(new Error("unused")),
   removeReaction: () => Promise.reject(new Error("unused")),
   markRead: () => Promise.reject(new Error("unused")),
+  queryChannels: () => Promise.reject(new Error("unused")),
+  createUpload: () => Promise.reject(new Error("unused")),
 };
 
 function mkClient(): { client: FiremootClient; sockets: FakeSocket[] } {
@@ -122,6 +124,58 @@ describe("FiremootClient routing", () => {
     });
     expect(presence).toEqual([{ userId: "bob", status: "online" }]);
     expect(globalEvents).toBe(2);
+  });
+
+  test("queryChannels hydrates handles and subscribes them when watching", async () => {
+    const sockets: FakeSocket[] = [];
+    const factory: SocketFactory = () => {
+      const socket = new FakeSocket();
+      sockets.push(socket);
+      return socket;
+    };
+    const client = new FiremootClient({
+      baseUrl: "http://localhost:6668",
+      userId: "alice",
+      token: "tok",
+      socketFactory: factory,
+      rest: {
+        ...rest,
+        queryChannels: () =>
+          Promise.resolve({
+            channels: [
+              {
+                channel: {
+                  cid: CID,
+                  type: "messaging",
+                  id: "general",
+                  custom: {},
+                  frozen: false,
+                  archived: false,
+                  currentSeq: 4,
+                  createdAt: "t",
+                  updatedAt: "t",
+                },
+                members: [{ userId: "alice", role: "owner", lastReadSeq: 4 }],
+                read: { lastReadSeq: 4, unreadCount: 0 },
+                latestMessage: msg("last", 3),
+              },
+            ],
+          }),
+      },
+    });
+    const promise = client.connect();
+    await Promise.resolve();
+    sockets[0]?.hello();
+    await promise;
+
+    const channels = await client.queryChannels({}, { watch: true });
+    expect(channels).toHaveLength(1);
+    expect(channels[0]?.cid).toBe(CID);
+    expect(channels[0]?.members).toEqual([{ userId: "alice", role: "owner" }]);
+    expect(channels[0]?.isWatching).toBe(true);
+    expect(sockets[0]?.sent).toContain(
+      JSON.stringify({ type: "subscribe", channels: { [CID]: 4 } }),
+    );
   });
 
   test("resubscribes watched channels with their resume seq after a reconnect", async () => {

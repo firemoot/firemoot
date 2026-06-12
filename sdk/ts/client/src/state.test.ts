@@ -85,6 +85,71 @@ describe("applyEvent", () => {
     expect(s.read).toEqual({ lastReadSeq: 5, unreadCount: 2, totalUnread: 9 });
   });
 
+  test("read.updated records every member's lastReadSeq (read receipts)", () => {
+    let s = emptyChannelState("c");
+    s = applyEvent(
+      s,
+      {
+        type: "read.updated",
+        cid: "c",
+        seq: 6,
+        data: { cid: "c", userId: "other", lastReadSeq: 3, unreadCount: 0, totalUnread: 0 },
+      },
+      "me",
+    );
+    s = applyEvent(
+      s,
+      {
+        type: "read.updated",
+        cid: "c",
+        seq: 7,
+        data: { cid: "c", userId: "me", lastReadSeq: 5, unreadCount: 0, totalUnread: 0 },
+      },
+      "me",
+    );
+    expect(s.reads).toEqual({ other: 3, me: 5 });
+  });
+
+  test("member.added/removed maintain the member list and read map", () => {
+    let s = emptyChannelState("c");
+    s = applyEvent(s, {
+      type: "member.added",
+      cid: "c",
+      seq: 1,
+      data: { cid: "c", userId: "alice", role: "owner" },
+    });
+    s = applyEvent(s, {
+      type: "member.added",
+      cid: "c",
+      seq: 2,
+      data: { cid: "c", userId: "bob" },
+    });
+    expect(s.members).toEqual([
+      { userId: "alice", role: "owner" },
+      { userId: "bob", role: "member" },
+    ]);
+    expect(s.reads).toEqual({ alice: 0, bob: 0 });
+
+    s = applyEvent(
+      s,
+      {
+        type: "read.updated",
+        cid: "c",
+        seq: 3,
+        data: { cid: "c", userId: "bob", lastReadSeq: 2, unreadCount: 0, totalUnread: 0 },
+      },
+      "alice",
+    );
+    s = applyEvent(s, {
+      type: "member.removed",
+      cid: "c",
+      seq: 4,
+      data: { cid: "c", userId: "bob" },
+    });
+    expect(s.members).toEqual([{ userId: "alice", role: "owner" }]);
+    expect(s.reads).toEqual({ alice: 0 });
+  });
+
   test("typing tracks others, ignores self, does not advance seq", () => {
     let s = emptyChannelState("c");
     s = applyEvent(s, { type: "typing.start", cid: "c", seq: 0, data: { userId: "bob" } }, "me");

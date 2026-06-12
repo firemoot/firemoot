@@ -8,6 +8,12 @@ export interface ReadState {
   totalUnread: number;
 }
 
+/** A channel member, as hydrated and then maintained by member.* events. */
+export interface Member {
+  userId: string;
+  role: string;
+}
+
 /**
  * The cached state of one channel, derived purely from the server event stream.
  * `messages` holds confirmed (server) messages ordered by `seq`; optimistic sends
@@ -23,6 +29,10 @@ export interface ChannelState {
   /** userIds currently typing (excluding self). */
   typing: string[];
   read: ReadState | null;
+  /** The channel's members (userId, role), maintained by member.* events. */
+  members: Member[];
+  /** userId -> lastReadSeq for every member - the read-receipt map. */
+  reads: Record<string, number>;
   lastSeq: number;
 }
 
@@ -35,6 +45,8 @@ export function emptyChannelState(cid: string): ChannelState {
     reactions: {},
     typing: [],
     read: null,
+    members: [],
+    reads: {},
     lastSeq: 0,
   };
 }
@@ -62,6 +74,14 @@ function withoutUser(users: string[], userId: string): string[] {
 
 function addUser(users: string[], userId: string): string[] {
   return users.includes(userId) ? users : [...users, userId];
+}
+
+function addMember(members: Member[], member: Member): Member[] {
+  const index = members.findIndex((m) => m.userId === member.userId);
+  if (index < 0) return [...members, member];
+  const next = members.slice();
+  next[index] = member;
+  return next;
 }
 
 /**
@@ -92,19 +112,24 @@ export function applyEvent(
         lastSeq: advanceSeq(state, event.seq),
         reactions: { ...state.reactions, [event.data.messageId]: event.data.counts },
       };
-    case "read.updated":
-      if (selfUserId !== undefined && event.data.userId !== selfUserId) {
-        return { ...state, lastSeq: advanceSeq(state, event.seq) };
-      }
-      return {
+    case "read.updated": {
+      // Every read receipt (mine or another member's) updates the read map;
+      // only my own moves my unread badge.
+      const base = {
         ...state,
         lastSeq: advanceSeq(state, event.seq),
+        reads: { ...state.reads, [event.data.userId]: event.data.lastReadSeq },
+      };
+      if (selfUserId !== undefined && event.data.userId !== selfUserId) return base;
+      return {
+        ...base,
         read: {
           lastReadSeq: event.data.lastReadSeq,
           unreadCount: event.data.unreadCount,
           totalUnread: event.data.totalUnread,
         },
       };
+    }
     case "typing.start":
       return event.data.userId === selfUserId
         ? state
@@ -116,8 +141,25 @@ export function applyEvent(
     case "channel.deleted":
       return { ...state, lastSeq: advanceSeq(state, event.seq), deleted: true };
     case "member.added":
-    case "member.removed":
-      return { ...state, lastSeq: advanceSeq(state, event.seq) };
+      return {
+        ...state,
+        lastSeq: advanceSeq(state, event.seq),
+        members: addMember(state.members, {
+          userId: event.data.userId,
+          role: event.data.role ?? "member",
+        }),
+        reads: { [event.data.userId]: 0, ...state.reads },
+      };
+    case "member.removed": {
+      const reads = { ...state.reads };
+      delete reads[event.data.userId];
+      return {
+        ...state,
+        lastSeq: advanceSeq(state, event.seq),
+        members: state.members.filter((m) => m.userId !== event.data.userId),
+        reads,
+      };
+    }
     default:
       return state;
   }

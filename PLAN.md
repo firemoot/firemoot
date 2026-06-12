@@ -488,13 +488,20 @@ soak regressions.
       `read` is absent for a server-key caller. The response-DTO change is
       regenerated into `@firemoot/core`; consuming the richer state in
       `@firemoot/client` is M4.4.
-- [ ] **M4.4 SDK gap-close** (audit-confirmed list): `FiremootClient.queryChannels`
-      with `watch: true` (subscribes each result), expose `removeReaction` on
-      `Channel`, reducer keeps **other** members' lastReadSeq (read receipts),
-      `Channel.sendFileMessage` (presign → PUT → attach), server helpers
-      `createToken(userId, expiresAt)` + `upsertUser` + create-channel-with-members
-      / `addMembers`. Keep Stream-compatible naming where free
-      (`keystroke`/`stopTyping`/`markRead`/`watch` already match).
+- [x] **M4.4 SDK gap-close** (audit-confirmed list): `FiremootClient.queryChannels`
+      with `watch: true` seeds a `Channel` handle per result from the hydrated
+      response (members, read state, latest message) and subscribes each from its
+      current seq (re-subscribed across reconnects via the existing registry).
+      `Channel.removeReaction` (self-only, server-enforced) and
+      `Channel.sendFileMessage` (presign → injectable PUT → attach, `url` key for
+      the async thumbnailer) added. The reducer now keeps **every** member's
+      `lastReadSeq` (`reads` map, read receipts) and a `members` list maintained by
+      `member.*` events, both seeded by `Channel.hydrate`. New `@firemoot/server`
+      surface (`FiremootServer`): `createToken(userId, expiresAt?)` (HS256 over the
+      API secret - the key the gateway verifies), `upsertUser`, and
+      `createChannel(req, members?)` / `addMembers` over HMAC-signed REST, with an
+      injectable `ServerRestApi` seam for tests. Stream-compatible names kept
+      (`keystroke`/`stopTyping`/`markRead`/`watch`). 44 client tests green.
 - [ ] **M4.5 `@firemoot/test`**: starts Firemoot (Docker image + postgres - decide
       compose vs testcontainers-node here), waits healthy, seeds
       users/channels/messages via server API, returns URLs + tokens (minted JWTs);
