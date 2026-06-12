@@ -7,3 +7,4 @@
  */
 export * from "./instance.js";
 export * from "./seed.js";
+export * from "./tcp-proxy.js";

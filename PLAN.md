@@ -518,11 +518,16 @@ soak regressions.
       default REST adapter to send `Authorization: Bearer <user JWT>`. Seed
       orchestration is unit-tested with an injectable backend; the container path is
       the opt-in dogfood. 50 SDK tests green (+ 4 dogfood).
-- [ ] **M4.6 Reconnect chaos tests**: a hand-rolled Node TCP proxy (decision: not
-      toxiproxy - no new deps, full control of drop/delay timing) between
-      `@firemoot/client` and a real server booted by `@firemoot/test`; drop and
-      delay mid-stream; assert zero message loss/duplication across reconnects -
-      the SDK's headline credibility test.
+- [x] **M4.6 Reconnect chaos tests**: a hand-rolled Node TCP proxy (`TcpProxy` on
+      `node:net`; decision held: not toxiproxy - no new deps, full control of the
+      drop) tunnels the WS between `@firemoot/client` and a real server booted by
+      `@firemoot/test`; `chaos.test.ts` streams 24 messages, severs the proxy
+      mid-stream (`proxy.drop()`), and asserts the client reconnects (resume) and
+      receives **every message exactly once** - completeness + uniqueness, i.e.
+      zero loss/duplication across the reconnect. This exercises the M1.8 hardened
+      resume end-to-end through a genuine network cut - the SDK's headline
+      credibility test. Runs in the CI `dogfood` job (opt-in via `FIREMOOT_DOGFOOD`,
+      its own container); `TcpProxy` is exported so consumers can build their own.
 - [ ] **M4.7 npm publishing**: changesets-based release flow for the three packages
       (dry-run until the npm org exists - §12 user task); `@firemoot/core`
       regeneration remains a CI drift gate.
