@@ -547,11 +547,16 @@ soak regressions.
       interim registry-push path until the Docker Hub image exists (§12). The
       idle-stop gotcha is the lead of both files: a stateful WS node must never be
       auto-stopped.
-- [ ] **M4.9 Docs site**: docs/ as the source; static site (decide generator here -
-      lean default: VitePress); covers quickstart (compose in 5 minutes), the auth
-      model (server HMAC vs client JWT), protocol reference (generated event list),
-      Stream→Firemoot migration notes (seeded by the M4.2 audit), sizing guidance,
-      unsupported-hosts framing (serverless apps are *clients*).
+- [x] **M4.9 Docs site** (generator: **VitePress**): `docs/` as the source, built
+      by `@firemoot/docs` (workspace package, gated by the sdk job's `pnpm -r
+      build`; the internal decision records + compat audit are `srcExclude`d from
+      the published site). Pages: quickstart (compose in 5 min + connect a client),
+      the auth model (server HMAC vs client JWT, per-op authz), protocol reference
+      (the full WS frame + event vocabulary mirroring `events.ts`), Stream→Firemoot
+      migration (generic, public-safe mappings drawn from the M4.2 audit), sizing &
+      performance (RSS flags + soak envelope), and hosting (Compose/Caddy/Fly + the
+      serverless-is-a-client framing). Builds to `docs/.vitepress/dist`; deploying
+      it to firemoot.com is a §12 user step.
 - [x] **M4.10 Caddy reference config**: `deploy/caddy/Caddyfile` (the one-stanza
       `reverse_proxy localhost:6668` - Caddy auto-TLS and transparent WS upgrade,
       no special directive) plus a compose-network variant, surfaced in the new

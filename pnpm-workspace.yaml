@@ -2,10 +2,16 @@ packages:
   - "sdk/ts/*"
   - "sdk/test"
   - "admin"
+  - "docs"
 # testcontainers' transitive native deps. We talk to a local Docker socket, so
 # ssh2/cpu-features (docker-over-SSH) never load native code, and protobufjs runs
 # pure-JS - none need their postinstall build step.
 allowBuilds:
+  # esbuild (via VitePress) needs its postinstall to link its platform binary.
+  esbuild: true
+  # testcontainers' transitive native deps. We talk to a local Docker socket, so
+  # ssh2/cpu-features (docker-over-SSH) never load native code, and protobufjs runs
+  # pure-JS - none need their postinstall build step.
   cpu-features: false
   protobufjs: false
   ssh2: false

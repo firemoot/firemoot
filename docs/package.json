@@ -1,0 +1,16 @@
+{
+  "name": "@firemoot/docs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Firemoot documentation site (VitePress). Source is the markdown under docs/ (see PLAN.md M4.9).",
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.4"
+  }
+}
