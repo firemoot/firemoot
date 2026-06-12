@@ -54,7 +54,7 @@ object ApiEndpoints:
   private val channelPath = "channels" / path[String]("type") / path[String]("id")
 
   val getChannel =
-    base.get.in(channelPath).out(jsonBody[Channel]).summary("Get a channel")
+    base.get.in(channelPath).out(jsonBody[ChannelState]).summary("Get a channel")
 
   val updateChannel =
     base.patch
@@ -129,7 +129,7 @@ object ApiEndpoints:
     base.post
       .in("channels" / "query")
       .in(jsonBody[ChannelQuery])
-      .out(jsonBody[ChannelPage])
+      .out(jsonBody[ChannelStatePage])
       .summary("Query channels with filters, sorting and cursor pagination")
 
   val listMessages =

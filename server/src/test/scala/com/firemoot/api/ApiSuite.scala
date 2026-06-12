@@ -11,6 +11,7 @@ import com.firemoot.db.{Database, Migrations}
 import com.firemoot.domain.{Channel, Message, User}
 import com.firemoot.service.{
   ChannelService,
+  HydrationService,
   MessageService,
   ModerationService,
   QueryService,
@@ -65,6 +66,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               QueryService(pool),
               WebhookService(pool),
               ModerationService(pool, WebhookService(pool)),
+              HydrationService(pool),
             )
           val app = ApiAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
 
@@ -142,6 +144,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               QueryService(pool),
               WebhookService(pool),
               ModerationService(pool, WebhookService(pool)),
+              HydrationService(pool),
             )
           val app = ApiAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val chPath = "/v1/channels/messaging/room2"
@@ -204,6 +207,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               QueryService(pool),
               WebhookService(pool),
               ModerationService(pool, WebhookService(pool)),
+              HydrationService(pool),
             )
           val app = ApiAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val msgs = "/v1/channels/messaging/room3/messages"
@@ -260,6 +264,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
             QueryService(pool),
             WebhookService(pool),
             ModerationService(pool, WebhookService(pool)),
+            HydrationService(pool),
           )
           val app = ApiAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val msgs = "/v1/channels/messaging/room4/messages"
@@ -316,6 +321,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
             QueryService(pool),
             WebhookService(pool),
             ModerationService(pool, WebhookService(pool)),
+            HydrationService(pool),
           )
           val app = ApiAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
 
@@ -357,6 +363,7 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
             QueryService(pool),
             WebhookService(pool),
             ModerationService(pool, WebhookService(pool)),
+            HydrationService(pool),
           )
           val app = ApiAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
           val msgs = "/v1/channels/qt/qroom/messages"
@@ -382,8 +389,14 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               ChannelQuery(Some("qt"), None, None, None, None, None, None),
             ))
             _ = assertEquals(queryRes.status, Status.Ok)
-            page <- queryRes.as[ChannelPage]
-            _ = assertEquals(page.channels.map(_.cid), List("qt:qroom"))
+            page <- queryRes.as[ChannelStatePage]
+            _ = assertEquals(page.channels.map(_.channel.cid), List("qt:qroom"))
+            _ = assertEquals(
+              page.channels.head.latestMessage.flatMap(_.text),
+              Some("second message"),
+              "the server-key query is hydrated with the latest message",
+            )
+            _ = assertEquals(page.channels.head.read, None, "a server-key caller has no read state")
 
             histRes <- app.run(get(s"$msgs?limit=1"))
             _ = assertEquals(histRes.status, Status.Ok)

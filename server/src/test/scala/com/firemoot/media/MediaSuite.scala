@@ -77,6 +77,7 @@ class MediaSuite extends CatsEffectSuite, TestContainerForAll:
       QueryService(pool),
       webhooks,
       ModerationService(pool, webhooks),
+      HydrationService(pool),
       rate,
       media,
     )

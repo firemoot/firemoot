@@ -21,6 +21,14 @@ export type AddReactionRequest = {
 };
 
 /**
+ * CallerReadState
+ */
+export type CallerReadState = {
+    lastReadSeq: number;
+    unreadCount: number;
+};
+
+/**
  * Channel
  */
 export type Channel = {
@@ -47,14 +55,6 @@ export type ChannelCursor = {
 };
 
 /**
- * ChannelPage
- */
-export type ChannelPage = {
-    channels?: Array<Channel>;
-    nextCursor?: ChannelCursor;
-};
-
-/**
  * ChannelQuery
  */
 export type ChannelQuery = {
@@ -65,6 +65,24 @@ export type ChannelQuery = {
     archived?: boolean;
     limit?: number;
     cursor?: ChannelCursor;
+};
+
+/**
+ * ChannelState
+ */
+export type ChannelState = {
+    channel: Channel;
+    members?: Array<MemberState>;
+    read?: CallerReadState;
+    latestMessage?: Message;
+};
+
+/**
+ * ChannelStatePage
+ */
+export type ChannelStatePage = {
+    channels?: Array<ChannelState>;
+    nextCursor?: ChannelCursor;
 };
 
 /**
@@ -139,6 +157,15 @@ export type MapLong = {
 export type MarkReadRequest = {
     userId: string;
     seq?: number;
+};
+
+/**
+ * MemberState
+ */
+export type MemberState = {
+    userId: string;
+    role: string;
+    lastReadSeq: number;
 };
 
 /**
@@ -402,7 +429,7 @@ export type GetV1ChannelsTypeIdErrors = {
 export type GetV1ChannelsTypeIdError = GetV1ChannelsTypeIdErrors[keyof GetV1ChannelsTypeIdErrors];
 
 export type GetV1ChannelsTypeIdResponses = {
-    200: Channel;
+    200: ChannelState;
 };
 
 export type GetV1ChannelsTypeIdResponse = GetV1ChannelsTypeIdResponses[keyof GetV1ChannelsTypeIdResponses];
@@ -691,7 +718,7 @@ export type PostV1ChannelsQueryErrors = {
 export type PostV1ChannelsQueryError = PostV1ChannelsQueryErrors[keyof PostV1ChannelsQueryErrors];
 
 export type PostV1ChannelsQueryResponses = {
-    200: ChannelPage;
+    200: ChannelStatePage;
 };
 
 export type PostV1ChannelsQueryResponse = PostV1ChannelsQueryResponses[keyof PostV1ChannelsQueryResponses];

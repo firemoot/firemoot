@@ -160,7 +160,7 @@
             "content" : {
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/Channel"
+                  "$ref" : "#/components/schemas/ChannelState"
                 }
               }
             }
@@ -896,7 +896,7 @@
             "content" : {
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ChannelPage"
+                  "$ref" : "#/components/schemas/ChannelStatePage"
                 }
               }
             }
@@ -1279,6 +1279,24 @@
           }
         }
       },
+      "CallerReadState" : {
+        "title" : "CallerReadState",
+        "type" : "object",
+        "required" : [
+          "lastReadSeq",
+          "unreadCount"
+        ],
+        "properties" : {
+          "lastReadSeq" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "unreadCount" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
       "Channel" : {
         "title" : "Channel",
         "type" : "object",
@@ -1354,21 +1372,6 @@
           }
         }
       },
-      "ChannelPage" : {
-        "title" : "ChannelPage",
-        "type" : "object",
-        "properties" : {
-          "channels" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/Channel"
-            }
-          },
-          "nextCursor" : {
-            "$ref" : "#/components/schemas/ChannelCursor"
-          }
-        }
-      },
       "ChannelQuery" : {
         "title" : "ChannelQuery",
         "type" : "object",
@@ -1399,6 +1402,45 @@
             "format" : "int32"
           },
           "cursor" : {
+            "$ref" : "#/components/schemas/ChannelCursor"
+          }
+        }
+      },
+      "ChannelState" : {
+        "title" : "ChannelState",
+        "type" : "object",
+        "required" : [
+          "channel"
+        ],
+        "properties" : {
+          "channel" : {
+            "$ref" : "#/components/schemas/Channel"
+          },
+          "members" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/MemberState"
+            }
+          },
+          "read" : {
+            "$ref" : "#/components/schemas/CallerReadState"
+          },
+          "latestMessage" : {
+            "$ref" : "#/components/schemas/Message"
+          }
+        }
+      },
+      "ChannelStatePage" : {
+        "title" : "ChannelStatePage",
+        "type" : "object",
+        "properties" : {
+          "channels" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ChannelState"
+            }
+          },
+          "nextCursor" : {
             "$ref" : "#/components/schemas/ChannelCursor"
           }
         }
@@ -1554,6 +1596,27 @@
             "type" : "string"
           },
           "seq" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "MemberState" : {
+        "title" : "MemberState",
+        "type" : "object",
+        "required" : [
+          "userId",
+          "role",
+          "lastReadSeq"
+        ],
+        "properties" : {
+          "userId" : {
+            "type" : "string"
+          },
+          "role" : {
+            "type" : "string"
+          },
+          "lastReadSeq" : {
             "type" : "integer",
             "format" : "int64"
           }

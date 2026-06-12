@@ -15,6 +15,7 @@ import com.firemoot.metrics.{MetricsRoutes, MetricsService}
 import com.firemoot.ratelimit.RateGuard
 import com.firemoot.service.{
   ChannelService,
+  HydrationService,
   MessageService,
   ModerationService,
   PresenceService,
@@ -58,6 +59,7 @@ object Application:
       QueryService(pool),
       webhooks,
       ModerationService(pool, webhooks),
+      HydrationService(pool),
       rate,
       media,
     )

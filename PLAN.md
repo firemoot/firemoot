@@ -467,8 +467,8 @@ soak regressions.
       message in query/get responses); the only consumed webhook without an
       equivalent is `user.unread_message_reminder` (not gate-blocking, v1.x or
       Frented-side cron).
-- [~] **M4.3 Client-authenticated REST** (**auth + authz + scoping done**;
-      response hydration remains): `Authorization: Bearer <user JWT>` (HS256 - the
+- [x] **M4.3 Client-authenticated REST** (auth + authz + scoping + hydration):
+      `Authorization: Bearer <user JWT>` (HS256 - the
       same tokens the WS gateway verifies) is resolved by the unified `ApiAuth`
       middleware into a `Principal` (`Server` for HMAC, `User` for a JWT, attached
       to the request and read in the routes via tapir `extractFromRequest`). The
@@ -479,12 +479,15 @@ soak regressions.
       send/flag/react-as-another), `queryChannels` is forcibly scoped to the
       caller's membership, and the server-only endpoints (user/channel admin,
       webhooks) 403 an end-user token. 401/403 problem+json; frozen ⇒ 409. The
-      OpenAPI doc is unchanged (the principal is a non-documented extraction), so
-      no SDK drift. Closes the M1.1 authz deferral; makes SPEC §13 enforceable.
-      `ClientAuthSuite` covers the matrix. **Remaining:** hydrate the client-auth
-      `get channel` / `channels/query` responses with members (userId, role,
-      lastReadSeq), the caller's {lastReadSeq, unreadCount} and the latest message
-      (changes those response DTOs → SDK regen).
+      Closes the M1.1 authz deferral; makes SPEC §13 enforceable.
+      `ClientAuthSuite` covers the matrix. `get channel` / `channels/query` now
+      return a hydrated `ChannelState`: per-channel `members` (userId, role,
+      `lastReadSeq`), the caller's `{lastReadSeq, unreadCount}` and the
+      `latestMessage` (conversation preview). Hydration is batched over the whole
+      cid set (`HydrationRepo`/`HydrationService`, ≤3 queries per page, no N+1);
+      `read` is absent for a server-key caller. The response-DTO change is
+      regenerated into `@firemoot/core`; consuming the richer state in
+      `@firemoot/client` is M4.4.
 - [ ] **M4.4 SDK gap-close** (audit-confirmed list): `FiremootClient.queryChannels`
       with `watch: true` (subscribes each result), expose `removeReaction` on
       `Channel`, reducer keeps **other** members' lastReadSeq (read receipts),

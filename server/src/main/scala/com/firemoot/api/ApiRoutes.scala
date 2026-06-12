@@ -4,11 +4,12 @@ import java.util.UUID
 
 import cats.effect.IO
 import com.firemoot.auth.Principal
-import com.firemoot.domain.{Channel, Message}
+import com.firemoot.domain.Message
 import com.firemoot.media.{MediaService, UploadError}
 import com.firemoot.ratelimit.{RateGuard, RateLimitDecision}
 import com.firemoot.service.{
   ChannelService,
+  HydrationService,
   MessageService,
   ModerationService,
   QueryService,
@@ -39,6 +40,7 @@ final class ApiRoutes(
     queries: QueryService,
     webhooks: WebhookService,
     moderation: ModerationService,
+    hydration: HydrationService,
     rate: RateGuard = RateGuard.unlimited,
     media: Option[MediaService] = None,
 ):
@@ -196,8 +198,16 @@ final class ApiRoutes(
       case None => Left(notFound(s"message '$messageId'"))
     }
 
-  private def doGetChannel(c: String): IO[Either[Problem, Channel]] =
-    channels.get(c).map(_.toRight(notFound(s"channel '$c'")))
+  /** A single channel hydrated (members, latest message, caller read state). */
+  private def doGetChannelState(
+      c: String,
+      caller: Option[String],
+  ): IO[Either[Problem, ChannelState]] =
+    channels.get(c).flatMap {
+      case None => IO.pure(Left(notFound(s"channel '$c'")))
+      case Some(channel) =>
+        hydration.hydrate(List(channel), caller).map(states => Right(states.head))
+    }
 
   private def doUpload(req: CreateUploadRequest): IO[Either[Problem, UploadTicket]] =
     media match
@@ -343,7 +353,10 @@ final class ApiRoutes(
   private val getChannelServer =
     ApiEndpoints.getChannel.in(principalInput).serverLogic { case (channelType, id, principal) =>
       val c = cid(channelType, id)
-      authed(principal, c)(doGetChannel(c), (_, _) => doGetChannel(c))
+      authed(principal, c)(
+        doGetChannelState(c, None),
+        (uid, _) => doGetChannelState(c, Some(uid)),
+      )
     }
 
   private val sendMessageServer =
@@ -421,10 +434,15 @@ final class ApiRoutes(
 
   private val queryChannelsServer =
     ApiEndpoints.queryChannels.in(principalInput).serverLogic { case (query, principal) =>
+      def page(q: ChannelQuery, caller: Option[String]): IO[Either[Problem, ChannelStatePage]] =
+        queries.channels(q).flatMap { p =>
+          hydration.hydrate(p.channels, caller).map(states =>
+            Right(ChannelStatePage(states, p.nextCursor))
+          )
+        }
       principal match
-        case Principal.Server(_) => queries.channels(query).map(Right(_))
-        case Principal.User(uid, _) =>
-          queries.channels(query.copy(members = Some(List(uid)))).map(Right(_))
+        case Principal.Server(_) => page(query, None)
+        case Principal.User(uid, _) => page(query.copy(members = Some(List(uid))), Some(uid))
         case Principal.Denied => IO.pure(Left(unauthenticated))
     }
 

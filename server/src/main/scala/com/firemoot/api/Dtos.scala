@@ -125,6 +125,43 @@ object ChannelPage:
   given Codec[ChannelPage] = deriveCodec
   given Schema[ChannelPage] = Schema.derived
 
+/** A channel member with their role and read pointer (drives read receipts). */
+final case class MemberState(userId: String, role: String, lastReadSeq: Long)
+
+object MemberState:
+  given Codec[MemberState] = deriveCodec
+  given Schema[MemberState] = Schema.derived
+
+/** The calling user's own read position in a channel (badge logic). */
+final case class CallerReadState(lastReadSeq: Long, unreadCount: Long)
+
+object CallerReadState:
+  given Codec[CallerReadState] = deriveCodec
+  given Schema[CallerReadState] = Schema.derived
+
+/**
+ * A channel hydrated for the client-authenticated surface (M4.3): the channel
+ * row plus its `members` (each with `lastReadSeq`), the caller's own `read`
+ * state (absent for a server-key caller, which has no single subject) and the
+ * `latestMessage` for conversation previews.
+ */
+final case class ChannelState(
+    channel: Channel,
+    members: List[MemberState],
+    read: Option[CallerReadState],
+    latestMessage: Option[Message],
+)
+
+object ChannelState:
+  given Codec[ChannelState] = deriveCodec
+  given Schema[ChannelState] = Schema.derived
+
+final case class ChannelStatePage(channels: List[ChannelState], nextCursor: Option[ChannelCursor])
+
+object ChannelStatePage:
+  given Codec[ChannelStatePage] = deriveCodec
+  given Schema[ChannelStatePage] = Schema.derived
+
 final case class MessagePage(messages: List[Message], nextBeforeSeq: Option[Long])
 
 object MessagePage:

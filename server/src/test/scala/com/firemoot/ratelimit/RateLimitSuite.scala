@@ -58,6 +58,7 @@ class RateLimitSuite extends CatsEffectSuite, TestContainerForAll:
       QueryService(pool),
       webhooks,
       ModerationService(pool, webhooks),
+      HydrationService(pool),
       rate,
     )
     ApiAuth(ApiKeys.fromConfig(serverCfg), rate)(api.routes).orNotFound

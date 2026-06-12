@@ -12,6 +12,7 @@ import com.firemoot.config.{DbConfig, ServerConfig}
 import com.firemoot.db.{Database, Migrations}
 import com.firemoot.service.{
   ChannelService,
+  HydrationService,
   MessageService,
   ModerationService,
   QueryService,
@@ -83,6 +84,7 @@ class ClientAuthSuite extends CatsEffectSuite, TestContainerForAll:
             QueryService(pool),
             WebhookService(pool),
             ModerationService(pool, WebhookService(pool)),
+            HydrationService(pool),
           )
           val app = ApiAuth(ApiKeys.fromConfig(serverCfg), jwtSecret = Some(secret))(api.routes)
             .orNotFound
@@ -195,7 +197,8 @@ class ClientAuthSuite extends CatsEffectSuite, TestContainerForAll:
             )
             _ = assertEquals(read.status, Status.Ok)
 
-            // queryChannels only returns the caller's channels.
+            // queryChannels only returns the caller's channels, hydrated with
+            // members, the caller's read state and the latest message.
             queryRes <- app.run(
               bearer(
                 POST,
@@ -204,15 +207,38 @@ class ClientAuthSuite extends CatsEffectSuite, TestContainerForAll:
                 alice,
               )
             )
-            channels <- queryRes.as[Json]
-            cids = channels.hcursor
-              .downField("channels")
-              .as[List[Json]]
-              .toOption
-              .getOrElse(Nil)
-              .flatMap(_.hcursor.get[String]("cid").toOption)
-              .toSet
-            _ = assertEquals(cids, Set("messaging:general"), "alice sees only her channels")
+            page <- queryRes.as[ChannelStatePage]
+            _ = assertEquals(
+              page.channels.map(_.channel.cid),
+              List("messaging:general"),
+              "alice sees only her channels",
+            )
+            general = page.channels.head
+            _ = assertEquals(
+              general.members.map(m => m.userId -> m.role).toSet,
+              Set("alice" -> "owner", "bob" -> "member"),
+              "members are hydrated with their roles",
+            )
+            _ = assertEquals(
+              general.latestMessage.flatMap(_.text),
+              Some("edited"),
+              "the latest message hydrates the conversation preview",
+            )
+            _ = assertEquals(
+              general.read.map(_.unreadCount),
+              Some(0L),
+              "alice's only message is her own, so nothing is unread for her",
+            )
+
+            // get-channel hydrates the single-channel path with the caller's own
+            // read state: bob marked the channel read, so he has no unread.
+            bobChannel <- app.run(
+              bearerNoBody(GET, "/v1/channels/messaging/general", bob)
+            )
+            _ = assertEquals(bobChannel.status, Status.Ok)
+            bobState <- bobChannel.as[ChannelState]
+            _ = assertEquals(bobState.read.map(_.unreadCount), Some(0L))
+            _ = assertEquals(bobState.members.size, 2, "get-channel hydrates members too")
 
             // Server-only endpoints reject an end-user token.
             userOnAdmin <- app.run(

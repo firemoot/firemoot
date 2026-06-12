@@ -77,7 +77,7 @@ export function coreRestApi(config: CoreRestConfig): RestApi {
         path: { type, id },
         headers: await auth("GET", `/v1/channels/${type}/${id}`),
       });
-      return data;
+      return data.channel;
     },
     async getMessages(type, id, query) {
       const { data } = await getV1ChannelsTypeIdMessages({
