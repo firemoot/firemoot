@@ -88,7 +88,13 @@ client's `Channel`/reducer.
 ## Riskiest seams (verify first)
 1. The `channel.state` facade fidelity - read receipts (other members'
    `lastReadSeq`), unread badge, typing, optimistic order. Unit-test it against
-   `@firemoot/client` before wiring the UI.
+   `@firemoot/client` before wiring the UI. **De-risked (13/06/2026):**
+   `@firemoot/client` ships `streamChannelState(channel)` - a
+   Stream-`channel.state`-shaped projection (`messages`, `members`, per-user
+   `read` receipts, `unreadCount`, `last_message_at`) over the M4.4 reducer, with
+   unit tests driving hydration + `read.updated`/`member.*`/`message.new` (the
+   five `state.*` fields Frented actually reads are all covered). The browser
+   adapter (PR 3) wraps this rather than rebuilding the reducer.
 2. Pre-publish SDK consumption (tarball vs link) - get it reproducible in CI early.
 3. Async thumbnails - the thread view must subscribe to `message.updated`
    (Stream returned `thumb_url` synchronously; Firemoot patches it later).
