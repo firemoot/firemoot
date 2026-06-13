@@ -85,6 +85,39 @@ client's `Channel`/reducer.
 - **Accept:** `pnpm test:e2e:file e2e/messaging-core.spec.ts` green against
   Firemoot; flip `CHAT_BACKEND` default to `firemoot`.
 
+## PR 3 surface + event map (derived 13/06/2026 - turnkey for the build)
+
+PR 3 is **not** a flat function swap: the app uses a StreamChat **client** facade
+*and* a **channel** facade. Used surface (counted across `app`/`components`/`hooks`/`lib`):
+
+- **client**: `on` (×15), `channel` (×9), `queryChannels` (×6), `userID` (×6), `user`,
+  `connectUser`/`disconnectUser`, `flagMessage`.
+- **channel**: `id` (×13), `sendMessage` (×11), `state` (×7, via `streamChannelState`),
+  `data` (×5), `watch`, `sendImage`/`sendFile`, plus `on`/`keystroke`/`stopTyping`/
+  `markRead`/`sendReaction`/`deleteReaction` (from the adapter).
+
+**Event translation** (`client.on`/`channel.on` subscriptions found in the app →
+the facade must synthesise a Stream-shaped event for each; **verify each handler's
+read payload against the running E2E - this is the irreducible runtime risk**):
+
+| Stream event (subscribed) | Firemoot source | Shim |
+|---|---|---|
+| `message.new` | channel `message.new` | direct; handler reads `event.message` |
+| `message.read` | channel `read.updated` | rename; reader = `data.userId` |
+| `typing.start` / `typing.stop` | channel `typing.start`/`typing.stop` | direct |
+| `notification.added_to_channel` / `removed_from_channel` | client same-named (user-targeted) | direct - names already match |
+| `notification.message_new` | (none) | covered by watched-channel `message.new` under `watch:true`; residual risk only beyond page 1 (audit: acceptable) |
+| `notification.mark_read` | client `read.updated` (targeted to reader) | shim |
+| `notification.mark_unread` | (none) | Frented only listens to trigger a refresh - safe no-op |
+| `connection.changed` / `connection.recovered` | client `status`/`connected`/`reconnecting` | shim |
+
+Build order: `FiremootChannelFacade` (`.state`=`streamChannelState`, action methods,
+translating `.on`) **+ unit tests in isolation** first (verifiable, no app); then the
+client facade (`channel`/`queryChannels({watch})`/`on`/`userID`); then redefine
+`StreamChannelType` to the used-subset interface so both Stream's `Channel` and the
+facade satisfy it (call sites don't move); then branch `connectUser`/`getUserChannels`
+on the flag.
+
 ## Riskiest seams (verify first)
 1. The `channel.state` facade fidelity - read receipts (other members'
    `lastReadSeq`), unread badge, typing, optimistic order. Unit-test it against
