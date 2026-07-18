@@ -28,7 +28,7 @@ import com.firemoot.service.{
 import com.firemoot.ws.{ConnectionRegistry, EventReplay, WsRoutes}
 import org.http4s.dsl.io.*
 import org.http4s.headers.`Content-Type`
-import org.http4s.server.middleware.Logger
+import org.http4s.server.middleware.{CORS, Logger}
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.http4s.{HttpApp, HttpRoutes, MediaType}
 import skunk.Session
@@ -97,10 +97,29 @@ object Application:
       ).routes
     val demo = if devDemo then DemoRoutes.routes else HttpRoutes.empty[IO]
 
-    // securedApi is last: health, metrics, admin, openapi, demo and ws own their
+    // Firemoot is an embeddable, token-authenticated backend: end-user browsers
+    // connect from arbitrary customer origins and authorise per request (HS256
+    // bearer / HMAC), so access is gated by the credential, not the origin -
+    // hence an origin-agnostic CORS policy (the same posture as hosted chat
+    // backends). Restrict via a reverse proxy if a single-origin deployment wants
+    // a tighter policy.
+    // `withAllowHeadersReflect` echoes the requested headers: a literal `*` in
+    // Access-Control-Allow-Headers does NOT cover `Authorization` (Fetch spec),
+    // which the end-user bearer + HMAC headers rely on.
+    val cors =
+      CORS.policy.withAllowOriginAll.withAllowMethodsAll.withAllowHeadersReflect
+        .withMaxAge(1.day)
+
+    // securedApi is last: health, metrics, admin, openapi and demo own their
     // paths and must not be intercepted by the HMAC middleware (which 401s them).
+    // The WebSocket route is composed OUTSIDE the Logger/CORS middleware: both
+    // reconstruct the Response, which drops the upgrade context Ember needs and
+    // makes the browser handshake fail with 501. WS upgrades are not subject to
+    // CORS (the browser enforces it on fetch/XHR, not WebSocket), so they need
+    // neither wrapper.
     wsb =>
-      Logger.httpApp(logHeaders = true, logBody = false)(
-        (HealthRoutes(pool).routes <+> metrics <+> admin <+> AdminSpaRoutes.routes <+>
-          openApi <+> demo <+> ws.routes(wsb) <+> securedApi).orNotFound
-      )
+      val httpRoutes =
+        HealthRoutes(pool).routes <+> metrics <+> admin <+> AdminSpaRoutes.routes <+>
+          openApi <+> demo <+> securedApi
+      val wrapped = cors(Logger.httpRoutes(logHeaders = true, logBody = false)(httpRoutes))
+      (ws.routes(wsb) <+> wrapped).orNotFound

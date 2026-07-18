@@ -1,4 +1,8 @@
-import type { ChannelState as HydratedChannel, Message } from "@firemoot/core";
+import type {
+  Channel as ChannelMeta,
+  ChannelState as HydratedChannel,
+  Message,
+} from "@firemoot/core";
 
 import { TypedEmitter, type Handler } from "./emitter.js";
 import {
@@ -121,6 +125,11 @@ export class Channel {
   /** Read receipts: userId -> lastReadSeq for every member. */
   get readReceipts(): Record<string, number> {
     return this.state.reads;
+  }
+
+  /** The channel's metadata row (custom, type, id, frozen, ...), null until hydrated. */
+  get meta(): ChannelMeta | null {
+    return this.state.channel;
   }
 
   on<K extends keyof ChannelEvents>(type: K, handler: Handler<ChannelEvents[K]>): () => void {
@@ -247,14 +256,12 @@ export class Channel {
   }
 
   /**
-   * Uploads a file (presign -> PUT -> attach) then sends it as a message. The
-   * attachment carries `url` (the object URL); the server's thumbnailer patches
-   * `thumbUrl` onto it asynchronously via a later `message.updated`.
+   * Uploads a file (presign -> PUT) and returns its object URL, without sending a
+   * message. Use when batching several files into one message; the server's
+   * thumbnailer patches `thumbUrl` onto the attachment that later references this
+   * URL. [[sendFileMessage]] is the single-file convenience built on this.
    */
-  async sendFileMessage(
-    file: FiremootFile,
-    input: { text?: string; custom?: Record<string, unknown> } = {},
-  ): Promise<Message> {
+  async uploadFile(file: FiremootFile): Promise<{ url: string }> {
     if (this.deps.selfUserId === undefined) throw new Error("a userId is required to upload");
     const ticket = await this.deps.rest.createUpload({
       userId: this.deps.selfUserId,
@@ -264,9 +271,22 @@ export class Channel {
     });
     const put = this.deps.putFile ?? defaultPutFile;
     await put(ticket.uploadUrl, file.body, file.type);
+    return { url: ticket.objectUrl };
+  }
+
+  /**
+   * Uploads a file (presign -> PUT -> attach) then sends it as a message. The
+   * attachment carries `url` (the object URL); the server's thumbnailer patches
+   * `thumbUrl` onto it asynchronously via a later `message.updated`.
+   */
+  async sendFileMessage(
+    file: FiremootFile,
+    input: { text?: string; custom?: Record<string, unknown> } = {},
+  ): Promise<Message> {
+    const { url } = await this.uploadFile(file);
     const attachment = {
       type: file.type.startsWith("image/") ? "image" : "file",
-      url: ticket.objectUrl,
+      url,
       name: file.name,
       mime: file.type,
       size: file.size,
