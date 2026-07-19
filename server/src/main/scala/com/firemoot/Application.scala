@@ -2,6 +2,7 @@ package com.firemoot
 
 import scala.concurrent.duration.*
 
+import cats.data.{Kleisli, OptionT}
 import cats.effect.{IO, Resource}
 import cats.syntax.semigroupk.*
 import com.firemoot.admin.{AdminRoutes, AdminService}
@@ -117,9 +118,23 @@ object Application:
     // makes the browser handshake fail with 501. WS upgrades are not subject to
     // CORS (the browser enforces it on fetch/XHR, not WebSocket), so they need
     // neither wrapper.
+    // Log any exception escaping a route before Ember turns it into a bare 500 -
+    // without this, production 500s leave no trace at all.
+    def logUnhandled(routes: HttpRoutes[IO]): HttpRoutes[IO] =
+      Kleisli { req =>
+        OptionT {
+          routes.run(req).value.onError { case e =>
+            org.typelevel.log4cats.slf4j.Slf4jLogger
+              .getLogger[IO]
+              .error(e)(s"unhandled exception serving ${req.method} ${req.uri.path}")
+          }
+        }
+      }
+
     wsb =>
       val httpRoutes =
         HealthRoutes(pool).routes <+> metrics <+> admin <+> AdminSpaRoutes.routes <+>
           openApi <+> demo <+> securedApi
-      val wrapped = cors(Logger.httpRoutes(logHeaders = true, logBody = false)(httpRoutes))
+      val wrapped =
+        cors(Logger.httpRoutes(logHeaders = true, logBody = false)(logUnhandled(httpRoutes)))
       (ws.routes(wsb) <+> wrapped).orNotFound

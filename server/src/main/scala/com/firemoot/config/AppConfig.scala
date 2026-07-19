@@ -36,6 +36,11 @@ final case class MediaConfig(
     maxImageBytes: Long,
     maxFileBytes: Long,
     allowedMime: Set[String],
+    // Path-style addressing (endpoint/bucket/key) suits MinIO and friends;
+    // stores that serve public objects virtual-host style only (e.g. Tigris,
+    // where path-style public reads 403) need this off so presigned PUTs and
+    // public GETs share the bucket-subdomain origin.
+    forcePathStyle: Boolean = true,
 ):
   /** The public URL for an object key (`publicBaseUrl` override, else path-style). */
   def objectUrl(key: String): String =
@@ -116,8 +121,20 @@ object AppConfig:
           env("FIREMOOT_MEDIA_MAX_IMAGE_BYTES").as[Long].default(10L * 1024 * 1024),
           env("FIREMOOT_MEDIA_MAX_FILE_BYTES").as[Long].default(50L * 1024 * 1024),
           env("FIREMOOT_MEDIA_ALLOWED_MIME").default(defaultMime),
+          env("FIREMOOT_S3_FORCE_PATH_STYLE").as[Boolean].default(true),
         ).parMapN {
-          (region, bucket, accessKey, secret, publicUrl, expiry, maxImage, maxFile, mimes) =>
+          (
+              region,
+              bucket,
+              accessKey,
+              secret,
+              publicUrl,
+              expiry,
+              maxImage,
+              maxFile,
+              mimes,
+              pathStyle,
+          ) =>
             Some(MediaConfig(
               endpoint = endpoint,
               region = region,
@@ -129,6 +146,7 @@ object AppConfig:
               maxImageBytes = maxImage,
               maxFileBytes = maxFile,
               allowedMime = mimes.split(",").map(_.trim).filter(_.nonEmpty).toSet,
+              forcePathStyle = pathStyle,
             ))
         }
     }

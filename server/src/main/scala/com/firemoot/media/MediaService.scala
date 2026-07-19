@@ -79,7 +79,9 @@ object MediaService:
             AwsBasicCredentials.create(cfg.accessKey, cfg.secretKey.value)
           )
         )
-        .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+        .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(
+          cfg.forcePathStyle
+        ).build())
         .build()
     })
 
