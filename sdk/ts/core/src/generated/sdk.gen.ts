@@ -88,6 +88,8 @@ export const deleteV1ChannelsTypeIdMembersUserid = <ThrowOnError extends boolean
 
 /**
  * List a channel's message history (newest first), paginated by seq
+ *
+ * Pagination cursor: pass either `before_seq` (a sequence number) or `before_id` (a message id, resolved to its seq within this channel) to fetch messages strictly before that point; omit both to start from the latest. Supplying both is a 400; a `before_id` that names no message in this channel is a 404.
  */
 export const getV1ChannelsTypeIdMessages = <ThrowOnError extends boolean = false>(options: Options<GetV1ChannelsTypeIdMessagesData, ThrowOnError>): RequestResult<GetV1ChannelsTypeIdMessagesResponses, GetV1ChannelsTypeIdMessagesErrors, ThrowOnError> => (options.client ?? client).get<GetV1ChannelsTypeIdMessagesResponses, GetV1ChannelsTypeIdMessagesErrors, ThrowOnError>({ url: '/v1/channels/{type}/{id}/messages', ...options });
 

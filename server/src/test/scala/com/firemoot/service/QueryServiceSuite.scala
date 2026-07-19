@@ -211,6 +211,32 @@ class QueryServiceSuite extends CatsEffectSuite, TestContainerForEach:
     }
   }
 
+  test("message history resolves a before_id cursor to its seq, then paginates before it") {
+    withContainers { pg =>
+      withServices(pg) { (users, channels, messages, queries) =>
+        val cid = "mhid:room"
+        def send(i: Int) =
+          messages
+            .send(cid, Some("h"), Some(s"m$i"), Json.obj(), Json.arr(), None, "regular")
+            .map(_.toOption.get)
+        for
+          _ <- users.upsert("h", None, None, "user", Json.obj())
+          _ <- channels.create("mhid", "room", Some("h"), Json.obj())
+          sent <- (1 to 5).toList.traverse(send)
+          cursor = sent(3) // "m4"
+          seq <- queries.messageSeq(cid, cursor.id)
+          missing <- queries.messageSeq(cid, java.util.UUID.randomUUID())
+          page <- queries.messageHistory(cid, seq, Some(2))
+        yield
+          assertEquals(seq, Some(cursor.seq), "resolves the cursor message's seq")
+          assertEquals(missing, None, "an unknown id resolves to nothing")
+          // Strictly before m4, newest first, clamped to the limit: m3, m2.
+          assertEquals(page.messages.map(_.text), List(Some("m3"), Some("m2")))
+          assert(page.nextBeforeSeq.isDefined, "a full page yields a further cursor")
+      }
+    }
+  }
+
   test("full-text search ranks matches, honours the cid filter and websearch syntax") {
     withContainers { pg =>
       withServices(pg) { (users, channels, messages, queries) =>

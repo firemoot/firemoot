@@ -81,6 +81,19 @@ object QueryRepo:
     """.query(Codecs.channel)
 
   /**
+   * The seq of a message by its id within a channel, for resolving a `before_id`
+   * pagination cursor. Ignores `deleted_at` so a tombstoned cursor message still
+   * resolves and pagination stays stable. Params: cid, messageId.
+   */
+  val messageSeqById: Query[(String, java.util.UUID), Long] =
+    sql"""
+      select m.seq
+      from messages m
+      where m.cid = $text and m.id = $uuid
+      limit 1
+    """.query(int8)
+
+  /**
    * A channel's live messages, newest first, paginated by seq. `beforeSeq` NULL
    * starts from the latest. Params: cid, beforeSeq, limit.
    */

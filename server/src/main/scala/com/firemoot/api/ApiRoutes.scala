@@ -426,9 +426,21 @@ final class ApiRoutes(
 
   private val listMessagesServer =
     ApiEndpoints.listMessages.in(principalInput).serverLogic {
-      case (channelType, id, beforeSeq, limit, principal) =>
+      case (channelType, id, beforeSeq, beforeId, limit, principal) =>
         val c = cid(channelType, id)
-        def history = queries.messageHistory(c, beforeSeq, limit).map(Right(_))
+        def history: IO[Either[Problem, MessagePage]] = (beforeSeq, beforeId) match
+          case (Some(_), Some(_)) =>
+            IO.pure(Left(Problem.of(
+              400,
+              "Bad Request",
+              Some("provide before_seq or before_id, not both"),
+            )))
+          case (_, Some(messageId)) =>
+            queries.messageSeq(c, messageId).flatMap {
+              case None => IO.pure(Left(notFound(s"message '$messageId'")))
+              case seq => queries.messageHistory(c, seq, limit).map(Right(_))
+            }
+          case (_, None) => queries.messageHistory(c, beforeSeq, limit).map(Right(_))
         authed(principal, c)(history, (_, _) => history)
     }
 

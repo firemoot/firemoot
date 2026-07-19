@@ -388,6 +388,7 @@
     "/v1/channels/{type}/{id}/messages" : {
       "get" : {
         "summary" : "List a channel's message history (newest first), paginated by seq",
+        "description" : "Pagination cursor: pass either `before_seq` (a sequence number) or `before_id` (a message id, resolved to its seq within this channel) to fetch messages strictly before that point; omit both to start from the latest. Supplying both is a 400; a `before_id` that names no message in this channel is a 404.",
         "operationId" : "getV1ChannelsTypeIdMessages",
         "parameters" : [
           {
@@ -416,6 +417,15 @@
             }
           },
           {
+            "name" : "before_id",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
+          },
+          {
             "name" : "limit",
             "in" : "query",
             "required" : false,
@@ -437,7 +447,7 @@
             }
           },
           "400" : {
-            "description" : "Invalid value for: query parameter before_seq, Invalid value for: query parameter limit",
+            "description" : "Invalid value for: query parameter before_seq, Invalid value for: query parameter before_id, Invalid value for: query parameter limit",
             "content" : {
               "text/plain" : {
                 "schema" : {

@@ -54,6 +54,10 @@ final class QueryService(pool: Resource[IO, Session[IO]]):
       MessagePage(rows, Option.when(rows.sizeIs == lim)(rows.last.seq))
     }
 
+  /** The seq of `messageId` within `cid`, for resolving a `before_id` cursor (None if absent). */
+  def messageSeq(cid: String, messageId: java.util.UUID): IO[Option[Long]] =
+    pool.use(_.runOption(QueryRepo.messageSeqById, (cid, messageId)))
+
   def search(req: SearchRequest): IO[SearchPage] =
     val lim = clamp(req.limit)
     pool.use(_.runList(QueryRepo.search, (req.query, req.cid, lim))).map { rows =>

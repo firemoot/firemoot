@@ -379,10 +379,11 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
               SendMessageRequest(Some("ivy"), Some("hello world"), None, None, None),
             ))
             m1 <- m1Res.as[Message]
-            _ <- app.run(post(
+            m2Res <- app.run(post(
               msgs,
               SendMessageRequest(Some("ivy"), Some("second message"), None, None, None),
             ))
+            m2 <- m2Res.as[Message]
 
             queryRes <- app.run(post(
               "/v1/channels/query",
@@ -403,6 +404,27 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
             hist <- histRes.as[MessagePage]
             _ = assertEquals(hist.messages.map(_.text), List(Some("second message")))
             _ = assert(hist.nextBeforeSeq.isDefined, "a full page yields a cursor")
+
+            beforeIdRes <- app.run(get(s"$msgs?before_id=${m2.id}"))
+            _ = assertEquals(beforeIdRes.status, Status.Ok)
+            beforeId <- beforeIdRes.as[MessagePage]
+            _ = assertEquals(
+              beforeId.messages.map(_.text),
+              List(Some("hello world")),
+              "before_id returns messages strictly older than the cursor",
+            )
+            unknownIdRes <- app.run(get(s"$msgs?before_id=${java.util.UUID.randomUUID()}"))
+            _ = assertEquals(
+              unknownIdRes.status,
+              Status.NotFound,
+              "an unknown before_id is a 404, not an empty page",
+            )
+            bothCursorsRes <- app.run(get(s"$msgs?before_seq=99&before_id=${m2.id}"))
+            _ = assertEquals(
+              bothCursorsRes.status,
+              Status.BadRequest,
+              "before_seq and before_id together is a 400",
+            )
 
             searchRes <- app.run(post("/v1/search", SearchRequest("hello", Some("qt:qroom"), None)))
             _ = assertEquals(searchRes.status, Status.Ok)

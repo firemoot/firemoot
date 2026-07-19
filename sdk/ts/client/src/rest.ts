@@ -30,7 +30,7 @@ export interface RestApi {
   getMessages(
     type: string,
     id: string,
-    query?: { before_seq?: number; limit?: number },
+    query?: { before_seq?: number; before_id?: string; limit?: number },
   ): Promise<MessagePage>;
   sendMessage(type: string, id: string, body: SendMessageRequest): Promise<Message>;
   editMessage(

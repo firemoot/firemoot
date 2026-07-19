@@ -517,6 +517,7 @@ export type GetV1ChannelsTypeIdMessagesData = {
     };
     query?: {
         before_seq?: number;
+        before_id?: string;
         limit?: number;
     };
     url: '/v1/channels/{type}/{id}/messages';
@@ -524,7 +525,7 @@ export type GetV1ChannelsTypeIdMessagesData = {
 
 export type GetV1ChannelsTypeIdMessagesErrors = {
     /**
-     * Invalid value for: query parameter before_seq, Invalid value for: query parameter limit
+     * Invalid value for: query parameter before_seq, Invalid value for: query parameter before_id, Invalid value for: query parameter limit
      */
     400: string;
     default: Problem;
