@@ -15,6 +15,7 @@ final case class DbConfig(
     user: String,
     password: Secret[String],
     maxConnections: Int,
+    sslMode: String = "prefer",
 )
 
 final case class ServerConfig(apiKeyId: String, apiSecret: Secret[String])
@@ -67,6 +68,11 @@ object AppConfig:
       env("FIREMOOT_DB_USER").default("firemoot"),
       env("FIREMOOT_DB_PASSWORD").default("firemoot").secret,
       env("FIREMOOT_DB_MAX_CONNECTIONS").as[Int].default(10),
+      // JDBC sslmode for the boot-time Flyway connection ("prefer" matches
+      // pgjdbc's default). Set "disable" for servers whose proxy breaks the
+      // TLS handshake instead of refusing it (e.g. Fly unmanaged Postgres
+      // over flycast), where "prefer" cannot fall back to plaintext.
+      env("FIREMOOT_DB_SSLMODE").default("prefer"),
     ).parMapN(DbConfig.apply)
 
   private val server: ConfigValue[Effect, ServerConfig] =

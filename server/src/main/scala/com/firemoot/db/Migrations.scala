@@ -16,7 +16,7 @@ object Migrations:
    * not crash boot.
    */
   def run(cfg: DbConfig): IO[Int] = IO.blocking {
-    val url = s"jdbc:postgresql://${cfg.host}:${cfg.port}/${cfg.database}"
+    val url = s"jdbc:postgresql://${cfg.host}:${cfg.port}/${cfg.database}?sslmode=${cfg.sslMode}"
     Flyway
       .configure()
       .dataSource(url, cfg.user, cfg.password.value)
