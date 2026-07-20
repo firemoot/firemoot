@@ -2,6 +2,7 @@ import {
   type AddMemberRequest,
   type Channel,
   type CreateChannelRequest,
+  deleteV1MessagesMessageid,
   postV1Channels,
   postV1ChannelsTypeIdMembers,
   postV1Users,
@@ -21,6 +22,7 @@ export interface ServerRestApi {
   upsertUser(body: UpsertUserRequest): Promise<User>;
   createChannel(body: CreateChannelRequest): Promise<Channel>;
   addMember(type: string, id: string, body: AddMemberRequest): Promise<void>;
+  deleteMessage(messageId: string): Promise<void>;
 }
 
 export function coreServerRestApi(config: {
@@ -55,6 +57,14 @@ export function coreServerRestApi(config: {
         path: { type, id },
         body,
         headers: await auth("POST", `/v1/channels/${type}/${id}/members`, body),
+      });
+    },
+    async deleteMessage(messageId) {
+      await deleteV1MessagesMessageid({
+        baseUrl: config.baseUrl,
+        throwOnError: true,
+        path: { messageId },
+        headers: await auth("DELETE", `/v1/messages/${messageId}`),
       });
     },
   };
@@ -136,6 +146,14 @@ export class FiremootServer {
 
   upsertUser(body: UpsertUserRequest): Promise<User> {
     return this.rest.upsertUser(body);
+  }
+
+  /**
+   * Deletes a message by its id alone, resolving its channel server-side (Stream
+   * parity). Soft-delete; a 404 surfaces as a rejected promise.
+   */
+  deleteMessage(messageId: string): Promise<void> {
+    return this.rest.deleteMessage(messageId);
   }
 
   /** Adds members one by one (the REST endpoint is single-member, idempotent). */

@@ -256,6 +256,7 @@ export type SendMessageRequest = {
     attachments?: unknown;
     parentMessageId?: string;
     type?: string;
+    id?: string;
 };
 
 /**
@@ -525,7 +526,7 @@ export type GetV1ChannelsTypeIdMessagesData = {
 
 export type GetV1ChannelsTypeIdMessagesErrors = {
     /**
-     * Invalid value for: query parameter before_seq, Invalid value for: query parameter before_id, Invalid value for: query parameter limit
+     * Invalid value for: query parameter before_seq, Invalid value for: query parameter limit
      */
     400: string;
     default: Problem;
@@ -577,10 +578,6 @@ export type DeleteV1ChannelsTypeIdMessagesMessageidData = {
 };
 
 export type DeleteV1ChannelsTypeIdMessagesMessageidErrors = {
-    /**
-     * Invalid value for: path parameter messageId
-     */
-    400: string;
     default: Problem;
 };
 
@@ -605,7 +602,7 @@ export type PatchV1ChannelsTypeIdMessagesMessageidData = {
 
 export type PatchV1ChannelsTypeIdMessagesMessageidErrors = {
     /**
-     * Invalid value for: path parameter messageId, Invalid value for: body
+     * Invalid value for: body
      */
     400: string;
     default: Problem;
@@ -618,6 +615,27 @@ export type PatchV1ChannelsTypeIdMessagesMessageidResponses = {
 };
 
 export type PatchV1ChannelsTypeIdMessagesMessageidResponse = PatchV1ChannelsTypeIdMessagesMessageidResponses[keyof PatchV1ChannelsTypeIdMessagesMessageidResponses];
+
+export type DeleteV1MessagesMessageidData = {
+    body?: never;
+    path: {
+        messageId: string;
+    };
+    query?: never;
+    url: '/v1/messages/{messageId}';
+};
+
+export type DeleteV1MessagesMessageidErrors = {
+    default: Problem;
+};
+
+export type DeleteV1MessagesMessageidError = DeleteV1MessagesMessageidErrors[keyof DeleteV1MessagesMessageidErrors];
+
+export type DeleteV1MessagesMessageidResponses = {
+    204: void;
+};
+
+export type DeleteV1MessagesMessageidResponse = DeleteV1MessagesMessageidResponses[keyof DeleteV1MessagesMessageidResponses];
 
 export type PostV1ChannelsTypeIdMessagesMessageidReactionsData = {
     body: AddReactionRequest;
@@ -632,7 +650,7 @@ export type PostV1ChannelsTypeIdMessagesMessageidReactionsData = {
 
 export type PostV1ChannelsTypeIdMessagesMessageidReactionsErrors = {
     /**
-     * Invalid value for: path parameter messageId, Invalid value for: body
+     * Invalid value for: body
      */
     400: string;
     default: Problem;
@@ -660,10 +678,6 @@ export type DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridDa
 };
 
 export type DeleteV1ChannelsTypeIdMessagesMessageidReactionsReactiontypeUseridErrors = {
-    /**
-     * Invalid value for: path parameter messageId
-     */
-    400: string;
     default: Problem;
 };
 
@@ -823,7 +837,7 @@ export type PostV1ChannelsTypeIdMessagesMessageidFlagData = {
 
 export type PostV1ChannelsTypeIdMessagesMessageidFlagErrors = {
     /**
-     * Invalid value for: path parameter messageId, Invalid value for: body
+     * Invalid value for: body
      */
     400: string;
     default: Problem;

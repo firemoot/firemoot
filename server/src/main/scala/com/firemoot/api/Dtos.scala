@@ -53,8 +53,9 @@ final case class SendMessageRequest(
     text: Option[String],
     custom: Option[Json],
     attachments: Option[Json],
-    parentMessageId: Option[UUID],
+    parentMessageId: Option[String],
     `type`: Option[String] = None,
+    id: Option[String] = None,
 )
 
 object SendMessageRequest:
@@ -74,7 +75,7 @@ object AddReactionRequest:
   given Schema[AddReactionRequest] = Schema.derived
 
 /** A message's per-type reaction counts after a reaction change. */
-final case class ReactionSummary(messageId: UUID, counts: Map[String, Long])
+final case class ReactionSummary(messageId: String, counts: Map[String, Long])
 
 object ReactionSummary:
   given Codec[ReactionSummary] = deriveCodec
@@ -250,7 +251,7 @@ object UploadTicket:
 /** A moderation flag against a message. `flaggedUser` is the message's author. */
 final case class Flag(
     id: UUID,
-    messageId: UUID,
+    messageId: String,
     cid: String,
     flaggedUser: Option[String],
     flaggedBy: String,

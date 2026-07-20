@@ -1,7 +1,5 @@
 package com.firemoot.api
 
-import java.util.UUID
-
 import cats.effect.IO
 import com.firemoot.auth.Principal
 import com.firemoot.domain.Message
@@ -80,6 +78,18 @@ final class ApiRoutes(
   private val validRoles = Set("owner", "moderator", "member")
   private val validMessageTypes = Set("regular", "system")
 
+  /** Stream's practical bound; client ids must be a printable, whitespace-free token. */
+  private val MaxMessageIdLength = 255
+
+  /** The reason a client-supplied message id is rejected (400), or None if it is valid. */
+  private def messageIdError(id: String): Option[String] =
+    if id.isEmpty then Some("message id must not be empty")
+    else if id.length > MaxMessageIdLength then
+      Some(s"message id must be at most $MaxMessageIdLength characters")
+    else if id.exists(c => c.isWhitespace || c.isControl) then
+      Some("message id must not contain whitespace or control characters")
+    else None
+
   /** The verified caller, read off the request attribute the auth middleware set. */
   private val principalInput: EndpointInput[Principal] =
     extractFromRequest(req =>
@@ -118,8 +128,11 @@ final class ApiRoutes(
 
   private def doSend(c: String, req: SendMessageRequest): IO[Either[Problem, Message]] =
     val messageType = req.`type`.getOrElse("regular")
+    val idError = req.id.flatMap(messageIdError)
     if !validMessageTypes(messageType) then
       IO.pure(Left(Problem.of(400, "Bad Request", Some(s"invalid message type '$messageType'"))))
+    else if idError.isDefined then
+      IO.pure(Left(Problem.of(400, "Bad Request", idError)))
     else
       sendAllowed(req.userId).flatMap {
         case Some(problem) => IO.pure(Left(problem))
@@ -133,18 +146,21 @@ final class ApiRoutes(
               attachments = req.attachments.getOrElse(Json.arr()),
               parentMessageId = req.parentMessageId,
               messageType = messageType,
+              id = req.id,
             )
             .map {
               case Right(message) => Right(message)
               case Left(SendError.ChannelNotFound) => Left(notFound(s"channel '$c'"))
               case Left(SendError.ChannelFrozen) =>
                 Left(Problem.of(409, "Conflict", Some(s"channel '$c' is frozen")))
+              case Left(SendError.DuplicateId(id)) =>
+                Left(Problem.of(409, "Conflict", Some(s"message '$id' already exists")))
             }
       }
 
   private def doEdit(
       c: String,
-      messageId: UUID,
+      messageId: String,
       req: EditMessageRequest,
   ): IO[Either[Problem, Message]] =
     messages.edit(
@@ -154,7 +170,7 @@ final class ApiRoutes(
       req.custom,
     ).map(_.toRight(notFound(s"message '$messageId'")))
 
-  private def doDelete(c: String, messageId: UUID): IO[Either[Problem, Unit]] =
+  private def doDelete(c: String, messageId: String): IO[Either[Problem, Unit]] =
     messages.delete(c, messageId).map {
       case true => Right(())
       case false => Left(notFound(s"message '$messageId'"))
@@ -162,7 +178,7 @@ final class ApiRoutes(
 
   private def doAddReaction(
       c: String,
-      messageId: UUID,
+      messageId: String,
       req: AddReactionRequest,
   ): IO[Either[Problem, ReactionSummary]] =
     reactions.add(c, messageId, req.userId, req.`type`).map {
@@ -172,7 +188,7 @@ final class ApiRoutes(
 
   private def doRemoveReaction(
       c: String,
-      messageId: UUID,
+      messageId: String,
       user: String,
       reactionType: String,
   ): IO[Either[Problem, ReactionSummary]] =
@@ -190,7 +206,7 @@ final class ApiRoutes(
 
   private def doFlag(
       c: String,
-      messageId: UUID,
+      messageId: String,
       req: FlagMessageRequest,
   ): IO[Either[Problem, Flag]] =
     moderation.flag(c, messageId, req.userId, req.reason).map {
@@ -231,7 +247,7 @@ final class ApiRoutes(
         }
 
   /** Author or a channel moderator/owner may edit/delete a message. */
-  private def asAuthorOrModerator[A](c: String, messageId: UUID, uid: String, role: String)(
+  private def asAuthorOrModerator[A](c: String, messageId: String, uid: String, role: String)(
       body: => IO[Either[Problem, A]]
   ): IO[Either[Problem, A]] =
     messages.authorInChannel(c, messageId).flatMap {
@@ -386,6 +402,18 @@ final class ApiRoutes(
         )
     }
 
+  private val deleteMessageGlobalServer =
+    ApiEndpoints.deleteMessageGlobal.in(principalInput).serverLogic { case (messageId, principal) =>
+      messages.channelOf(messageId).flatMap {
+        case None => IO.pure(Left(notFound(s"message '$messageId'")))
+        case Some(c) =>
+          authed(principal, c)(
+            doDelete(c, messageId),
+            (uid, role) => asAuthorOrModerator(c, messageId, uid, role)(doDelete(c, messageId)),
+          )
+      }
+    }
+
   private val addReactionServer =
     ApiEndpoints.addReaction.in(principalInput).serverLogic {
       case (channelType, id, messageId, req, principal) =>
@@ -488,6 +516,7 @@ final class ApiRoutes(
         sendMessageServer,
         editMessageServer,
         deleteMessageServer,
+        deleteMessageGlobalServer,
         addReactionServer,
         removeReactionServer,
         markReadServer,

@@ -1,7 +1,5 @@
 package com.firemoot.service
 
-import java.util.UUID
-
 import cats.effect.{IO, Resource}
 import com.firemoot.api.Flag
 import com.firemoot.db.ModerationRepo
@@ -22,7 +20,7 @@ final class ModerationService(pool: Resource[IO, Session[IO]], webhooks: Webhook
 
   def flag(
       cid: String,
-      messageId: UUID,
+      messageId: String,
       flaggedBy: String,
       reason: Option[String],
   ): IO[Option[Flag]] =

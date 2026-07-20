@@ -55,7 +55,7 @@ final class QueryService(pool: Resource[IO, Session[IO]]):
     }
 
   /** The seq of `messageId` within `cid`, for resolving a `before_id` cursor (None if absent). */
-  def messageSeq(cid: String, messageId: java.util.UUID): IO[Option[Long]] =
+  def messageSeq(cid: String, messageId: String): IO[Option[Long]] =
     pool.use(_.runOption(QueryRepo.messageSeqById, (cid, messageId)))
 
   def search(req: SearchRequest): IO[SearchPage] =

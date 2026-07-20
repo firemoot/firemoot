@@ -1,7 +1,5 @@
 package com.firemoot.service
 
-import java.util.UUID
-
 import cats.effect.{IO, Resource}
 import cats.syntax.all.*
 import com.firemoot.backplane.Backplane
@@ -20,7 +18,7 @@ final class ReactionService(pool: Resource[IO, Session[IO]], backplane: Backplan
    */
   def add(
       cid: String,
-      messageId: UUID,
+      messageId: String,
       userId: String,
       reactionType: String,
   ): IO[Option[Map[String, Long]]] =
@@ -29,7 +27,7 @@ final class ReactionService(pool: Resource[IO, Session[IO]], backplane: Backplan
   /** Removes a reaction, emitting `reaction.deleted` when one was actually removed. */
   def remove(
       cid: String,
-      messageId: UUID,
+      messageId: String,
       userId: String,
       reactionType: String,
   ): IO[Option[Map[String, Long]]] =
@@ -37,10 +35,10 @@ final class ReactionService(pool: Resource[IO, Session[IO]], backplane: Backplan
 
   private def mutate(
       cid: String,
-      messageId: UUID,
+      messageId: String,
       userId: String,
       reactionType: String,
-      op: Query[(UUID, String, String), String],
+      op: Query[(String, String, String), String],
       eventType: String,
   ): IO[Option[Map[String, Long]]] =
     pool

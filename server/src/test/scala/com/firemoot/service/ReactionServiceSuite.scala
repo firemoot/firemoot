@@ -57,7 +57,7 @@ class ReactionServiceSuite extends CatsEffectSuite, TestContainerForAll:
             c2 <- reactions.add(cid, message.id, "bob", "like")
             c3 <- reactions.add(cid, message.id, "bob", "like") // idempotent
             c4 <- reactions.add(cid, message.id, "alice", "heart")
-            missing <- reactions.add(cid, java.util.UUID.randomUUID(), "alice", "like")
+            missing <- reactions.add(cid, "no-such-message", "alice", "like")
 
             afterRemove <- reactions.remove(cid, message.id, "alice", "like")
             removeAgain <- reactions.remove(cid, message.id, "alice", "like")

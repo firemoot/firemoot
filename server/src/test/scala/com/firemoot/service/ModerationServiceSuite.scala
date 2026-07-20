@@ -1,7 +1,5 @@
 package com.firemoot.service
 
-import java.util.UUID
-
 import cats.effect.IO
 import ciris.Secret
 import com.dimafeng.testcontainers.PostgreSQLContainer
@@ -57,7 +55,7 @@ class ModerationServiceSuite extends CatsEffectSuite, TestContainerForAll:
               webhooks.register(CreateWebhookRequest("http://example.test/hook", None, Some(true)))
 
             flagged <- moderation.flag(cid, msg.id, "bob", Some("spam"))
-            missing <- moderation.flag(cid, UUID.randomUUID(), "bob", None)
+            missing <- moderation.flag(cid, "no-such-message", "bob", None)
             open <- moderation.listFlags("open")
             events <- pool.use(_.execute(deliveredEvents))
           yield

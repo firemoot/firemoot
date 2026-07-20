@@ -1,7 +1,5 @@
 package com.firemoot.service
 
-import java.util.UUID
-
 import cats.effect.IO
 import ciris.Secret
 import com.dimafeng.testcontainers.PostgreSQLContainer
@@ -33,9 +31,9 @@ class UserServiceSuite extends CatsEffectSuite, TestContainerForAll:
     )
 
   private val insertReaction =
-    sql"insert into reactions (message_id, user_id, type) values ($uuid, $text, $text)".command
-  private val messageState: Query[UUID, (Option[String], Option[String], Boolean)] =
-    sql"select text, user_id, (deleted_at is not null) from messages where id = $uuid"
+    sql"insert into reactions (message_id, user_id, type) values ($text, $text, $text)".command
+  private val messageState: Query[String, (Option[String], Option[String], Boolean)] =
+    sql"select text, user_id, (deleted_at is not null) from messages where id = $text"
       .query(text.opt *: text.opt *: bool)
   private val countMembers: Query[String, Long] =
     sql"select count(*) from channel_members where user_id = $text".query(int8)

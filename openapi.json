@@ -421,8 +421,7 @@
             "in" : "query",
             "required" : false,
             "schema" : {
-              "type" : "string",
-              "format" : "uuid"
+              "type" : "string"
             }
           },
           {
@@ -447,7 +446,7 @@
             }
           },
           "400" : {
-            "description" : "Invalid value for: query parameter before_seq, Invalid value for: query parameter before_id, Invalid value for: query parameter limit",
+            "description" : "Invalid value for: query parameter before_seq, Invalid value for: query parameter limit",
             "content" : {
               "text/plain" : {
                 "schema" : {
@@ -559,24 +558,13 @@
             "in" : "path",
             "required" : true,
             "schema" : {
-              "type" : "string",
-              "format" : "uuid"
+              "type" : "string"
             }
           }
         ],
         "responses" : {
           "204" : {
             "description" : ""
-          },
-          "400" : {
-            "description" : "Invalid value for: path parameter messageId",
-            "content" : {
-              "text/plain" : {
-                "schema" : {
-                  "type" : "string"
-                }
-              }
-            }
           },
           "default" : {
             "description" : "",
@@ -615,8 +603,7 @@
             "in" : "path",
             "required" : true,
             "schema" : {
-              "type" : "string",
-              "format" : "uuid"
+              "type" : "string"
             }
           }
         ],
@@ -642,7 +629,7 @@
             }
           },
           "400" : {
-            "description" : "Invalid value for: path parameter messageId, Invalid value for: body",
+            "description" : "Invalid value for: body",
             "content" : {
               "text/plain" : {
                 "schema" : {
@@ -650,6 +637,38 @@
                 }
               }
             }
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/messages/{messageId}" : {
+      "delete" : {
+        "summary" : "Delete a message by id, resolving its channel (soft)",
+        "description" : "Deletes a message given only its id - the channel is resolved server-side. Authorisation mirrors the channel-scoped delete: a server key may delete any message; an end user must be a member of the resolved channel and either the author or a moderator/owner. Unknown id is a 404.",
+        "operationId" : "deleteV1MessagesMessageid",
+        "parameters" : [
+          {
+            "name" : "messageId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "204" : {
+            "description" : ""
           },
           "default" : {
             "description" : "",
@@ -690,8 +709,7 @@
             "in" : "path",
             "required" : true,
             "schema" : {
-              "type" : "string",
-              "format" : "uuid"
+              "type" : "string"
             }
           }
         ],
@@ -717,7 +735,7 @@
             }
           },
           "400" : {
-            "description" : "Invalid value for: path parameter messageId, Invalid value for: body",
+            "description" : "Invalid value for: body",
             "content" : {
               "text/plain" : {
                 "schema" : {
@@ -765,8 +783,7 @@
             "in" : "path",
             "required" : true,
             "schema" : {
-              "type" : "string",
-              "format" : "uuid"
+              "type" : "string"
             }
           },
           {
@@ -793,16 +810,6 @@
               "application/json" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ReactionSummary"
-                }
-              }
-            }
-          },
-          "400" : {
-            "description" : "Invalid value for: path parameter messageId",
-            "content" : {
-              "text/plain" : {
-                "schema" : {
-                  "type" : "string"
                 }
               }
             }
@@ -1117,8 +1124,7 @@
             "in" : "path",
             "required" : true,
             "schema" : {
-              "type" : "string",
-              "format" : "uuid"
+              "type" : "string"
             }
           }
         ],
@@ -1144,7 +1150,7 @@
             }
           },
           "400" : {
-            "description" : "Invalid value for: path parameter messageId, Invalid value for: body",
+            "description" : "Invalid value for: body",
             "content" : {
               "text/plain" : {
                 "schema" : {
@@ -1548,8 +1554,7 @@
             "format" : "uuid"
           },
           "messageId" : {
-            "type" : "string",
-            "format" : "uuid"
+            "type" : "string"
           },
           "cid" : {
             "type" : "string"
@@ -1648,8 +1653,7 @@
         ],
         "properties" : {
           "id" : {
-            "type" : "string",
-            "format" : "uuid"
+            "type" : "string"
           },
           "cid" : {
             "type" : "string"
@@ -1674,8 +1678,7 @@
             
           },
           "parentMessageId" : {
-            "type" : "string",
-            "format" : "uuid"
+            "type" : "string"
           },
           "replyCount" : {
             "type" : "integer",
@@ -1744,8 +1747,7 @@
         ],
         "properties" : {
           "messageId" : {
-            "type" : "string",
-            "format" : "uuid"
+            "type" : "string"
           },
           "counts" : {
             "$ref" : "#/components/schemas/Map_Long"
@@ -1840,10 +1842,12 @@
             
           },
           "parentMessageId" : {
-            "type" : "string",
-            "format" : "uuid"
+            "type" : "string"
           },
           "type" : {
+            "type" : "string"
+          },
+          "id" : {
             "type" : "string"
           }
         }

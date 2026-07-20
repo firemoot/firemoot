@@ -92,18 +92,30 @@ object ApiEndpoints:
 
   val editMessage =
     base.patch
-      .in(channelPath / "messages" / path[java.util.UUID]("messageId"))
+      .in(channelPath / "messages" / path[String]("messageId"))
       .in(jsonBody[EditMessageRequest])
       .out(jsonBody[Message])
       .summary("Edit a message")
 
   val deleteMessage =
     base.delete
-      .in(channelPath / "messages" / path[java.util.UUID]("messageId"))
+      .in(channelPath / "messages" / path[String]("messageId"))
       .out(statusCode(StatusCode.NoContent))
       .summary("Delete a message (soft)")
 
-  private val messagePath = channelPath / "messages" / path[java.util.UUID]("messageId")
+  val deleteMessageGlobal =
+    base.delete
+      .in("messages" / path[String]("messageId"))
+      .out(statusCode(StatusCode.NoContent))
+      .summary("Delete a message by id, resolving its channel (soft)")
+      .description(
+        "Deletes a message given only its id - the channel is resolved server-side. " +
+          "Authorisation mirrors the channel-scoped delete: a server key may delete " +
+          "any message; an end user must be a member of the resolved channel and " +
+          "either the author or a moderator/owner. Unknown id is a 404."
+      )
+
+  private val messagePath = channelPath / "messages" / path[String]("messageId")
 
   val addReaction =
     base.post
@@ -136,7 +148,7 @@ object ApiEndpoints:
     base.get
       .in(channelPath / "messages")
       .in(query[Option[Long]]("before_seq"))
-      .in(query[Option[java.util.UUID]]("before_id"))
+      .in(query[Option[String]]("before_id"))
       .in(query[Option[Int]]("limit"))
       .out(jsonBody[MessagePage])
       .summary("List a channel's message history (newest first), paginated by seq")
@@ -215,6 +227,7 @@ object ApiEndpoints:
     sendMessage,
     editMessage,
     deleteMessage,
+    deleteMessageGlobal,
     addReaction,
     removeReaction,
     markRead,

@@ -21,5 +21,5 @@ object Codecs:
       timestamptz.opt *: timestamptz *: timestamptz *: timestamptz.opt).to[Channel]
 
   val message: Codec[Message] =
-    (uuid *: text *: int8 *: text.opt *: text *: text.opt *: jsonb[Json] *: jsonb[Json] *:
-      uuid.opt *: int4 *: timestamptz *: timestamptz *: timestamptz.opt).to[Message]
+    (text *: text *: int8 *: text.opt *: text *: text.opt *: jsonb[Json] *: jsonb[Json] *:
+      text.opt *: int4 *: timestamptz *: timestamptz *: timestamptz.opt).to[Message]

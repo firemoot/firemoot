@@ -225,7 +225,7 @@ class QueryServiceSuite extends CatsEffectSuite, TestContainerForEach:
           sent <- (1 to 5).toList.traverse(send)
           cursor = sent(3) // "m4"
           seq <- queries.messageSeq(cid, cursor.id)
-          missing <- queries.messageSeq(cid, java.util.UUID.randomUUID())
+          missing <- queries.messageSeq(cid, "no-such-message")
           page <- queries.messageHistory(cid, seq, Some(2))
         yield
           assertEquals(seq, Some(cursor.seq), "resolves the cursor message's seq")

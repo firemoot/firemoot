@@ -1,7 +1,5 @@
 package com.firemoot.service
 
-import java.util.UUID
-
 import cats.effect.{IO, Resource}
 import cats.syntax.all.*
 import com.firemoot.backplane.Backplane
@@ -10,11 +8,12 @@ import com.firemoot.db.{ChannelRepo, EventRepo, MessageRepo}
 import com.firemoot.domain.{Event, Message, UuidV7}
 import io.circe.Json
 import io.circe.syntax.*
-import skunk.Session
+import skunk.{Session, SqlState}
 
 /** Why a send was refused. */
 enum SendError:
   case ChannelNotFound, ChannelFrozen
+  case DuplicateId(id: String)
 
 final class MessageService(pool: Resource[IO, Session[IO]], backplane: Backplane):
 
@@ -23,6 +22,11 @@ final class MessageService(pool: Resource[IO, Session[IO]], backplane: Backplane
    * deleted or absent channels), inserts the message, increments the parent's
    * `reply_count` when it is a thread reply, and writes the `message.new` event -
    * all in one transaction (SPEC.md §3). Published to the backplane after commit.
+   *
+   * A caller may supply `id` (Stream parity); absent, the server mints a UUIDv7
+   * string. Ids are globally unique (the primary key), so a re-send of an
+   * existing id surfaces as [[SendError.DuplicateId]] by catching the unique
+   * violation - race-safe without a check-then-insert.
    */
   def send(
       cid: String,
@@ -30,38 +34,51 @@ final class MessageService(pool: Resource[IO, Session[IO]], backplane: Backplane
       text: Option[String],
       custom: Json,
       attachments: Json,
-      parentMessageId: Option[UUID],
+      parentMessageId: Option[String],
       messageType: String = "regular",
+      id: Option[String] = None,
   ): IO[Either[SendError, Message]] =
-    pool
-      .use { session =>
-        session.transaction.use { _ =>
-          session.runOption(ChannelRepo.bumpSeqForMessage, cid).flatMap {
-            case Some(seq) =>
-              for
-                id <- UuidV7.next
-                message <- session.runUnique(
-                  MessageRepo.insert,
-                  (id, cid, seq, userId, messageType, text, custom, attachments, parentMessageId),
-                )
-                _ <- session.run(EventRepo.insert, (cid, seq, "message.new", message.asJson))
-                _ <- parentMessageId.traverse_(pid =>
-                  session.run(MessageRepo.incrementReplyCount, pid)
-                )
-              yield Right(message)
-            case None =>
-              session.runOption(ChannelRepo.statusOf, cid).map {
-                case Some((frozen, _)) if frozen => Left(SendError.ChannelFrozen)
-                case _ => Left(SendError.ChannelNotFound)
-              }
+    id.fold(UuidV7.next.map(_.toString))(IO.pure).flatMap { messageId =>
+      pool
+        .use { session =>
+          session.transaction.use { _ =>
+            session.runOption(ChannelRepo.bumpSeqForMessage, cid).flatMap {
+              case Some(seq) =>
+                for
+                  message <- session.runUnique(
+                    MessageRepo.insert,
+                    (
+                      messageId,
+                      cid,
+                      seq,
+                      userId,
+                      messageType,
+                      text,
+                      custom,
+                      attachments,
+                      parentMessageId,
+                    ),
+                  )
+                  _ <- session.run(EventRepo.insert, (cid, seq, "message.new", message.asJson))
+                  _ <- parentMessageId.traverse_(pid =>
+                    session.run(MessageRepo.incrementReplyCount, pid)
+                  )
+                yield Right(message)
+              case None =>
+                session.runOption(ChannelRepo.statusOf, cid).map {
+                  case Some((frozen, _)) if frozen => Left(SendError.ChannelFrozen)
+                  case _ => Left(SendError.ChannelNotFound)
+                }
+            }
           }
         }
-      }
-      .flatTap {
-        case Right(message) =>
-          backplane.publish(Event("message.new", cid, message.seq, message.asJson))
-        case Left(_) => IO.unit
-      }
+        .recover { case SqlState.UniqueViolation(_) => Left(SendError.DuplicateId(messageId)) }
+        .flatTap {
+          case Right(message) =>
+            backplane.publish(Event("message.new", cid, message.seq, message.asJson))
+          case Left(_) => IO.unit
+        }
+    }
 
   /**
    * Edits a message's text/custom and emits `message.updated`. None if the
@@ -69,7 +86,7 @@ final class MessageService(pool: Resource[IO, Session[IO]], backplane: Backplane
    */
   def edit(
       cid: String,
-      messageId: UUID,
+      messageId: String,
       text: Option[String],
       custom: Option[Json],
   ): IO[Option[Message]] =
@@ -91,8 +108,12 @@ final class MessageService(pool: Resource[IO, Session[IO]], backplane: Backplane
    * The author of a live message in the channel, for edit/delete authorisation:
    * outer none = no such message, inner none = author scrubbed.
    */
-  def authorInChannel(cid: String, messageId: UUID): IO[Option[Option[String]]] =
+  def authorInChannel(cid: String, messageId: String): IO[Option[Option[String]]] =
     pool.use(_.runOption(MessageRepo.authorInChannel, (messageId, cid)))
+
+  /** The channel a live message belongs to, for the channel-less global delete. */
+  def channelOf(messageId: String): IO[Option[String]] =
+    pool.use(_.runOption(MessageRepo.channelOf, messageId))
 
   /**
    * Patches the `thumbUrl` onto every attachment referencing `originalUrl` and
@@ -131,7 +152,7 @@ final class MessageService(pool: Resource[IO, Session[IO]], backplane: Backplane
    * Soft-deletes a message (scrubbing its text), decrements the parent thread's
    * `reply_count`, and emits `message.deleted`. False if nothing was deleted.
    */
-  def delete(cid: String, messageId: UUID): IO[Boolean] =
+  def delete(cid: String, messageId: String): IO[Boolean] =
     pool
       .use { session =>
         session.transaction.use { _ =>

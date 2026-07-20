@@ -85,11 +85,11 @@ object QueryRepo:
    * pagination cursor. Ignores `deleted_at` so a tombstoned cursor message still
    * resolves and pagination stays stable. Params: cid, messageId.
    */
-  val messageSeqById: Query[(String, java.util.UUID), Long] =
+  val messageSeqById: Query[(String, String), Long] =
     sql"""
       select m.seq
       from messages m
-      where m.cid = $text and m.id = $uuid
+      where m.cid = $text and m.id = $text
       limit 1
     """.query(int8)
 

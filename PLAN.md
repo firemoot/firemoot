@@ -69,7 +69,8 @@ Acceptance: a PR with a trivial change runs both jobs green.
 ## 3. Data model (initial schema, refined during M0/M1)
 
 Single Flyway-managed schema. All ids are caller-supplied text for users (Stream
-parity) and `type:id` cids for channels; message ids are UUIDv7 (time-ordered).
+parity) and `type:id` cids for channels; message ids are caller-supplied text too
+(Stream parity, V006) - the server mints a UUIDv7 string when none is supplied.
 
 ```
 users             id text PK, name, image, role, custom jsonb, created_at,
@@ -81,10 +82,10 @@ channels          cid text PK ("type:id"), type text, id text, created_by,
 channel_members   cid FK, user_id FK, role text CHECK (owner|moderator|member),
                   last_read_seq bigint NOT NULL DEFAULT 0, created_at
                   PK (cid, user_id)
-messages          id uuid PK, cid FK, seq bigint, user_id, type (regular|system),
-                  text, custom jsonb, attachments jsonb, parent_message_id
-                  uuid NULL, reply_count int NOT NULL DEFAULT 0 (denormalised),
-                  created_at, updated_at, deleted_at
+messages          id text PK (caller-supplied or server UUIDv7, V006), cid FK,
+                  seq bigint, user_id, type (regular|system), text, custom jsonb,
+                  attachments jsonb, parent_message_id text NULL, reply_count int
+                  NOT NULL DEFAULT 0 (denormalised), created_at, updated_at, deleted_at
                   UNIQUE (cid, seq); GIN index on generated tsvector(text) for FTS
 reactions         message_id FK, user_id, type text, created_at
                   PK (message_id, user_id, type)

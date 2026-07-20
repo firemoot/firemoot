@@ -1,7 +1,6 @@
 package com.firemoot.domain
 
 import java.time.OffsetDateTime
-import java.util.UUID
 
 import io.circe.generic.semiauto.deriveCodec
 import io.circe.{Codec, Json}
@@ -44,7 +43,7 @@ object Channel:
   given Schema[Channel] = Schema.derived
 
 final case class Message(
-    id: UUID,
+    id: String,
     cid: String,
     seq: Long,
     userId: Option[String],
@@ -52,7 +51,7 @@ final case class Message(
     text: Option[String],
     custom: Json,
     attachments: Json,
-    parentMessageId: Option[UUID],
+    parentMessageId: Option[String],
     replyCount: Int,
     createdAt: OffsetDateTime,
     updatedAt: OffsetDateTime,

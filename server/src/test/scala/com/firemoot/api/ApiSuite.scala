@@ -250,6 +250,123 @@ class ApiSuite extends CatsEffectSuite, TestContainerForAll:
     }
   }
 
+  test("client-supplied message ids: round-trip, before_id cursor, duplicate 409, invalid 400") {
+    withContainers { pg =>
+      val cfg = dbConfig(pg)
+      Backplane.inProcess.flatMap { backplane =>
+        Migrations.run(cfg) >> Database.pool(cfg).use { pool =>
+          val api = ApiRoutes(
+            UserService(pool),
+            ChannelService(pool, backplane),
+            MessageService(pool, backplane),
+            ReactionService(pool, backplane),
+            ReadService(pool, backplane),
+            QueryService(pool),
+            WebhookService(pool),
+            ModerationService(pool, WebhookService(pool)),
+            HydrationService(pool),
+          )
+          val app = ApiAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
+          val msgs = "/v1/channels/messaging/cid1/messages"
+          def get(path: String) =
+            Signing.signedNoBody(GET, Uri.unsafeFromString(path), apiKey, secret)
+          def sendWith(id: Option[String], text: String) =
+            SendMessageRequest(Some("nate"), Some(text), None, None, None, None, id)
+
+          for
+            _ <- app.run(post("/v1/users", UpsertUserRequest("nate", None, None, None, None)))
+            _ <- app.run(post(
+              "/v1/channels",
+              CreateChannelRequest("messaging", "cid1", Some("nate"), None),
+            ))
+
+            firstRes <- app.run(post(msgs, sendWith(Some("cmrxyz_first"), "first")))
+            _ = assertEquals(firstRes.status, Status.Created)
+            first <- firstRes.as[Message]
+            _ = assertEquals(first.id, "cmrxyz_first", "the caller's id round-trips on the wire")
+
+            secondRes <- app.run(post(msgs, sendWith(Some("cmrxyz_second"), "second")))
+            _ = assertEquals(secondRes.status, Status.Created)
+
+            beforeIdRes <- app.run(get(s"$msgs?before_id=cmrxyz_second"))
+            _ = assertEquals(beforeIdRes.status, Status.Ok)
+            beforeId <- beforeIdRes.as[MessagePage]
+            _ = assertEquals(
+              beforeId.messages.map(_.text),
+              List(Some("first")),
+              "before_id resolves a client-supplied id to its seq",
+            )
+
+            dupRes <- app.run(post(msgs, sendWith(Some("cmrxyz_first"), "again")))
+            _ = assertEquals(dupRes.status, Status.Conflict)
+            dupBody <- dupRes.bodyText.compile.string
+            _ = assert(
+              dupBody.contains("already exists") && dupBody.contains("cmrxyz_first"),
+              s"the 409 detail names the id and says 'already exists': $dupBody",
+            )
+
+            blankRes <- app.run(post(msgs, sendWith(Some(""), "blank")))
+            _ = assertEquals(blankRes.status, Status.BadRequest, "an empty id is a 400")
+            wsRes <- app.run(post(msgs, sendWith(Some("has space"), "ws")))
+            _ = assertEquals(wsRes.status, Status.BadRequest, "whitespace in an id is a 400")
+            longRes <- app.run(post(msgs, sendWith(Some("x" * 256), "long")))
+          yield assertEquals(longRes.status, Status.BadRequest, "an over-length id is a 400")
+        }
+      }
+    }
+  }
+
+  test("global message delete: resolves the channel, soft-deletes, 404 unknown") {
+    withContainers { pg =>
+      val cfg = dbConfig(pg)
+      Backplane.inProcess.flatMap { backplane =>
+        Migrations.run(cfg) >> Database.pool(cfg).use { pool =>
+          val api = ApiRoutes(
+            UserService(pool),
+            ChannelService(pool, backplane),
+            MessageService(pool, backplane),
+            ReactionService(pool, backplane),
+            ReadService(pool, backplane),
+            QueryService(pool),
+            WebhookService(pool),
+            ModerationService(pool, WebhookService(pool)),
+            HydrationService(pool),
+          )
+          val app = ApiAuth(ApiKeys.fromConfig(serverCfg))(api.routes).orNotFound
+          val msgs = "/v1/channels/messaging/cid2/messages"
+          def get(path: String) =
+            Signing.signedNoBody(GET, Uri.unsafeFromString(path), apiKey, secret)
+          def del(path: String) =
+            Signing.signedNoBody(DELETE, Uri.unsafeFromString(path), apiKey, secret)
+
+          for
+            _ <- app.run(post("/v1/users", UpsertUserRequest("olive", None, None, None, None)))
+            _ <- app.run(post(
+              "/v1/channels",
+              CreateChannelRequest("messaging", "cid2", Some("olive"), None),
+            ))
+            sent <- app.run(post(
+              msgs,
+              SendMessageRequest(Some("olive"), Some("bye"), None, None, None),
+            ))
+            msg <- sent.as[Message]
+
+            deleted <- app.run(del(s"/v1/messages/${msg.id}"))
+            _ =
+              assertEquals(deleted.status, Status.NoContent, "delete by id alone resolves the cid")
+
+            hist <- app.run(get(s"$msgs")).flatMap(_.as[MessagePage])
+            _ = assertEquals(hist.messages, Nil, "the soft-deleted message is gone from history")
+
+            deleteAgain <- app.run(del(s"/v1/messages/${msg.id}"))
+            _ = assertEquals(deleteAgain.status, Status.NotFound, "a re-delete is a 404")
+            deleteUnknown <- app.run(del("/v1/messages/no-such-message"))
+          yield assertEquals(deleteUnknown.status, Status.NotFound, "an unknown id is a 404")
+        }
+      }
+    }
+  }
+
   test("reaction endpoints: add / remove / counts / missing message") {
     withContainers { pg =>
       val cfg = dbConfig(pg)

@@ -36,6 +36,10 @@ function recordingRest(): { rest: ServerRestApi; calls: string[] } {
       calls.push(`addMember:${type}:${id}:${body.userId}:${body.role ?? ""}`);
       return Promise.resolve();
     },
+    deleteMessage: (messageId) => {
+      calls.push(`deleteMessage:${messageId}`);
+      return Promise.resolve();
+    },
   };
   return { rest, calls };
 }
@@ -117,5 +121,12 @@ describe("FiremootServer provisioning", () => {
     const result = await server.upsertUser({ id: "carol", name: "Carol" });
     expect(result.id).toBe("carol");
     expect(calls).toEqual(["upsertUser:carol"]);
+  });
+
+  test("deleteMessage delegates to the id-only REST endpoint", async () => {
+    const { rest, calls } = recordingRest();
+    const server = new FiremootServer({ ...baseConfig, rest });
+    await server.deleteMessage("cmrxyz_first");
+    expect(calls).toEqual(["deleteMessage:cmrxyz_first"]);
   });
 });
