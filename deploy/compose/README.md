@@ -6,11 +6,9 @@ $7 Hetzner-class VPS.
 
 ## Quickstart (about 5 minutes)
 
-1. Build the image (until it is published to Docker Hub, §12):
-   ```sh
-   sbt "server/Docker/publishLocal"     # tags firemoot:latest
-   ```
-2. Set the credentials you must not ship with defaults, then boot:
+1. Set the credentials you must not ship with defaults, then boot (the stack
+   pulls the published `ghcr.io/firemoot/firemoot` image; to run a local build,
+   `sbt "server/Docker/publishLocal"` and set `FIREMOOT_IMAGE=firemoot:latest`):
    ```sh
    cd deploy/compose
    export FIREMOOT_API_SECRET=$(openssl rand -hex 32)

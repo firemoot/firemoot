@@ -1,5 +1,6 @@
 # Reference deployment (SPEC.md §11) and the exact stack the project's CI runs.
-# Build the image first: `sbt "server/Docker/publishLocal"` (tags firemoot:latest).
+# Uses the published ghcr.io/firemoot/firemoot image; set FIREMOOT_IMAGE to run
+# a locally-built one (`sbt "server/Docker/publishLocal"` tags firemoot:latest).
 services:
   postgres:
     image: postgres:17
@@ -32,7 +33,9 @@ services:
     # Create the 'firemoot' bucket once (mc mb local/firemoot) before first use.
 
   firemoot:
-    image: firemoot:latest
+    # The published image by default; set FIREMOOT_IMAGE=firemoot:latest to run
+    # a locally-built one (CI's cold-boot gate does, so the gate tests the build).
+    image: ${FIREMOOT_IMAGE:-ghcr.io/firemoot/firemoot:latest}
     depends_on:
       postgres:
         condition: service_healthy

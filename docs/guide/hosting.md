@@ -14,9 +14,6 @@ MinIO for media. Postgres and MinIO publish no host ports - only Firemoot's
 `6668` is exposed.
 
 ```sh
-# Build the image (until v1.0 publishes it to a registry):
-mise exec -- sbt "server/Docker/publishLocal"   # tags firemoot:latest
-
 cd deploy/compose
 export FIREMOOT_API_SECRET=$(openssl rand -hex 32)
 export FIREMOOT_ADMIN_PASSWORD='choose-something'
@@ -25,8 +22,9 @@ docker compose up -d
 curl localhost:6668/readyz
 ```
 
-From v1.0 the image is published as `ghcr.io/firemoot/firemoot`: point the compose
-`image:` at it, drop the build step, and nothing else changes.
+The stack pulls the published `ghcr.io/firemoot/firemoot` image. To run a
+locally-built server instead, `mise exec -- sbt "server/Docker/publishLocal"`
+(tags `firemoot:latest`) and set `FIREMOOT_IMAGE=firemoot:latest`.
 
 Both of those are read from your environment with development defaults behind
 them, so **set `FIREMOOT_API_SECRET` before you expose the box** - the fallback is

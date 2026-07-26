@@ -148,6 +148,10 @@ jobs:
 
       - name: Boot the compose stack and assert healthy < 15s
         working-directory: deploy/compose
+        env:
+          # The gate must test the image built in the previous step, never the
+          # published ghcr default the compose file ships for end users.
+          FIREMOOT_IMAGE: firemoot:latest
         run: |
           # Pre-pull the only remote image so the gate times boot, not the
           # registry download (firemoot:latest was just built locally).

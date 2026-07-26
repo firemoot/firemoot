@@ -9,9 +9,6 @@ Firemoot is one Docker image plus a Postgres. The reference Compose stack wires
 both together:
 
 ```sh
-# Build the image (until v1.0 publishes it to a registry):
-mise exec -- sbt "server/Docker/publishLocal"   # tags firemoot:latest
-
 cd deploy/compose
 export FIREMOOT_API_SECRET=$(openssl rand -hex 32)
 export FIREMOOT_ADMIN_PASSWORD='choose-something'   # optional, unlocks /admin
@@ -25,8 +22,9 @@ curl localhost:6668/healthz     # liveness
 curl localhost:6668/readyz      # liveness + a Postgres ping
 ```
 
-From v1.0 the image is published as `ghcr.io/firemoot/firemoot`: point the compose
-`image:` at it, drop the build step, and nothing else changes.
+The stack pulls the published `ghcr.io/firemoot/firemoot` image. To run a
+locally-built server instead, `mise exec -- sbt "server/Docker/publishLocal"`
+(tags `firemoot:latest`) and set `FIREMOOT_IMAGE=firemoot:latest`.
 
 `FIREMOOT_API_SECRET` is the one credential you must set. It signs your server's
 HMAC requests **and** mints the end-user JWTs the browser connects with, so keep

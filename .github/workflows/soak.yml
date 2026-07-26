@@ -61,6 +61,9 @@ jobs:
 
       - name: Boot the memory-capped stack
         working-directory: deploy/compose
+        env:
+          # Soak the image built in the previous step, not the published default.
+          FIREMOOT_IMAGE: firemoot:latest
         run: |
           docker pull postgres:17
           docker compose -f docker-compose.yml -f docker-compose.soak.yml up -d
