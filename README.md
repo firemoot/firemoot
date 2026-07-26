@@ -5,7 +5,7 @@
   <img src="docs/public/logo-wordmark.svg" alt="Firemoot" width="300">
 </picture>
 
-**Stream Chat's developer experience, your infrastructure.**
+**[Stream Chat](https://getstream.io/chat/)'s developer experience, your infrastructure.**
 
 [![CI](https://github.com/firemoot/firemoot/actions/workflows/ci.yml/badge.svg)](https://github.com/firemoot/firemoot/actions/workflows/ci.yml)
 [![Soak](https://github.com/firemoot/firemoot/actions/workflows/soak.yml/badge.svg)](https://github.com/firemoot/firemoot/actions/workflows/soak.yml)
@@ -17,30 +17,32 @@
 
 </div>
 
-Firemoot is a self-hosted, open-source chat backend with a Stream-compatible API
-surface and first-class TypeScript SDKs. It is **one JVM binary plus PostgreSQL** -
-no Kafka, no Redis, no MongoDB, no sidecars. A *moot* is a gathering; a firemoot is
-the gathering round the fire, which is what a chat channel has always been. It
-listens on port `6668` ("MOOT" on a phone keypad, a neighbourly nod to IRC's 6667).
+Firemoot is a self-hosted, open-source chat backend with a
+[Stream](https://getstream.io/chat/)-compatible API surface and first-class
+TypeScript SDKs. It is **one JVM binary plus PostgreSQL** - no Kafka, no Redis,
+no MongoDB, no sidecars. A *moot* is a gathering; a firemoot is the gathering
+round the fire, which is what a chat channel has always been. It listens on port
+`6668` ("MOOT" on a phone keypad, a neighbourly nod to IRC's 6667).
 
-The headline feature is **testability**. Because the whole backend is a container
-and a database, it boots inside your CI pipeline in seconds: no network, no flake,
-no MAU metering, no shared sandbox that another branch just corrupted. Our CI has a
-cold-boot gate that fails the build if the server does not answer `/healthz` within
-15 seconds of `docker run` (it typically manages it in about 9). That is the thing a
-SaaS structurally cannot sell you.
+There are two primary ways we envisage it being used:
 
-It is also meant to be genuinely cheap to run. The nightly soak drives real
-WebSocket traffic through the real auth paths against a container capped at 1GB of
-memory and gates the build on p99 delivery latency and peak resident memory. What
-it reports: **p95 delivery around 61ms at a peak RSS of about 260MiB**. A $7 VPS is
-a serious deployment target here, not a joke.
+- **A cheap-to-run testing replacement for CI pipelines when integrating with
+  [getstream.io](https://getstream.io).** Your integration tests run against a
+  real chat backend that boots inside the pipeline in seconds - no network, no
+  flake, no MAU metering, no shared sandbox that another branch just corrupted.
+- **A high-performance, single-instance, single-region, full-featured chat
+  service in its own right.** Your messages stay in your Postgres, on your
+  infrastructure.
 
-The compatibility story is not theoretical either. A production marketplace
-application's full Playwright end-to-end suite - booking threads, a concierge
-inbox, attachments, unread badges, typing indicators, read receipts, webhooks -
-passes against Firemoot with **zero spec changes**, driven through a
-Stream-compatible facade.
+On the first: our CI has a cold-boot gate that fails the build if the server does
+not answer `/healthz` within 15 seconds of `docker run` (it typically manages it
+in about 9). That is the thing a SaaS structurally cannot sell you.
+
+On the second: the nightly soak drives real WebSocket traffic through the real
+auth paths against a container capped at 1GB of memory and gates the build on p99
+delivery latency and peak resident memory. What it reports: **p95 delivery around
+61ms at a peak RSS of about 260MiB**. A $7 VPS is a serious deployment target
+here, not a joke.
 
 ## Use it as
 
@@ -136,7 +138,7 @@ arrives first, and never duplicated. Full walkthrough in the
 
 ## Stream compatibility
 
-Firemoot deliberately mirrors Stream Chat's model rather than inventing a new one:
+Firemoot deliberately mirrors [Stream Chat](https://getstream.io/chat/)'s model rather than inventing a new one:
 your backend mints user tokens, the browser talks to the chat backend directly, and
 the backend authorises every operation. The covered surface is the part most apps
 actually use - `type:id` channels with typed members and roles, messages with
