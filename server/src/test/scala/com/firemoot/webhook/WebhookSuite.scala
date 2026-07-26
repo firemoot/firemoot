@@ -33,9 +33,12 @@ class WebhookSuite extends CatsEffectSuite, TestContainerForEach:
   override val containerDef: PostgreSQLContainer.Def =
     PostgreSQLContainer.Def(DockerImageName.parse("postgres:17"))
 
-  final private case class Received(body: String, signature: Option[String], event: Option[String])
+  final private case class Received(body: String, headers: Map[CIString, String]):
+    def header(name: String): Option[String] = headers.get(CIString(name))
 
   private val secret = "top-secret"
+
+  private val apiKeyId = "test-key"
 
   private val deliveryStatus =
     sql"""select status, attempts, coalesce(last_error, '')
@@ -57,9 +60,8 @@ class WebhookSuite extends CatsEffectSuite, TestContainerForEach:
     HttpRoutes
       .of[IO] { case req @ POST -> _ =>
         req.as[String].flatMap { body =>
-          val sig = req.headers.get(ci"X-Firemoot-Signature").map(_.head.value)
-          val evt = req.headers.get(ci"X-Firemoot-Event").map(_.head.value)
-          received.update(_ :+ Received(body, sig, evt)) >> IO.pure(Response[IO](status))
+          val headers = req.headers.headers.map(h => h.name -> h.value).toMap
+          received.update(_ :+ Received(body, headers)) >> IO.pure(Response[IO](status))
         }
       }
       .orNotFound
@@ -82,7 +84,7 @@ class WebhookSuite extends CatsEffectSuite, TestContainerForEach:
             server =>
               JdkHttpClient.simple[IO].flatMap { client =>
                 val webhooks = WebhookService(pool)
-                val dispatcher = WebhookDispatcher(pool, client, fastCfg)
+                val dispatcher = WebhookDispatcher(pool, client, fastCfg, apiKeyId)
                 val hookUrl = (server.baseUri / "hook").renderString
                 val event =
                   Event("message.new", "messaging:general", 7, Json.obj("text" -> "hi".asJson))
@@ -100,13 +102,24 @@ class WebhookSuite extends CatsEffectSuite, TestContainerForEach:
                   assert(listed.forall(_.url == hookUrl))
                   assertEquals(got.size, 2, "one delivery per enabled endpoint")
                   got.foreach { r =>
+                    val digest = HmacSigner.sign(secret, r.body)
                     assertEquals(
-                      r.signature,
-                      Some("sha256=" + HmacSigner.sign(secret, r.body)),
+                      r.header("X-Firemoot-Signature"),
+                      Some(s"sha256=$digest"),
                       "the body is signed with the endpoint secret",
                     )
-                    assertEquals(r.event, Some("message.new"))
+                    assertEquals(r.header("X-Firemoot-Event"), Some("message.new"))
                     assert(r.body.contains("\"seq\":7"))
+                    assertEquals(
+                      r.header("X-Signature"),
+                      Some(digest),
+                      "the Stream alias is the bare hex digest, with no sha256= prefix",
+                    )
+                    val delivery = r.header("X-Firemoot-Delivery")
+                    assert(delivery.exists(_.nonEmpty), "the delivery id is sent")
+                    assertEquals(r.header("X-Webhook-Id"), delivery)
+                    assertEquals(r.header("X-Webhook-Attempt"), Some("1"))
+                    assertEquals(r.header("X-Api-Key"), Some(apiKeyId))
                   }
                   assertEquals(statusA._1, "delivered")
                   assertEquals(statusB._1, "delivered")
@@ -128,7 +141,7 @@ class WebhookSuite extends CatsEffectSuite, TestContainerForEach:
           ).use { server =>
             JdkHttpClient.simple[IO].flatMap { client =>
               val webhooks = WebhookService(pool)
-              val dispatcher = WebhookDispatcher(pool, client, fastCfg)
+              val dispatcher = WebhookDispatcher(pool, client, fastCfg, apiKeyId)
               val hookUrl = (server.baseUri / "hook").renderString
               val event = Event("message.new", "messaging:general", 1, Json.obj())
               for
@@ -148,6 +161,16 @@ class WebhookSuite extends CatsEffectSuite, TestContainerForEach:
                 assertEquals(finalStatus._2, 3, "three attempts were made")
                 assert(finalStatus._3.contains("500"), s"records the failure: ${finalStatus._3}")
                 assertEquals(got.size, 3, "the endpoint was hit once per attempt")
+                assertEquals(
+                  got.flatMap(_.header("X-Webhook-Attempt")),
+                  Vector("1", "2", "3"),
+                  "X-Webhook-Attempt counts from 1",
+                )
+                assertEquals(
+                  got.flatMap(_.header("X-Webhook-Id")).distinct.size,
+                  1,
+                  "the dedupe id is stable across retries",
+                )
             }
           }
         }

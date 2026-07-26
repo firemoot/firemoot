@@ -37,7 +37,16 @@ Content-Type: application/json
 X-Firemoot-Signature: sha256=<hex>
 X-Firemoot-Delivery: <uuid>
 X-Firemoot-Event: message.new
+X-Signature: <hex>
+X-Webhook-Id: <uuid>
+X-Webhook-Attempt: 1
+X-Api-Key: <your server api key id>
 ```
+
+The second block is [getstream.io](https://getstream.io)'s header naming for the
+same delivery, so a handler written against Stream keeps working unchanged - see
+[migrating from Stream](./migration). Prefer the `X-Firemoot-*` headers in new
+code; the aliases exist for compatibility and carry no extra information.
 
 The body is the same envelope the WebSocket carries:
 
@@ -47,8 +56,10 @@ The body is the same envelope the WebSocket carries:
 
 Delivery is **at-least-once and unordered** - rows are claimed with
 `for update skip locked` and processed eight at a time, so a retry can land after
-a newer event. `X-Firemoot-Delivery` is stable across retries of the same event;
-dedupe on it. Within a channel, `seq` gives you the true ordering.
+a newer event. `X-Firemoot-Delivery` (and its alias `X-Webhook-Id`) is stable
+across retries of the same event; dedupe on it. `X-Webhook-Attempt` counts from
+`1`, so a value above `1` tells you this event has been tried before. Within a
+channel, `seq` gives you the true ordering.
 
 ### Verifying the signature
 
@@ -70,6 +81,19 @@ function verify(rawBody: Buffer, header: string, secret: string): boolean {
 This is a different scheme from the one your *outbound* server requests use, even
 though both land in a header called `X-Firemoot-Signature`. See
 [authentication](./auth).
+
+`X-Signature` carries the same digest **without** the `sha256=` prefix, which is
+the exact shape Stream's `verifyWebhook(rawBody, signature)` expects - so a
+handler ported from Stream verifies against it with no code change:
+
+```ts
+client.verifyWebhook(rawBody, req.headers["x-signature"]);
+```
+
+`X-Api-Key` is your server API key id (`FIREMOOT_API_KEY_ID`), sent because
+Stream sends one. Treat it as routing metadata only: Firemoot signs with the
+**endpoint's** secret, not the API key's secret, so it is not the key to verify
+with.
 
 ## Which events are delivered
 

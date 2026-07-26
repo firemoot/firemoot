@@ -66,7 +66,8 @@ object Main extends IOApp.Simple:
             onActive =
               (userId: String) => lastActive.touch(userId) >> metrics.record(userId).attempt.void
             webhooks = WebhookService(pool)
-            dispatcher = WebhookDispatcher(pool, httpClient, WebhookConfig.default)
+            dispatcher =
+              WebhookDispatcher(pool, httpClient, WebhookConfig.default, cfg.server.apiKeyId)
             // Persisted channel events fan out to registered webhook endpoints.
             enqueue = backplane.subscribe
               .filter(WebhookService.isDeliverable)

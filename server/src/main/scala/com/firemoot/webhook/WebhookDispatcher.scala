@@ -24,11 +24,17 @@ import skunk.Session
  * A 2xx marks the delivery delivered; anything else (including a timeout)
  * schedules the next retry on the backoff, and once the retries are exhausted
  * the delivery becomes a dead letter.
+ *
+ * Every delivery also carries getstream.io's header names for the same values
+ * (`X-Signature`, `X-Webhook-Id`, `X-Webhook-Attempt`, `X-Api-Key`) so a handler
+ * written against Stream keeps working unchanged. `X-Signature` is the bare
+ * lowercase hex digest Stream sends - no `sha256=` prefix.
  */
 final class WebhookDispatcher(
     pool: Resource[IO, Session[IO]],
     client: Client[IO],
     cfg: WebhookConfig,
+    apiKeyId: String,
 ):
 
   def stream: Stream[IO, Nothing] =
@@ -63,15 +69,19 @@ final class WebhookDispatcher(
       case Left(_) => fail(id, attempts, s"invalid endpoint url: $url")
       case Right(uri) =>
         val body = event.noSpaces
-        val signature = "sha256=" + HmacSigner.sign(secret, body)
+        val digest = HmacSigner.sign(secret, body)
         val eventType = event.hcursor.get[String]("type").getOrElse("")
         val request = Request[IO](Method.POST, uri)
           .withEntity(body)
           .withContentType(`Content-Type`(MediaType.application.json))
           .putHeaders(
-            "X-Firemoot-Signature" -> signature,
+            "X-Firemoot-Signature" -> s"sha256=$digest",
             "X-Firemoot-Delivery" -> id.toString,
             "X-Firemoot-Event" -> eventType,
+            "X-Signature" -> digest,
+            "X-Webhook-Id" -> id.toString,
+            "X-Webhook-Attempt" -> attempts.toString,
+            "X-Api-Key" -> apiKeyId,
           )
         client
           .status(request)
