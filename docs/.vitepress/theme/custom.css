@@ -39,12 +39,25 @@
   max-width: 420px;
 }
 @media (min-width: 960px) {
+  /* centre the artwork against the heading/tagline/actions block instead of
+     the default translate that hangs it near the navbar */
+  .VPHero .container {
+    align-items: center;
+  }
+  .VPHero .image {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
   .VPHero .image-container {
     width: 460px;
     height: auto;
-    margin-top: 32px;
+    margin-top: 0;
+    transform: none;
   }
   .VPHero .VPImage {
     max-width: 460px;
+    position: static;
+    transform: none;
   }
 }
