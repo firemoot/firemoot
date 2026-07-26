@@ -22,8 +22,13 @@ Firemoot needs one Postgres. Either works:
   fly secrets set \
     FIREMOOT_DB_HOST=firemoot-db.flycast \
     FIREMOOT_DB_USER=firemoot \
-    FIREMOOT_DB_PASSWORD=<from attach output>
+    FIREMOOT_DB_PASSWORD=<from attach output> \
+    FIREMOOT_DB_SSLMODE=disable
   ```
+  `FIREMOOT_DB_SSLMODE=disable` is not optional over `flycast`: the proxy accepts
+  the SSL request and then breaks the handshake instead of refusing it, so
+  pgjdbc's default `prefer` never falls back to plaintext and boot dies in
+  Flyway. The traffic stays inside your private WireGuard network.
 - **Neon** (serverless Postgres): create a database, then set the same three
   `FIREMOOT_DB_*` secrets from its connection string. Use a pooled, non-idling
   endpoint - Firemoot keeps a small persistent skunk pool.
@@ -63,8 +68,14 @@ Docker Hub (PLAN §12) the deploy is just:
 
 ```sh
 fly apps create firemoot        # once; or `fly launch --copy-config --no-deploy`
-fly deploy
+fly deploy --ha=false
 ```
+
+`--ha=false` matters. `fly deploy` provisions **two** machines by default for high
+availability, and with the v1 in-process backplane the second node shares no state
+with the first - two users on the same channel can land on different machines and
+never see each other. One machine until the Postgres `LISTEN`/`NOTIFY` backplane
+lands.
 
 ### Interim: before Docker Hub
 
@@ -77,7 +88,7 @@ sbt "server/Docker/publishLocal"                 # tags firemoot:latest
 fly auth docker
 docker tag firemoot:latest registry.fly.io/firemoot:latest
 docker push registry.fly.io/firemoot:latest
-fly deploy --image registry.fly.io/firemoot:latest
+fly deploy --ha=false --image registry.fly.io/firemoot:latest
 ```
 
 (or point `[build] image` at any registry Fly can pull from).

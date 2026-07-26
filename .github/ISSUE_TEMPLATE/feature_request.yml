@@ -1,0 +1,66 @@
+name: Feature request
+description: Propose a capability Firemoot does not have yet
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check [SPEC.md](https://github.com/firemoot/firemoot/blob/main/SPEC.md)
+        first - section 3 lists what is deliberately out of scope for v1, and the
+        decisions log in section 2 explains several choices that look surprising
+        from the outside.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >
+        What are you trying to do, and where does Firemoot get in the way? Describe
+        the situation rather than the solution you have in mind.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like it to do
+      description: The change you are proposing, and roughly what its API would look like.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Firemoot version
+      description: Which version you are on, so we know whether this already exists.
+      placeholder: "v0.1.0"
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Server / REST API
+        - Server / WebSocket protocol
+        - "TypeScript SDK (@firemoot/core, @firemoot/client)"
+        - "Test helper (@firemoot/test)"
+        - Admin dashboard
+        - Deployment and operations
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: stream-parity
+    attributes:
+      label: Stream Chat parity
+      description: >
+        If this exists in Stream Chat, name the equivalent API. Parity gaps that
+        block a migration get priority.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you have considered
+      description: Including any workaround you are using today.

@@ -1,0 +1,90 @@
+name: Bug report
+description: Something behaves differently from how it is documented
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please do not file security vulnerabilities here -
+        see [SECURITY.md](https://github.com/firemoot/firemoot/blob/main/SECURITY.md)
+        for private disclosure.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: >
+        The smallest sequence that shows the problem. A failing test or a short
+        script against a freshly booted server is ideal.
+      placeholder: |
+        1. Boot the compose stack with ...
+        2. Send ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Firemoot version
+      description: Release tag, Docker image tag, or the commit sha you built from.
+      placeholder: "v0.1.0 / firemoot:latest built from a1b2c3d"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How is it deployed?
+      options:
+        - Docker Compose (reference stack)
+        - Fly.io
+        - "@firemoot/test / Testcontainers in CI"
+        - Another container platform
+        - Built and run from source
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: component
+    attributes:
+      label: Affected component and version
+      description: >
+        Server only, or an SDK package too? Include the package version if the
+        problem is in `@firemoot/core`, `@firemoot/client` or `@firemoot/test`.
+      placeholder: "server + @firemoot/client 0.1.0"
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Host OS and architecture, Postgres version, Node version if relevant.
+      placeholder: "Ubuntu 24.04 arm64, postgres:17, node 22"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: >
+        Server logs around the failure (they are structured JSON), plus any
+        client-side error. Redact secrets, tokens and API keys before pasting.
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I have searched existing issues for this problem
+          required: true
+        - label: I have removed secrets, tokens and personal data from anything I pasted
+          required: true

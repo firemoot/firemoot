@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea
+    url: https://github.com/firemoot/firemoot/discussions
+    about: Usage questions, design discussion and anything not yet a concrete bug.
+  - name: Security vulnerability
+    url: https://github.com/firemoot/firemoot/security/advisories/new
+    about: Report privately. Please do not open a public issue.
+  - name: Documentation
+    url: https://github.com/firemoot/firemoot/tree/main/docs/guide
+    about: Quickstart, auth model, protocol reference, migrating from Stream.

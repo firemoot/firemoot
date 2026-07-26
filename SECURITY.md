@@ -16,8 +16,9 @@ Pre-1.0: only the latest release receives security fixes.
 
 ## Scope notes
 
-Firemoot is object-storage-adjacent (S3-compatible media store) and exposes a
-WebSocket gateway; reports in the following areas are particularly welcome:
+Firemoot holds user messages, mints and verifies tokens, presigns uploads to an
+S3-compatible store and exposes a public WebSocket gateway. Reports in these
+areas are particularly welcome:
 
 - Authentication/authorisation bypass (JWT verification, channel membership checks)
 - Presigned upload policy bypass (MIME/size limits)
