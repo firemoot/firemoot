@@ -15,7 +15,11 @@ jobs:
   release:
     name: Version or publish (@firemoot/*)
     # Inert until launch: set the `RELEASE_ENABLED` repository variable to `true`
-    # and add an `NPM_TOKEN` secret once the npm @firemoot org exists (PLAN.md §12).
+    # once the npm @firemoot org exists (PLAN.md §12). There is no NPM_TOKEN to
+    # add - this publishes over OIDC, so each @firemoot package instead needs
+    # this repo and this workflow file registered as its trusted publisher on
+    # npmjs.com (npm will not mint a package's *first* version over OIDC, hence
+    # the 0.0.0 placeholders published by hand).
     if: ${{ vars.RELEASE_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     steps:
@@ -38,13 +42,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Configure npm auth
-        run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "$HOME/.npmrc"
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       # Opens (or updates) a "Version Packages" PR while changesets are pending;
       # once that PR is merged and none remain, runs `pnpm release` to publish.
+      #
+      # The publish path is `pnpm release` -> `changeset publish`, and changesets
+      # shells out to the package manager it detects - pnpm here, never the npm
+      # CLI - so the npm bundled with Node 22 (10.x, no OIDC) is irrelevant and
+      # nothing needs upgrading. pnpm (11.5.3, pinned in mise.toml) does the
+      # token exchange itself, swapping the Actions ID token for a short-lived
+      # per-package registry token; `id-token: write` above is what enables it,
+      # and without it pnpm just warns "Skipped OIDC" and fails unauthenticated.
+      # Provenance is attested automatically for public repos, so there is no
+      # `--provenance` to pass (changesets could not forward it anyway).
       - name: Create version PR or publish
         uses: changesets/action@v1
         with:
@@ -54,4 +63,3 @@ jobs:
           title: "chore: version @firemoot packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

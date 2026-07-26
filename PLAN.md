@@ -536,9 +536,12 @@ soak regressions.
       and publishes on merge. The packages are now publishable (private flag
       dropped, npm metadata + `publishConfig.access: public` added);
       `pnpm publish --dry-run` confirms each tarball ships `dist` with `workspace:*`
-      resolved to a concrete version. **Inert until launch:** the release job only
-      runs when the `RELEASE_ENABLED` repo variable is `true` and an `NPM_TOKEN`
-      secret exists - creating the npm `@firemoot` org is the §12 user step.
+      resolved to a concrete version. Auth is npm trusted publishing (OIDC via
+      `id-token: write`), so no `NPM_TOKEN` is involved: `changeset publish` hands
+      off to `pnpm publish`, which exchanges the Actions ID token for a
+      short-lived per-package registry token itself. **Inert until launch:** the
+      release job only runs when the `RELEASE_ENABLED` repo variable is `true` -
+      creating the npm `@firemoot` org is the §12 user step.
       `@firemoot/core` regeneration stays a CI drift gate (unchanged).
 - [x] **M4.8 Fly.io first-class**: `deploy/fly/fly.toml` (`auto_stop_machines =
       "off"`, `auto_start_machines = false`, `min_machines_running = 1`,
@@ -618,6 +621,9 @@ docs generator, Node floor) get recorded in SPEC.md §2 in the same PR.
 and tested locally, but completed before the public flip)
 
 - [ ] npm org `@firemoot`
+- [ ] Trusted publisher (this repo + `release.yml`) registered on each
+      `@firemoot/*` package, after a manual first publish - npm will not mint a
+      package's initial version over OIDC
 - [ ] Docker Hub org `firemoot`
 - [ ] Domains: **firemoot.com is canonical** (docs, security contact, everything);
       .io / .dev / .chat as defensive registrations
