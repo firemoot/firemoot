@@ -1,0 +1,84 @@
+name: Publish image
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag for a manual build (never moves :latest)"
+        required: false
+        default: edge
+
+concurrency: publish-image-${{ github.ref }}
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/firemoot/firemoot
+
+jobs:
+  publish:
+    name: Build and push to GHCR
+    # Forks cannot push to the firemoot org's package namespace; skip rather than
+    # fail their tag builds.
+    if: github.repository == 'firemoot/firemoot'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
+        with:
+          cache: true
+
+      - name: Cache Coursier and sbt
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/coursier
+            ~/.sbt
+          key: sbt-${{ runner.os }}-${{ hashFiles('build.sbt', 'project/**', '.scalafmt.conf') }}
+          restore-keys: sbt-${{ runner.os }}-
+
+      - name: Resolve the version
+        id: version
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            echo "latest=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${INPUT_TAG:-edge}" >> "$GITHUB_OUTPUT"
+            echo "latest=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # sbt bakes org.opencontainers.image.version into the image from the build
+      # version (build.sbt `dockerLabels`), so it has to be set to the tag we are
+      # about to publish rather than left at the -SNAPSHOT default.
+      - name: Build the image
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: sbt -batch "set ThisBuild / version := \"$VERSION\"" "server/Docker/publishLocal"
+
+      - name: Log in to ghcr.io
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Push
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          LATEST: ${{ steps.version.outputs.latest }}
+        run: |
+          docker tag "firemoot:$VERSION" "$IMAGE:$VERSION"
+          docker push "$IMAGE:$VERSION"
+          echo "pushed \`$IMAGE:$VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$LATEST" = "true" ]; then
+            docker tag "firemoot:$VERSION" "$IMAGE:latest"
+            docker push "$IMAGE:latest"
+            echo "pushed \`$IMAGE:latest\`" >> "$GITHUB_STEP_SUMMARY"
+          fi

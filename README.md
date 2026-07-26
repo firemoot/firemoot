@@ -73,7 +73,7 @@ the admin dashboard at `/admin` to see what is actually happening.
 
 ## Quickstart
 
-Firemoot has not been published to Docker Hub or npm yet, so build the image
+Firemoot has not been published to a registry or npm yet, so build the image
 locally first:
 
 ```sh
@@ -86,6 +86,9 @@ docker compose up -d
 curl localhost:6668/healthz               # liveness
 curl localhost:6668/readyz                # liveness + a Postgres ping
 ```
+
+From v1.0 the image is published as `ghcr.io/firemoot/firemoot`, so the build step
+drops away and everything below it stays the same.
 
 `FIREMOOT_API_SECRET` is the one credential you must set: it signs your backend's
 HMAC requests **and** mints the end-user JWTs the browser connects with. Set
