@@ -1,6 +1,6 @@
 {
   "name": "@firemoot/client",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "Hand-written Firemoot client: connection lifecycle, auto-reconnect with seq resume, Channel state, typed events (see PLAN.md M4.1).",
   "license": "Apache-2.0",

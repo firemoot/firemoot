@@ -1,6 +1,6 @@
 {
   "name": "@firemoot/stream-compat",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "A drop-in adapter exposing the getstream.io `stream-chat` API surface over @firemoot/client, so a Stream app can switch to Firemoot by changing configuration only.",
   "license": "Apache-2.0",
