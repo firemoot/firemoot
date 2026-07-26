@@ -43,3 +43,6 @@ Thumbs.db
 # Logs and local junk
 *.log
 .direnv/
+
+# Local brand workbench (concept art, upload-ready renders) - not for the public repo
+/brand-archive/
