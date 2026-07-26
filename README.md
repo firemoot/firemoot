@@ -240,9 +240,13 @@ change a tapir endpoint. [CONTRIBUTING.md](CONTRIBUTING.md) has the details.
 | Document | Purpose |
 |---|---|
 | [Quickstart](docs/guide/quickstart.md) | Boot a server and connect a browser in about five minutes |
+| [Configuration](docs/guide/configuration.md) | Every FIREMOOT_* environment variable, grouped, with defaults |
 | [Auth model](docs/guide/auth.md) | Server HMAC vs end-user JWT, and where each belongs |
 | [Protocol reference](docs/guide/protocol.md) | WebSocket frames, event vocabulary, resume semantics |
+| [Testing with @firemoot/test](docs/guide/testing.md) | Boot a real server in your test suite, seed it, break its network |
+| [Webhooks](docs/guide/webhooks.md) | Signatures, retries, dead-letter replay |
 | [Migrating from Stream](docs/guide/migration.md) | Mapping table and the differences to plan for |
+| [Admin dashboard](docs/guide/admin.md) | Metrics, API key rotation, webhook dead-letters |
 | [Sizing and performance](docs/guide/sizing.md) | What one node holds, and what it costs |
 | [Hosting](docs/guide/hosting.md) | Compose, Fly.io, Caddy, and what cannot host it |
 | [SPEC.md](SPEC.md) | Founding specification: scope, architecture, decisions log |
