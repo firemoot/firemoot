@@ -1,4 +1,4 @@
-# Reference deployment (SPEC.md §11) and the exact stack downstream CI runs.
+# Reference deployment (SPEC.md §11) and the exact stack the project's CI runs.
 # Build the image first: `sbt "server/Docker/publishLocal"` (tags firemoot:latest).
 services:
   postgres:
@@ -44,9 +44,12 @@ services:
       FIREMOOT_DB_NAME: firemoot
       FIREMOOT_DB_USER: firemoot
       FIREMOOT_DB_PASSWORD: firemoot
-      # Override these before exposing the instance publicly.
-      FIREMOOT_API_KEY_ID: firemoot
-      FIREMOOT_API_SECRET: change-me
+      # Override these before exposing the instance publicly; the defaults are
+      # only here so a bare `docker compose up` works.
+      FIREMOOT_API_KEY_ID: ${FIREMOOT_API_KEY_ID:-firemoot}
+      FIREMOOT_API_SECRET: ${FIREMOOT_API_SECRET:-change-me}
+      # Blank counts as unset, so the admin dashboard stays locked until set.
+      FIREMOOT_ADMIN_PASSWORD: ${FIREMOOT_ADMIN_PASSWORD:-}
       # Set FIREMOOT_DEV_DEMO=true to serve the dev demo page at /demo (never in prod).
       FIREMOOT_DEV_DEMO: ${FIREMOOT_DEV_DEMO:-false}
       # Media is off unless an S3 endpoint is set. Point at the minio service to enable:

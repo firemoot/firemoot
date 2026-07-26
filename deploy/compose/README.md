@@ -1,6 +1,6 @@
 # Firemoot via Docker Compose
 
-The reference deployment (SPEC.md §11) and the exact stack downstream CI runs:
+The reference deployment (SPEC.md §11) and the exact stack the project's own CI runs:
 `firemoot` + `postgres:17` (+ an optional `pgsty/minio` for media). Suitable for a
 $7 Hetzner-class VPS.
 
