@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Firemoot TypeScript SDK workspace (@firemoot/core, @firemoot/client, @firemoot/test).",
+  "description": "Firemoot TypeScript SDK workspace (@firemoot/core, @firemoot/client, @firemoot/stream-compat, @firemoot/test).",
   "license": "Apache-2.0",
   "packageManager": "pnpm@11.5.3",
   "engines": {

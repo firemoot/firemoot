@@ -64,6 +64,19 @@ importers:
         specifier: 0.98.2
         version: 0.98.2(typescript@6.0.3)
 
+  sdk/ts/stream-compat:
+    dependencies:
+      '@firemoot/client':
+        specifier: workspace:*
+        version: link:../client
+      '@firemoot/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.15.0
+        version: 22.19.20
+
 packages:
 
   '@algolia/abtesting@1.19.0':

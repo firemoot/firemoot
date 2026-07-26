@@ -135,22 +135,39 @@ arrives first, and never duplicated. Full walkthrough in the
 
 ## Stream compatibility
 
-Firemoot deliberately mirrors [Stream Chat](https://getstream.io/chat/)'s model rather than inventing a new one:
-your backend mints user tokens, the browser talks to the chat backend directly, and
-the backend authorises every operation. The covered surface is the part most apps
-actually use - `type:id` channels with typed members and roles, messages with
-client-supplied ids, reactions, threads, attachments, read state and unread counts,
-typing, presence, channel queries with keyset pagination, full-text search, flags
-and moderation, uploads, and HMAC-signed webhooks. `@firemoot/client` also ships
+**`@firemoot/stream-compat` is a drop-in adapter for the
+[`stream-chat`](https://getstream.io/chat/) JavaScript SDK.** It exports a
+`StreamChat` class with the same constructors and methods, so an app written
+against Stream switches backends by changing configuration - the key, the secret
+and a base URL. Alias the package in your bundler and application code does not
+change at all:
+
+```js
+// vite.config.js / next.config.js
+resolve: { alias: { "stream-chat": "@firemoot/stream-compat" } }
+```
+
+See the [drop-in compatibility guide](docs/guide/stream-compat.md) for the full
+compatibility table.
+
+Underneath, Firemoot deliberately mirrors Stream's model rather than inventing a
+new one: your backend mints user tokens, the browser talks to the chat backend
+directly, and the backend authorises every operation. The covered surface is the
+part most apps actually use - `type:id` channels with typed members and roles,
+messages with client-supplied ids, reactions, threads, attachments, read state and
+unread counts, typing, presence, channel queries with keyset pagination, full-text
+search, flags and moderation, uploads, and HMAC-signed webhooks (which carry
+Stream's header names alongside Firemoot's). `@firemoot/client` also ships
 `streamChannelState(channel)`, a projection of a channel into a Stream
 `channel.state`-shaped read model, so a migrated UI can keep reading
 `{ messages, members, read, unreadCount, last_message_at }`.
 
 This is not 100% of Stream's API and does not try to be: activity feeds, calling,
 AI moderation, polls, campaigns and push notifications are out of scope, and
-Firemoot uses camelCase on the wire where Stream uses snake_case. The
-[migration guide](docs/guide/migration.md) has the mapping table and the honest
-list of differences to plan for.
+Firemoot uses camelCase on the wire where Stream uses snake_case. The adapter
+covers what is covered and **throws a named error** on the rest rather than
+silently doing nothing. The [migration guide](docs/guide/migration.md) has the
+mapping table and the honest list of differences to plan for.
 
 ## Architecture
 
@@ -247,6 +264,7 @@ change a tapir endpoint. [CONTRIBUTING.md](CONTRIBUTING.md) has the details.
 | [Protocol reference](docs/guide/protocol.md) | WebSocket frames, event vocabulary, resume semantics |
 | [Testing with @firemoot/test](docs/guide/testing.md) | Boot a real server in your test suite, seed it, break its network |
 | [Webhooks](docs/guide/webhooks.md) | Signatures, retries, dead-letter replay |
+| [Drop-in Stream compatibility](docs/guide/stream-compat.md) | Alias `stream-chat` to @firemoot/stream-compat and change only config |
 | [Migrating from Stream](docs/guide/migration.md) | Mapping table and the differences to plan for |
 | [Admin dashboard](docs/guide/admin.md) | Metrics, API key rotation, webhook dead-letters |
 | [Sizing and performance](docs/guide/sizing.md) | What one node holds, and what it costs |

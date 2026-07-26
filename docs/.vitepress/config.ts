@@ -58,7 +58,10 @@ export default defineConfig({
       },
       {
         text: "Migration",
-        items: [{ text: "Migrating from Stream", link: "/guide/migration" }],
+        items: [
+          { text: "Drop-in Stream compatibility", link: "/guide/stream-compat" },
+          { text: "Migrating from Stream", link: "/guide/migration" },
+        ],
       },
     ],
     socialLinks: [{ icon: "github", link: "https://github.com/firemoot/firemoot" }],

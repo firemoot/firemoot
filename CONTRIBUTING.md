@@ -29,6 +29,7 @@ check start real containers.
 server/          # Scala 3 service (http4s + fs2 + cats-effect + tapir + skunk)
 sdk/ts/core/     # @firemoot/core - OpenAPI-generated transport, types, REST client
 sdk/ts/client/   # @firemoot/client - connection lifecycle, channel state, server SDK
+sdk/ts/stream-compat/ # @firemoot/stream-compat - the stream-chat API surface over the client
 sdk/test/        # @firemoot/test - boots and seeds a real server via Testcontainers
 admin/           # dashboard SPA source (Vite + TS), built into the server image
 deploy/          # docker-compose reference stack, Fly.io config, Caddy, soak harness

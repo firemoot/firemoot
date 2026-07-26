@@ -4,16 +4,31 @@ Firemoot deliberately mirrors the Stream Chat model - your backend mints user
 tokens, the browser talks directly to the chat backend, and the backend
 authorises each operation. Most of a migration is renaming, not rearchitecting.
 
+## Two routes
+
+There are two ways to do this, and it is worth picking deliberately.
+
+**The drop-in adapter.** [`@firemoot/stream-compat`](./stream-compat) exposes the
+`stream-chat` API - a class called `StreamChat`, the same methods, the same return
+shapes - over Firemoot. Alias the package in your bundler and the only thing that
+changes is configuration. It is the fastest route, and the rest of this page still
+tells you what differs underneath.
+
+**Porting the seam.** Reimplement your adapter modules over `@firemoot/client`
+directly, as described below. More work up front; you end up with a smaller
+dependency and the real API. These mix freely - adopt the adapter, then port
+screen by screen if and when it is worth it.
+
 ## The compatibility philosophy
 
-Firemoot is not a drop-in replacement for the `stream-chat` package and does not
-pretend to be. The compatibility is at the level of the **model**, not the
-symbols: the same auth topology, the same channel/member/message/reaction shape,
-the same `type:id` channel ids, the same "watch a channel and get an event
-stream" contract. Where a Stream name was free to keep - `watch()`, `keystroke()`,
-`stopTyping()`, `markRead()`, `notification.added_to_channel` - it was kept. Where
-keeping it would have meant carrying Stream's wire conventions into a new API, it
-was not.
+`@firemoot/client` itself is not a drop-in replacement for the `stream-chat`
+package and does not pretend to be - that is what the adapter above is for. Its
+compatibility is at the level of the **model**, not the symbols: the same auth
+topology, the same channel/member/message/reaction shape, the same `type:id`
+channel ids, the same "watch a channel and get an event stream" contract. Where a
+Stream name was free to keep - `watch()`, `keystroke()`, `stopTyping()`,
+`markRead()`, `notification.added_to_channel` - it was kept. Where keeping it
+would have meant carrying Stream's wire conventions into a new API, it was not.
 
 The practical consequence is that migration cost tracks how well your app is
 insulated from the SDK. In most codebases the chat client is wrapped in one or
@@ -105,18 +120,26 @@ to make a retry safe - only to assert uniqueness. Handle the `409` explicitly.
 
 ## Webhooks
 
-The signature differs in both name and scheme:
+Every delivery carries Stream's header names as well as Firemoot's, so a handler
+ported from Stream keeps reading the headers it already reads:
 
-| | Stream | Firemoot |
+| | Stream | Firemoot sends |
 | --- | --- | --- |
-| Signature header | `x-signature` | `X-Firemoot-Signature: sha256=<hex>` |
-| Dedupe header | `x-webhook-id` | `X-Firemoot-Delivery` |
+| Signature header | `x-signature` | `X-Signature` (bare hex) **and** `X-Firemoot-Signature: sha256=<hex>` |
+| Dedupe header | `x-webhook-id` | `X-Webhook-Id` **and** `X-Firemoot-Delivery` |
+| Attempt counter | `x-webhook-attempt` | `X-Webhook-Attempt` (counts from 1) |
 | Event type header | - | `X-Firemoot-Event` |
-| Verification helper | `verifyWebhook()` | none - verify by hand |
+| Verification helper | `verifyWebhook()` | `verifyWebhook()` via [`@firemoot/stream-compat`](./stream-compat), or a direct HMAC comparison |
 
-Firemoot signs the raw body with HMAC-SHA256 keyed by the *endpoint's* secret and
-prefixes the hex with `sha256=`. There is no SDK helper, so port your handler to
-a direct HMAC comparison; the [webhooks guide](./webhooks) has the code.
+Firemoot signs the raw body with HMAC-SHA256 keyed by the *endpoint's* secret -
+not the API secret, which is what Stream uses for this. That is the one thing you
+must reconfigure. `X-Signature` carries the bare hex digest Stream's helper
+expects; `X-Firemoot-Signature` is the same digest with a `sha256=` prefix. The
+[webhooks guide](./webhooks) has the hand-rolled verification code.
+
+The body is Firemoot's envelope (`{ type, cid, seq, data }`, camelCase) rather
+than Stream's; the adapter ships `normalizeWebhookEvent()` if your handler reads
+Stream's shape.
 
 Note also that there is no per-endpoint event subscription in v1 - every enabled
 endpoint gets every deliverable event and filters on `type` at your end.

@@ -1,0 +1,13 @@
+// Type-checks the suites and their fakes too, which the build config excludes.
+// Kept separate because the tests need Node's types (node:crypto) while the
+// shipped code is deliberately isomorphic and declares none.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "noEmit": true,
+    "rootDir": "src"
+  },
+  "include": ["src"],
+  "exclude": []
+}

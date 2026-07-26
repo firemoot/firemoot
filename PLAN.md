@@ -566,6 +566,23 @@ soak regressions.
       no special directive) plus a compose-network variant, surfaced in the new
       `deploy/compose/README.md` (5-minute quickstart, the RSS runtime flags, media
       enablement, the serverless-is-a-client framing, and a link to the Fly guide).
+- [x] **M4.11 `@firemoot/stream-compat`** (added 26/07/2026): the `stream-chat`
+      API surface over `@firemoot/client`, so a migrating app changes configuration
+      rather than code (alias `stream-chat` in the bundler; the docs page carries
+      the webpack/Next/Vite recipes and the `tsconfig` `paths` entry that makes the
+      *types* resolve too). Exports **`StreamChat`** - one class fusing browser and
+      server-trusted modes behind Stream's own constructor overloads, because
+      `stream-chat` is one class and any split would break the alias - plus
+      `getInstance()` singleton semantics. Ported from the downstream facade layer
+      that already carried that app's full Playwright suite: `queryChannels` filter
+      and sort translation with `watch:true`, the client/channel event maps,
+      duplicate-create and duplicate-message classification, the `channel.state`
+      projection, and webhook verify + normalise. `createToken` keeps Stream's
+      **synchronous** signature (see SPEC §2 - it forced an in-package HMAC-SHA256,
+      differential-tested against `node:crypto`, since `crypto.subtle` is
+      promise-only and a browser bundle must not resolve `node:crypto`). Uncovered
+      methods throw a named `FiremootCompatError` rather than no-op silently; three
+      documented exceptions are genuine no-ops. 98 tests green.
 
 ---
 

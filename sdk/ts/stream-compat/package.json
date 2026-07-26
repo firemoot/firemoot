@@ -1,0 +1,53 @@
+{
+  "name": "@firemoot/stream-compat",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "A drop-in adapter exposing the getstream.io `stream-chat` API surface over @firemoot/client, so a Stream app can switch to Firemoot by changing configuration only.",
+  "license": "Apache-2.0",
+  "author": "Firemoot",
+  "homepage": "https://firemoot.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/firemoot/firemoot.git",
+    "directory": "sdk/ts/stream-compat"
+  },
+  "bugs": "https://github.com/firemoot/firemoot/issues",
+  "keywords": [
+    "firemoot",
+    "chat",
+    "sdk",
+    "stream-chat",
+    "compatibility",
+    "migration",
+    "typescript"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.tests.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@firemoot/client": "workspace:*",
+    "@firemoot/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0"
+  }
+}
