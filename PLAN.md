@@ -550,8 +550,8 @@ soak regressions.
       auto-stopped.
 - [x] **M4.9 Docs site** (generator: **VitePress**): `docs/` as the source, built
       by `@firemoot/docs` (workspace package, gated by the sdk job's `pnpm -r
-      build`; the internal decision records + compat audit are `srcExclude`d from
-      the published site). Pages: quickstart (compose in 5 min + connect a client),
+      build`; the internal decision records are `srcExclude`d from the published
+      site). Pages: quickstart (compose in 5 min + connect a client),
       the auth model (server HMAC vs client JWT, per-op authz), protocol reference
       (the full WS frame + event vocabulary mirroring `events.ts`), Stream→Firemoot
       migration (generic, public-safe mappings drawn from the M4.2 audit), sizing &
