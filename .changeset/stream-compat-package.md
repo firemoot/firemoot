@@ -1,5 +1,5 @@
 ---
-"@firemoot/stream-compat": minor
+"@firemoot/stream-compat": major
 ---
 
 New package: a drop-in adapter exposing the getstream.io `stream-chat` SDK's

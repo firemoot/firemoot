@@ -1,7 +1,7 @@
 ---
-"@firemoot/core": minor
-"@firemoot/client": minor
-"@firemoot/test": minor
+"@firemoot/core": major
+"@firemoot/client": major
+"@firemoot/test": major
 ---
 
 Initial public release of the Firemoot TypeScript SDK: the generated
