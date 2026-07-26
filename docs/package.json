@@ -3,11 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Firemoot documentation site (VitePress). Source is the markdown under docs/ (see PLAN.md M4.9).",
+  "description": "Firemoot documentation site (VitePress). Source is the markdown under docs/; `build:pages` sets DOCS_BASE for GitHub Pages project hosting, which otherwise defaults to '/'.",
   "license": "Apache-2.0",
   "scripts": {
     "dev": "vitepress dev",
     "build": "vitepress build",
+    "build:pages": "DOCS_BASE=/firemoot/ vitepress build",
     "preview": "vitepress preview"
   },
   "devDependencies": {

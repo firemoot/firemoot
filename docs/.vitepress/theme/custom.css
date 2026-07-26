@@ -1,0 +1,34 @@
+/* Brand colours taken from the flame in logo.svg. The light and dark ramps are
+   deliberately different: orange-700 is readable on white, but on the dark
+   background it needs to come up to orange-300 to keep link contrast. */
+:root {
+  --vp-c-brand-1: #c2410c;
+  --vp-c-brand-2: #ea580c;
+  --vp-c-brand-3: #f97316;
+  --vp-c-brand-soft: rgba(249, 115, 22, 0.14);
+}
+
+.dark {
+  --vp-c-brand-1: #fdba74;
+  --vp-c-brand-2: #fb923c;
+  --vp-c-brand-3: #ea580c;
+  --vp-c-brand-soft: rgba(249, 115, 22, 0.16);
+}
+
+:root {
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(120deg, #fbbf24, #ea580c);
+  --vp-home-hero-image-filter: blur(48px);
+  --vp-home-hero-image-background-image: linear-gradient(
+    -45deg,
+    rgba(251, 191, 36, 0.35),
+    rgba(234, 88, 12, 0.35)
+  );
+}
+
+/* logo.svg is a 64px mark; the hero slot is 320px, so scale it up to fill. */
+.VPHero .VPImage {
+  width: 100%;
+  max-width: 240px;
+  height: auto;
+}

@@ -1,0 +1,72 @@
+name: Docs
+
+# Builds the VitePress site and publishes it to GitHub Pages.
+#
+# One-time setup: in repo Settings -> Pages, set Source to "GitHub Actions".
+# Without that this workflow's deploy step fails with a 404 on the Pages API.
+#
+# The site is a *project* page (https://<owner>.github.io/firemoot/), so the
+# build runs `build:pages`, which sets DOCS_BASE=/firemoot/. Local dev and
+# `pnpm --filter @firemoot/docs build` leave DOCS_BASE unset and get "/".
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    name: Build site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # lastUpdated timestamps come from git history.
+          fetch-depth: 0
+
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@v4
+        with:
+          cache: true
+
+      - name: Cache pnpm store
+        uses: actions/cache@v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: actions/configure-pages@v5
+
+      - name: Build
+        run: pnpm --filter @firemoot/docs run build:pages
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: docs/.vitepress/dist
+
+  deploy:
+    name: Deploy to Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

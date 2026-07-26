@@ -90,3 +90,9 @@ Every server event is a frame of the shape:
 This table mirrors `@firemoot/client`'s typed `events.ts` - the executable spec
 the protocol test suite is written against. New event types are added there with
 their exact `data` shape.
+
+The persisted events in this table are also what the
+[webhook](./webhooks) fan-out delivers; the ephemeral ones (typing, presence) are
+not. To exercise the resume path yourself, see
+[testing](./testing) - `TcpProxy` severs a live connection mid-stream so you can
+assert nothing is lost or duplicated.

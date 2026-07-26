@@ -1,18 +1,20 @@
 # Quickstart
 
-Get a Firemoot talking to a browser in about five minutes.
+Get a Firemoot talking to a browser in about five minutes: boot the stack, mint a
+token from your backend, connect, send.
 
 ## 1. Boot the stack
 
-Firemoot ships as a Docker image plus a Postgres. Using the reference compose
-stack:
+Firemoot is one Docker image plus a Postgres. The reference Compose stack wires
+both together:
 
 ```sh
 # Build the image (until it is published to Docker Hub):
-sbt "server/Docker/publishLocal"          # tags firemoot:latest
+mise exec -- sbt "server/Docker/publishLocal"   # tags firemoot:latest
 
 cd deploy/compose
 export FIREMOOT_API_SECRET=$(openssl rand -hex 32)
+export FIREMOOT_ADMIN_PASSWORD='choose-something'   # optional, unlocks /admin
 docker compose up -d
 ```
 
@@ -23,15 +25,15 @@ curl localhost:6668/healthz     # liveness
 curl localhost:6668/readyz      # liveness + a Postgres ping
 ```
 
-`FIREMOOT_API_SECRET` is the one credential you must set: it signs your server's
-HMAC requests **and** mints the end-user JWTs the browser connects with. Set
-`FIREMOOT_ADMIN_PASSWORD` too if you want the admin dashboard at `/admin`.
+`FIREMOOT_API_SECRET` is the one credential you must set. It signs your server's
+HMAC requests **and** mints the end-user JWTs the browser connects with, so keep
+it on your backend and never ship it to a client. Everything else has a usable
+default - see the [configuration reference](./configuration).
 
 ## 2. Provision from your backend
 
 Your backend talks to Firemoot with the server SDK, authenticated by the API key
-+ secret (never expose the secret to the browser). Mint a token for a user, and
-create a channel:
+and secret. Mint a token for a user and create a channel:
 
 ```ts
 import { FiremootServer } from "@firemoot/client";
@@ -49,12 +51,12 @@ await server.createChannel({ type: "messaging", id: "general", createdBy: "alice
 ]);
 
 // Hand this token to the browser (e.g. from your /token route):
-const token = await server.createToken("alice");
+const token = await server.createToken("alice"); // HS256, one-hour default expiry
 ```
 
 ## 3. Connect from the browser
 
-The browser uses the user's JWT - never the API secret. The client connects the
+The browser uses the user's JWT, never the API secret. The client opens the
 WebSocket, watches a channel, and sends optimistically:
 
 ```ts
@@ -69,18 +71,33 @@ const client = new FiremootClient({
 await client.connect();
 
 const channel = client.channel("messaging", "general");
-channel.on("message.new", (e) => console.log(e.data.userId, e.data.text));
+channel.on("message.new", (event) => console.log(event.data.userId, event.data.text));
 await channel.watch();
 
 await channel.sendMessage({ text: "hello, firemoot" });
 ```
 
-The send appears immediately (optimistically) and is reconciled when the server
-confirms it - whichever of the REST response or the `message.new` event arrives
-first, and never duplicated.
+`watch()` loads the channel's recent history and members, then subscribes over
+the socket. The send appears immediately (optimistically) and is reconciled when
+the server confirms it - whichever of the REST response or the `message.new`
+event arrives first, and never duplicated.
+
+For a long-lived session, pass `tokenProvider` instead of `token` so the client
+fetches a fresh JWT on every (re)connect rather than dying when the first one
+expires:
+
+```ts
+const client = new FiremootClient({
+  baseUrl: "http://localhost:6668",
+  userId: "alice",
+  tokenProvider: () => fetch("/api/chat/token").then((r) => r.text()),
+});
+```
 
 ## Next steps
 
-- [Auth model](./auth) - how the two surfaces (server HMAC, client JWT) fit together.
-- [Protocol reference](./protocol) - the WebSocket frames and event vocabulary.
-- [Hosting](./hosting) - Compose, Fly.io, Caddy, and which platforms can't host it.
+- [Configuration](./configuration) - every `FIREMOOT_*` variable and what it does.
+- [Authentication](./auth) - how the two credentials (server HMAC, user JWT) fit together.
+- [Realtime protocol](./protocol) - the WebSocket frames and event vocabulary.
+- [Testing](./testing) - boot a real Firemoot inside your test suite.
+- [Self-hosting](./hosting) - Compose, Caddy, Fly.io, and which platforms cannot host it.

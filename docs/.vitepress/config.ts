@@ -1,33 +1,72 @@
 import { defineConfig } from "vitepress";
 
-// The Firemoot docs site (PLAN.md M4.9). The internal decision records and the
-// downstream compatibility audit live under docs/ too, but are not published.
+// GitHub Pages serves a project site under /<repo>/, so the deploy workflow sets
+// DOCS_BASE=/firemoot/. Local dev and preview leave it unset and get "/".
+const base = process.env["DOCS_BASE"] ?? "/";
+
 export default defineConfig({
   title: "Firemoot",
-  description: "Self-hosted, single-binary realtime chat backend on Postgres.",
+  description: "Stream Chat's developer experience, your infrastructure.",
+  base,
   cleanUrls: true,
   lastUpdated: true,
-  srcExclude: ["frented-compat-audit.md", "frented-migration-plan.md", "decisions/**", "README.md"],
+  srcExclude: ["decisions/**", "README.md"],
+  head: [
+    ["link", { rel: "icon", type: "image/svg+xml", href: `${base}logo.svg` }],
+    ["meta", { property: "og:type", content: "website" }],
+    ["meta", { property: "og:site_name", content: "Firemoot" }],
+    ["meta", { property: "og:title", content: "Firemoot - self-hosted realtime chat backend" }],
+    [
+      "meta",
+      {
+        property: "og:description",
+        content:
+          "Stream Chat's developer experience, your infrastructure. One JVM service and Postgres, Apache-2.0.",
+      },
+    ],
+  ],
   themeConfig: {
+    logo: "/logo.svg",
     nav: [
-      { text: "Guide", link: "/guide/quickstart" },
-      { text: "Protocol", link: "/guide/protocol" },
+      { text: "Guide", link: "/guide/quickstart", activeMatch: "/guide/" },
+      { text: "GitHub", link: "https://github.com/firemoot/firemoot" },
     ],
     sidebar: [
       {
-        text: "Guide",
+        text: "Getting started",
         items: [
           { text: "Quickstart", link: "/guide/quickstart" },
-          { text: "Auth model", link: "/guide/auth" },
-          { text: "Protocol reference", link: "/guide/protocol" },
-          { text: "Migrating from Stream", link: "/guide/migration" },
-          { text: "Sizing & performance", link: "/guide/sizing" },
-          { text: "Hosting", link: "/guide/hosting" },
+          { text: "Configuration", link: "/guide/configuration" },
+          { text: "Testing", link: "/guide/testing" },
         ],
+      },
+      {
+        text: "Concepts",
+        items: [
+          { text: "Authentication", link: "/guide/auth" },
+          { text: "Realtime protocol", link: "/guide/protocol" },
+          { text: "Webhooks", link: "/guide/webhooks" },
+        ],
+      },
+      {
+        text: "Operations",
+        items: [
+          { text: "Self-hosting", link: "/guide/hosting" },
+          { text: "Admin dashboard", link: "/guide/admin" },
+          { text: "Sizing & performance", link: "/guide/sizing" },
+        ],
+      },
+      {
+        text: "Migration",
+        items: [{ text: "Migrating from Stream", link: "/guide/migration" }],
       },
     ],
     socialLinks: [{ icon: "github", link: "https://github.com/firemoot/firemoot" }],
     search: { provider: "local" },
+    editLink: {
+      pattern: "https://github.com/firemoot/firemoot/edit/main/docs/:path",
+      text: "Edit this page on GitHub",
+    },
     footer: {
       message: "Released under the Apache-2.0 License.",
       copyright: "Firemoot",

@@ -1,4 +1,4 @@
-# Auth model
+# Authentication
 
 Firemoot has exactly two callers, and a distinct credential for each.
 
@@ -26,10 +26,19 @@ X-Firemoot-Timestamp: <unix seconds>
 X-Firemoot-Signature: <hmac-sha256(secret, canonical)>
 ```
 
-The comparison is constant-time and the timestamp must be within ±300s. The
-server SDK builds these for you (`createHmacAuthorizer`); you only hold the key
-and secret. A server caller is fully trusted - it may send as any user and reach
-the admin-only endpoints (user/channel provisioning, webhooks).
+The signature is lowercase hex, the comparison is constant-time, and the
+timestamp must be within ±300s of the server's clock. The server SDK builds all
+three headers for you (`createHmacAuthorizer`); you only hold the key and secret.
+A server caller is fully trusted - it may send as any user and reach the
+admin-only endpoints (user and channel provisioning, webhook registration).
+
+::: warning One header name, two schemes
+`X-Firemoot-Signature` is also the header on **outbound** webhook deliveries, and
+the two are not the same thing. Inbound (here) it is a bare hex HMAC over the
+canonical string above. Outbound it is `sha256=<hex>` over the raw request body,
+keyed by the *webhook endpoint's* secret rather than the API secret. See
+[webhooks](./webhooks).
+:::
 
 ## Browser requests - end-user JWT
 
@@ -63,6 +72,11 @@ what.
 ## Rotating keys
 
 Server API keys live in config (the bootstrap key) **and** the database. Create
-or revoke DB-backed keys from the admin dashboard and they take effect
-immediately - no restart. The end-user JWT signing key is the API secret; rotate
-it deliberately (it invalidates live tokens).
+or revoke DB-backed keys from the [admin dashboard](./admin) and they take effect
+immediately - no restart. The bootstrap key from `FIREMOOT_API_KEY_ID` /
+`FIREMOOT_API_SECRET` is resolved before the database, so it keeps working on an
+empty schema, but for the same reason it cannot be revoked from the UI.
+
+The end-user JWT signing key *is* the API secret, so rotating it deliberately
+invalidates every live token as well as your server keys. Cutting over to a new
+DB-backed API key is the low-blast-radius move.
