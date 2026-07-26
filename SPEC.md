@@ -13,11 +13,11 @@ Stream Chat's developer experience, your infrastructure.
 
 ## 1. Origin and Differentiator
 
-Firemoot was conceived while fighting flaky E2E tests against Stream Chat's live API in the
-Frented project. The chat-API market has no self-hosted option with SaaS-grade developer
-experience: XMPP servers (ejabberd, MongooseIM) are protocol stacks without modern SDKs,
-OpenIM carries a Kafka+Redis+MongoDB footprint, and the rest are finished apps
-(Rocket.Chat, Mattermost), not embeddable backends.
+Firemoot was conceived while fighting flaky E2E tests against Stream Chat's live API in a
+production marketplace application. The chat-API market has no self-hosted option with
+SaaS-grade developer experience: XMPP servers (ejabberd, MongooseIM) are protocol stacks
+without modern SDKs, OpenIM carries a Kafka+Redis+MongoDB footprint, and the rest are
+finished apps (Rocket.Chat, Mattermost), not embeddable backends.
 
 **Headline differentiator: testability as a feature.** Single binary + Postgres means the
 entire backend boots in anyone's CI in seconds. The thing a SaaS structurally cannot offer
@@ -26,8 +26,8 @@ metering" - is Firemoot's pitch. Adoption wedge: teams who love Stream's SDK erg
 hate untestable external dependencies, unpredictable MAU pricing, or third-party data
 custody (the same regulated-industry concern that drives self-hosted adoption generally).
 
-First consumer: Frented's Playwright suite replaces its live-Stream `enableStream` specs
-and skip-gate bypasses with a local Firemoot instance.
+First consumer: the downstream production app's Playwright suite replaces its live-Stream
+`enableStream` specs and skip-gate bypasses with a local Firemoot instance.
 
 ## 2. Decisions Log
 
@@ -52,12 +52,12 @@ and skip-gate bypasses with a local Firemoot instance.
 | Admin dashboard chart library (added 11/06/2026, M3.5) | uPlot, not Chart.js | uPlot (~45KB, zero-dep, MIT) over Chart.js (~5x larger, canvas/animation-oriented) keeps the minimal-footprint/$7-VPS pitch honest for a self-hosted admin panel. Renders the §8 charts (DAU/WAU/MAU, hourly CCU p95/max, messages/day stacked by channel type, storage) |
 | Admin SPA build integration (added 11/06/2026, M3.5) | Vite + TS app at `admin/`, built into `server/src/main/resources/admin`, committed and CI drift-gated | The build emits stable, unminified filenames the server serves from the classpath via `AdminSpaRoutes` (mirrors `demo.html`). The output is committed and diff-checked in CI exactly like the generated SDK, so the JVM/Docker build stays node-free while CI guarantees freshness. CSRF is double-submit: the SPA reads the `firemoot_csrf` cookie back into an `X-CSRF-Token` header on mutations |
 | Soak harness (added 11/06/2026, M3.6) | k6 (v2.0, stable `k6/websockets`); nightly, memory-capped | `deploy/soak/ws-soak.js` mints HS256 JWTs + HMAC request signatures in-script so it drives the real auth paths; latency is measured end-to-end via `custom.sentAtMs`. Each run uses a fresh channel so seq-0 subscribe replays nothing (else stale-timestamp replays pollute the metric). The nightly workflow caps firemoot at 1g (the "$7 VPS" envelope, making the RSS gate meaningful against the MaxRAMPercentage heap sizing) and gates on p99 latency + peak RSS + no-OOM |
-| Client-authenticated REST (added 11/06/2026, M4 plan review) | v1 ships JWT-bearer client endpoints with per-op membership/role authz (M4.3) | The downstream audit showed Frented's browser sends messages **directly** with the user's JWT (Stream's model); HMAC must stay server-only, so without client auth the v1.0 gate fails or forces proxy routes into the customer app. This closes the M1.1 authz deferral and makes the §13 "authorise every channel op server-side" posture enforceable. The end-user JWT already described in §5 simply gains a REST bearer surface alongside the WS one |
+| Client-authenticated REST (added 11/06/2026, M4 plan review) | v1 ships JWT-bearer client endpoints with per-op membership/role authz (M4.3) | The downstream audit showed that app's browser sends messages **directly** with the user's JWT (Stream's model); HMAC must stay server-only, so without client auth the v1.0 gate fails or forces proxy routes into the customer app. This closes the M1.1 authz deferral and makes the §13 "authorise every channel op server-side" posture enforceable. The end-user JWT already described in §5 simply gains a REST bearer surface alongside the WS one |
 | Docs generator (added 12/06/2026, M4.9) | VitePress, `docs/` as source, a workspace package | Markdown-first, near-zero config, fast static output; the docs build is gated by the existing sdk job's `pnpm -r build` so pages can't rot. Internal records (decision log, downstream compat audit) stay in `docs/` but are `srcExclude`d from the published site. Astro/Docusaurus were heavier for no v1 gain |
-| Message ids are caller-suppliable text (added 20/07/2026) | `messages.id` (and its FK columns) migrated uuid -> text (V006); `SendMessageRequest.id` optional, duplicate -> 409 via the PK unique violation (race-safe); global `DELETE /v1/messages/{id}` added | Stream parity: Stream message ids are arbitrary caller strings, and idempotent re-sends (`<bookingId>_first` seeds) + delete-by-id-alone are load-bearing in the Frented migration. Server-minted ids remain UUIDv7 strings, so absent-callers see no change |
+| Message ids are caller-suppliable text (added 20/07/2026) | `messages.id` (and its FK columns) migrated uuid -> text (V006); `SendMessageRequest.id` optional, duplicate -> 409 via the PK unique violation (race-safe); global `DELETE /v1/messages/{id}` added | Stream parity: Stream message ids are arbitrary caller strings, and idempotent re-sends (`<bookingId>_first` seeds) + delete-by-id-alone are load-bearing in the downstream migration. Server-minted ids remain UUIDv7 strings, so absent-callers see no change |
 | Downstream test helper (added 12/06/2026, M4.5) | `@firemoot/test` boots Firemoot via **testcontainers-node**, not the reference compose | A programmatic helper's contract is "boot, wait healthy, hand back URLs + tokens"; testcontainers gives random mapped host ports (parallel-safe, no fixed-6668 collisions), automatic container reaping (Ryuk) even on a crashed run, and a clean async API returning the mapped `baseUrl`. The reference `docker-compose.yml` stays the *deployment* artifact; the *test* lifecycle is a separate concern. The dogfood gate (Firemoot's own SDK suite driving a real server) is the first consumer and caught the missing client REST bearer auth on day one |
-| Channel-state hydration (added 12/06/2026, M4.3) | `get channel` / `channels/query` return a hydrated `ChannelState` (the channel + `members` carrying `lastReadSeq`, the caller's `read` state, and the `latestMessage`) | The Frented audit named this the biggest non-auth gap - Stream returns members, read receipts, the caller's unread count and a conversation preview inline, and the browser UI leans on all four. Hydration is batched over the page's whole cid set (≤3 queries regardless of page size; the caller-unread query runs only for an end-user caller), so it never degrades to N+1. It is one tapir output type for both caller kinds; `read` is absent for a server-key caller (which has no single subject). `@firemoot/client` keeps returning a bare `Channel` from `getChannel` for now - consuming the richer state (other members' read receipts, badge counts) is M4.4 |
-| Client-supplied message ids + global delete (added 20/07/2026, Frented migration) | `messages.id` is caller-supplied **text**, not a server-only UUID; `POST …/messages` accepts an optional `id`; `DELETE /v1/messages/{id}` deletes by id alone | Closes the last Stream-parity gap the Frented audit flagged: Stream lets the caller set a message id on send (dedupes a re-send as "already exists") and delete a message by id without channel context, which Frented's `chatServerThreadPolicy` was compensating for. The V006 migration retypes `messages.id` and every referencing column (`parent_message_id`, `reactions.message_id`, `message_flags.message_id`) uuid→text in one step (drop FKs, `uuid::text` cast, re-add FKs), preserving existing rows; server-minted ids stay UUIDv7 strings. Client ids are validated (non-empty, ≤255 chars, no whitespace/control chars → 400). Dedupe is race-safe by construction: the id stays the primary key, so a duplicate surfaces as the unique-violation mapped to a **409** whose detail contains "already exists" and the id (consumers pattern-match that phrase). The global delete resolves the channel server-side and mirrors the channel-scoped delete's authorisation exactly (server key, or a member who is the author/moderator); the channel-scoped endpoint stays. Message DTOs already carried `id` as a JSON string, so WS events and the SDK outbox (nonce-based, no id parsing) are unaffected |
+| Channel-state hydration (added 12/06/2026, M4.3) | `get channel` / `channels/query` return a hydrated `ChannelState` (the channel + `members` carrying `lastReadSeq`, the caller's `read` state, and the `latestMessage`) | The downstream audit named this the biggest non-auth gap - Stream returns members, read receipts, the caller's unread count and a conversation preview inline, and the browser UI leans on all four. Hydration is batched over the page's whole cid set (≤3 queries regardless of page size; the caller-unread query runs only for an end-user caller), so it never degrades to N+1. It is one tapir output type for both caller kinds; `read` is absent for a server-key caller (which has no single subject). `@firemoot/client` keeps returning a bare `Channel` from `getChannel` for now - consuming the richer state (other members' read receipts, badge counts) is M4.4 |
+| Client-supplied message ids + global delete (added 20/07/2026, downstream migration) | `messages.id` is caller-supplied **text**, not a server-only UUID; `POST …/messages` accepts an optional `id`; `DELETE /v1/messages/{id}` deletes by id alone | Closes the last Stream-parity gap the downstream audit flagged: Stream lets the caller set a message id on send (dedupes a re-send as "already exists") and delete a message by id without channel context, which the downstream app's own thread-policy layer was compensating for. The V006 migration retypes `messages.id` and every referencing column (`parent_message_id`, `reactions.message_id`, `message_flags.message_id`) uuid→text in one step (drop FKs, `uuid::text` cast, re-add FKs), preserving existing rows; server-minted ids stay UUIDv7 strings. Client ids are validated (non-empty, ≤255 chars, no whitespace/control chars → 400). Dedupe is race-safe by construction: the id stays the primary key, so a duplicate surfaces as the unique-violation mapped to a **409** whose detail contains "already exists" and the id (consumers pattern-match that phrase). The global delete resolves the channel server-side and mirrors the channel-scoped delete's authorisation exactly (server key, or a member who is the author/moderator); the channel-scoped endpoint stays. Message DTOs already carried `id` as a JSON string, so WS events and the SDK outbox (nonce-based, no id parsing) are unaffected |
 
 ## 3. Scope
 
@@ -275,7 +275,7 @@ Two packages, npm scope `@firemoot`:
   read-state tracking), event emitter typed per §5 event list.
 - **`@firemoot/test`** - downstream-CI helper: starts Firemoot (Docker or binary),
   waits healthy, seeds users/channels/messages via server API, hands back URLs +
-  tokens. The dogfood target: Frented's Playwright suite.
+  tokens. The dogfood target: the downstream app's Playwright suite.
 - Server-side usage (token mint, server API) works in any Node runtime including
   serverless (it is plain HTTPS + JWT signing); only the realtime client needs a
   socket.
@@ -317,7 +317,8 @@ over HTTPS), exactly as it would be a client of Stream.
   heartbeat reaping, multi-device read sync).
 - Soak: k6 WS scenario (N idle connections + M msg/s) run nightly in CI; regression
   thresholds on memory and p99 delivery latency.
-- Dogfood: `@firemoot/test` used by Firemoot's own SDK tests, then by Frented.
+- Dogfood: `@firemoot/test` used by Firemoot's own SDK tests, then by the downstream
+  app.
 - CI: GitHub Actions; every PR runs the full stack in compose. The project must always
   pass its own "boots fast in CI" pitch - a CI job asserts cold start to healthy
   < 15s.
@@ -348,8 +349,8 @@ over HTTPS), exactly as it would be a client of Stream.
 - **M3 - dashboard.** Rollups, admin UI charts, Prometheus endpoint.
 - **M4 - SDK polish + test helper.** `@firemoot/client` state layer hardened
   (reconnect chaos tests), `@firemoot/test` shipped, docs site, Fly deploy guide.
-- **v1.0 gate.** Frented's messaging E2E suite passes against Firemoot in CI with
-  zero spec changes beyond configuration. That is the definition of done.
+- **v1.0 gate.** The downstream app's messaging E2E suite passes against Firemoot in CI
+  with zero spec changes beyond configuration. That is the definition of done.
 
 ## 15. Open Questions
 

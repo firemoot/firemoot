@@ -446,28 +446,28 @@ soak regressions.
       `@firemoot/core` via a pluggable `RestApi` (auth interceptor injectable). 29
       client unit tests (emitter, reducer, outbox, FSM, channel optimistic flow,
       client routing/resubscribe) - no real server needed.
-> **M4 reshape (11/06/2026 plan review).** Auditing Frented revealed the v1.0
-> gate's hidden dependency: Frented's browser sends messages **directly** to
-> Stream with the user's JWT (`lib/stream.ts` is client-side-only), but
+> **M4 reshape (11/06/2026 plan review).** Auditing the downstream app revealed
+> the v1.0 gate's hidden dependency: its browser sends messages **directly** to
+> Stream with the user's JWT (its Stream wrapper is client-side-only), but
 > Firemoot's REST is HMAC-server-only - and the M1.1 authz deferral ("lands with
 > client-authenticated endpoints") was never owned by any milestone. Decision:
 > client-authenticated REST joins v1 (M4.3). Good news from the same audit:
-> `stream-chat-react` is an **unused** dependency (zero imports - Frented's UI is
+> `stream-chat-react` is an **unused** dependency (zero imports - that app's UI is
 > hand-built on the core client), and the used Stream surface is ~15 methods,
 > mostly already covered by `@firemoot/client`. Also reordered: `@firemoot/test`
 > now precedes the chaos tests, which become its first dogfood consumer.
 
-- [x] **M4.2 Frented compat audit** (done 11/06/2026): structured pass over every
-      `stream-chat` call site in Frented (28 files) → `docs/frented-compat-audit.md`.
+- [x] **M4.2 Downstream compat audit** (done 11/06/2026): structured pass over
+      every `stream-chat` call site in the downstream app (28 files).
       Confirmed: the browser sends/reads/reacts/queries/uploads/flags/**searches**
       directly with the user JWT (M4.3 list now exact); `stream-chat-react` is an
       unused dep (zero imports); the Playwright gate spec never touches the SDK
-      (drives UI + Frented's `testApi` only - the `window.StreamChat` hook is dead
-      Cypress legacy); the biggest non-auth server gap is **channel-state
-      hydration** (members + caller read state + others' lastReadSeq + latest
-      message in query/get responses); the only consumed webhook without an
-      equivalent is `user.unread_message_reminder` (not gate-blocking, v1.x or
-      Frented-side cron).
+      (drives the UI and that app's own test fixture only - the `window.StreamChat`
+      hook is dead Cypress legacy); the biggest non-auth server gap is
+      **channel-state hydration** (members + caller read state + others' lastReadSeq
+      + latest message in query/get responses); the only consumed webhook without an
+      equivalent is `user.unread_message_reminder` (not gate-blocking, v1.x or a
+      consumer-side cron).
 - [x] **M4.3 Client-authenticated REST** (auth + authz + scoping + hydration):
       `Authorization: Bearer <user JWT>` (HS256 - the
       same tokens the WS gateway verifies) is resolved by the unified `ApiAuth`
@@ -568,9 +568,10 @@ soak regressions.
 
 ## 9. v1.0 gate (definition of done)
 
-- [ ] Frented's Playwright messaging E2E suite passes against a local Firemoot via
-      `@firemoot/test` **with zero spec changes beyond configuration** (SPEC §14).
-- [ ] `enableStream` specs and skip-gate bypasses removed from Frented.
+- [ ] The downstream app's Playwright messaging E2E suite passes against a local
+      Firemoot via `@firemoot/test` **with zero spec changes beyond configuration**
+      (SPEC §14).
+- [ ] `enableStream` specs and skip-gate bypasses removed from that app.
 - [ ] Cold-start-to-healthy <15s CI assertion still green (never regressed).
 - [ ] SECURITY.md disclosure address is real and monitored.
 - [ ] Assets registered (§12 below); repo flipped public; v1.0.0 tagged.
@@ -607,7 +608,7 @@ docs generator, Node floor) get recorded in SPEC.md §2 in the same PR.
 | pgsty/minio bus-factor / rename | Generic-S3-only code (M2.1 hard rule); Tigris verification (M2.6) proves swappability; compose pin by digest |
 | JVM RSS vs "$7 VPS" pitch | `-XX:MaxRAMPercentage` defaults in compose; soak job tracks RSS from M3.6; GraalVM native-image remains stretch |
 | FTS fidelity expectations | Documented as lower-fidelity from day one (docs task M4.9) |
-| Frented's browser sends directly to the chat backend (v1.0 gate dependency, found 11/06/2026) | Client-authenticated REST + per-op authz is now a v1 milestone (M4.3), scoped precisely by the M4.2 compat audit before any server work starts |
+| The downstream app's browser sends directly to the chat backend (v1.0 gate dependency, found 11/06/2026) | Client-authenticated REST + per-op authz is now a v1 milestone (M4.3), scoped precisely by the M4.2 compat audit before any server work starts |
 | Single-maintainer scope creep | SPEC §3 "v1 Out" list is contractual; new ideas go to a v1.x backlog section in SPEC, not the milestones |
 | Name squatting before launch | §12 asset registration happens *before* the repo goes public |
 

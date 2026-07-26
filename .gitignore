@@ -22,6 +22,14 @@ docs/.vitepress/cache/
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+
+# mise local overrides (machine-specific, may carry secrets)
+mise.local.toml
+.mise.local.toml
+mise.*.local.toml
+.mise/
 
 # IDE / editor
 .idea/
