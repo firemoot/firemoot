@@ -32,3 +32,19 @@
   max-width: 240px;
   height: auto;
 }
+
+/* The hero artwork is a wide burning wordmark, not a square logo - let it
+   breathe past the default ~320px image cap. */
+.VPHero .VPImage {
+  max-width: 420px;
+}
+@media (min-width: 960px) {
+  .VPHero .image-container {
+    width: 460px;
+    height: auto;
+    margin-top: 32px;
+  }
+  .VPHero .VPImage {
+    max-width: 460px;
+  }
+}
