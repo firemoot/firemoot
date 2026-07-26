@@ -5,9 +5,10 @@ name: Docs
 # One-time setup: in repo Settings -> Pages, set Source to "GitHub Actions".
 # Without that this workflow's deploy step fails with a 404 on the Pages API.
 #
-# The site is a *project* page (https://<owner>.github.io/firemoot/), so the
-# build runs `build:pages`, which sets DOCS_BASE=/firemoot/. Local dev and
-# `pnpm --filter @firemoot/docs build` leave DOCS_BASE unset and get "/".
+# The site is served on the custom domain https://firemoot.com (configured in
+# Settings -> Pages), which sits at the domain root, so the build uses the
+# default base of "/". `build:pages` (DOCS_BASE=/firemoot/) exists only for
+# anyone hosting a fork on a github.io project page.
 
 on:
   push:
@@ -54,7 +55,7 @@ jobs:
       - uses: actions/configure-pages@v5
 
       - name: Build
-        run: pnpm --filter @firemoot/docs run build:pages
+        run: pnpm --filter @firemoot/docs run build
 
       - uses: actions/upload-pages-artifact@v4
         with:
