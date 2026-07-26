@@ -268,3 +268,10 @@ Security reports go to security@firemoot.com privately, per
 
 [Apache-2.0](LICENSE). Explicit patent grant, and a trademark carve-out: the code
 is yours to use, the name is ours to keep meaning one thing.
+
+---
+
+Firemoot is an independent open-source project. It is not affiliated with,
+endorsed by, or sponsored by Stream.io, Inc. "Stream" and "Stream Chat" are
+trademarks of Stream.io, Inc., and are referenced here only to describe API
+compatibility.
