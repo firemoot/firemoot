@@ -1,9 +1,6 @@
 <div align="center">
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/public/logo-wordmark-dark.svg">
-  <img src="docs/public/logo-wordmark.svg" alt="Firemoot" width="300">
-</picture>
+<img src="docs/public/brand/firemoot-blaze.png" alt="FIREMOOT" width="560">
 
 **[Stream Chat](https://getstream.io/chat/)'s developer experience, your infrastructure.**
 

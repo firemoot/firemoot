@@ -6,8 +6,8 @@ hero:
   text: Self-hosted chat backend
   tagline: Stream Chat's developer experience, your infrastructure.
   image:
-    src: /logo.svg
-    alt: Firemoot
+    src: /brand/firemoot-blaze.png
+    alt: FIREMOOT ablaze
   actions:
     - theme: brand
       text: Get started
