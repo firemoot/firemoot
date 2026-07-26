@@ -1,6 +1,6 @@
 {
   "name": "@firemoot/test",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "Downstream-CI helper: boots a Firemoot (Docker via testcontainers), waits healthy, seeds users/channels/messages, returns URLs + tokens (see PLAN.md M4.5).",
   "license": "Apache-2.0",
