@@ -23,4 +23,12 @@ object Database:
       .withPort(cfg.port)
       .withUserAndPassword(cfg.user, cfg.password.value)
       .withDatabase(cfg.database)
+      // Prepared statements switch to a value-blind generic plan after five
+      // executions, and for the channel queries the generic plan degrades to a
+      // full scan/index walk (a light member's query went 5ms -> 545ms the
+      // moment the cached plan flipped, observed live). Per-value planning
+      // costs well under a millisecond; correctness of the plan dominates.
+      .withConnectionParameters(
+        Session.DefaultConnectionParameters + ("plan_cache_mode" -> "force_custom_plan")
+      )
       .pooled(cfg.maxConnections)
