@@ -95,6 +95,60 @@ class QueryServiceSuite extends CatsEffectSuite, TestContainerForEach:
     }
   }
 
+  test("cids and members filters combine (the cid-driven statement keeps the member clause)") {
+    withContainers { pg =>
+      withServices(pg) { (users, channels, _, queries) =>
+        for
+          _ <- List("alice", "bob").traverse_(u => users.upsert(u, None, None, "user", Json.obj()))
+          _ <- channels.create("fmsg", "one", Some("alice"), Json.obj())
+          _ <- channels.create("fmsg", "two", Some("bob"), Json.obj())
+          both <- queries.channels(
+            emptyQuery.copy(
+              cids = Some(List("fmsg:one", "fmsg:two")),
+              members = Some(List("alice")),
+            )
+          )
+        yield assertEquals(cidsOf(both), Set("fmsg:one"))
+      }
+    }
+  }
+
+  test("a heavy member routes through the generic statement with identical results") {
+    withContainers { pg =>
+      val cfg = dbConfig(pg)
+      Backplane.inProcess.flatMap { backplane =>
+        Migrations.run(cfg) >> Database.pool(cfg).use { pool =>
+          val users = UserService(pool)
+          val channels = ChannelService(pool, backplane)
+          val light = QueryService(pool)
+          val heavy = QueryService(pool, heavyMemberThreshold = 2)
+          for
+            _ <- users.upsert("omni", None, None, "user", Json.obj())
+            _ <- (1 to 5).toList.traverse_(i =>
+              channels.create("fmsg", s"room$i", Some("omni"), Json.obj())
+            )
+            byMembers <- light.channels(emptyQuery.copy(members = Some(List("omni"))))
+            byGeneric <- heavy.channels(emptyQuery.copy(members = Some(List("omni"))))
+            pagedGeneric <- heavy.channels(
+              emptyQuery.copy(members = Some(List("omni")), limit = Some(2))
+            )
+            nextPage <- heavy.channels(
+              emptyQuery.copy(members = Some(List("omni")), limit = Some(2))
+                .copy(cursor = pagedGeneric.nextCursor)
+            )
+          yield
+            assertEquals(cidsOf(byGeneric), cidsOf(byMembers))
+            assertEquals(byGeneric.channels.map(_.cid), byMembers.channels.map(_.cid))
+            assertEquals(pagedGeneric.channels.size, 2)
+            assertEquals(
+              (pagedGeneric.channels ++ nextPage.channels).map(_.cid).take(4),
+              byMembers.channels.map(_.cid).take(4),
+            )
+        }
+      }
+    }
+  }
+
   test("channel filter values are treated as literals, not SQL (injection-safe)") {
     withContainers { pg =>
       withServices(pg) { (users, channels, _, queries) =>

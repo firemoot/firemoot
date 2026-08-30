@@ -21,16 +21,28 @@ import skunk.Session
  * straight into [[QueryRepo]]'s bound parameters; list filters are carried as
  * jsonb arrays so the statement shape never varies with the input.
  */
-final class QueryService(pool: Resource[IO, Session[IO]]):
+final class QueryService(
+    pool: Resource[IO, Session[IO]],
+    heavyMemberThreshold: Int = QueryService.HeavyMemberThreshold,
+):
 
   import QueryService.{DefaultLimit, MaxLimit}
 
   private def clamp(limit: Option[Int]): Int =
     limit.map(l => math.max(1, math.min(l, MaxLimit))).getOrElse(DefaultLimit)
 
+  /**
+   * Routes to the statement whose plan is driven by the most selective filter
+   * present. The all-optional [[QueryRepo.channels]] statement can only scan
+   * every channel (each filter sits behind an `is null` OR), so it is reserved
+   * for the cases where that is genuinely the cheapest shape: no cid/member
+   * filter (an activity-index walk), or a member of more channels than
+   * [[heavyMemberThreshold]] (where the index walk stops after `limit` hits but
+   * a membership-driven join would touch every one of their channels).
+   */
   def channels(q: ChannelQuery): IO[ChannelPage] =
     val limit = clamp(q.limit)
-    val params = (
+    val genericParams = (
       q.`type`,
       q.cids.map(_.asJson),
       q.members.map(_.asJson),
@@ -40,13 +52,51 @@ final class QueryService(pool: Resource[IO, Session[IO]]):
       q.cursor.map(_.cid),
       limit,
     )
-    pool.use(_.runList(QueryRepo.channels, params)).map { rows =>
-      val next = Option.when(rows.sizeIs == limit) {
-        val last = rows.last
-        ChannelCursor(last.lastMessageAt.getOrElse(last.createdAt), last.cid)
+    pool
+      .use { s =>
+        (q.cids, q.members) match
+          case (Some(cids), _) =>
+            s.runList(
+              QueryRepo.channelsByCids,
+              (
+                cids.asJson,
+                q.`type`,
+                q.members.map(_.asJson),
+                q.custom,
+                q.archived,
+                q.cursor.map(_.ts),
+                q.cursor.map(_.cid),
+                limit,
+              ),
+            )
+          case (None, Some(members)) =>
+            s.runUnique(QueryRepo.memberChannelCount, (members.asJson, heavyMemberThreshold))
+              .flatMap { memberships =>
+                if memberships >= heavyMemberThreshold then
+                  s.runList(QueryRepo.channels, genericParams)
+                else
+                  s.runList(
+                    QueryRepo.channelsByMembers,
+                    (
+                      members.asJson,
+                      q.`type`,
+                      q.custom,
+                      q.archived,
+                      q.cursor.map(_.ts),
+                      q.cursor.map(_.cid),
+                      limit,
+                    ),
+                  )
+              }
+          case (None, None) => s.runList(QueryRepo.channels, genericParams)
       }
-      ChannelPage(rows, next)
-    }
+      .map { rows =>
+        val next = Option.when(rows.sizeIs == limit) {
+          val last = rows.last
+          ChannelCursor(last.lastMessageAt.getOrElse(last.createdAt), last.cid)
+        }
+        ChannelPage(rows, next)
+      }
 
   def messageHistory(cid: String, beforeSeq: Option[Long], limit: Option[Int]): IO[MessagePage] =
     val lim = clamp(limit)
@@ -74,3 +124,11 @@ final class QueryService(pool: Resource[IO, Session[IO]]):
 object QueryService:
   private val DefaultLimit = 25
   private val MaxLimit = 100
+
+  /**
+   * Memberships at which a members query stops being driven from the member's
+   * own channel list and falls back to the activity-index walk. Both shapes
+   * cost single-digit milliseconds at the boundary, so the exact value is not
+   * sensitive.
+   */
+  private val HeavyMemberThreshold = 1000

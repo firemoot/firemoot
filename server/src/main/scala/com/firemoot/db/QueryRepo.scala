@@ -81,6 +81,114 @@ object QueryRepo:
     """.query(Codecs.channel)
 
   /**
+   * As [[channels]] with the cid list required, so it drives the plan. In the
+   * generic statement every filter sits behind an `is null` OR, which Postgres
+   * can only satisfy by scanning all channels - O(total channels) per call. A
+   * required cid list plans as pkey lookups instead. Params: cids, type,
+   * members, custom, archived, cursorTs, cursorCid, limit.
+   */
+  val channelsByCids: Query[
+    (
+        Json,
+        Option[String],
+        Option[Json],
+        Option[Json],
+        Option[Boolean],
+        Option[OffsetDateTime],
+        Option[String],
+        Int,
+    ),
+    Channel,
+  ] =
+    sql"""
+      with q as (
+        select
+          ${jsonb[Json]}     as f_cids,
+          ${text.opt}        as f_type,
+          ${jsonb[Json].opt} as f_members,
+          ${jsonb[Json].opt} as f_custom,
+          ${bool.opt}        as f_archived,
+          ${timestamptz.opt} as f_cursor_ts,
+          ${text.opt}        as f_cursor_cid
+      )
+      select $channelColumns
+      from channels c, q
+      where c.cid in (select jsonb_array_elements_text(q.f_cids))
+        and c.deleted_at is null
+        and (q.f_type is null or c.type = q.f_type)
+        and (q.f_members is null
+             or exists (select 1 from channel_members m
+                        where m.cid = c.cid
+                          and m.user_id in (select jsonb_array_elements_text(q.f_members))))
+        and (q.f_custom is null or c.custom @> q.f_custom)
+        and (q.f_archived is null or c.archived = q.f_archived)
+        and (q.f_cursor_ts is null
+             or (coalesce(c.last_message_at, c.created_at), c.cid)
+                < (q.f_cursor_ts, q.f_cursor_cid))
+      order by coalesce(c.last_message_at, c.created_at) desc, c.cid desc
+      limit $int4
+    """.query(Codecs.channel)
+
+  /**
+   * As [[channels]] with the member list required, driving the plan from
+   * `channel_members_user_idx` - O(the caller's own memberships) instead of
+   * O(total channels). Only for members with few memberships: a member of most
+   * channels (e.g. a system user) is faster through [[channels]], whose
+   * activity-index walk stops after `limit` hits. [[QueryService]] routes on
+   * [[memberChannelCount]]. Params: members, type, custom, archived, cursorTs,
+   * cursorCid, limit.
+   */
+  val channelsByMembers: Query[
+    (
+        Json,
+        Option[String],
+        Option[Json],
+        Option[Boolean],
+        Option[OffsetDateTime],
+        Option[String],
+        Int,
+    ),
+    Channel,
+  ] =
+    sql"""
+      with q as (
+        select
+          ${jsonb[Json]}     as f_members,
+          ${text.opt}        as f_type,
+          ${jsonb[Json].opt} as f_custom,
+          ${bool.opt}        as f_archived,
+          ${timestamptz.opt} as f_cursor_ts,
+          ${text.opt}        as f_cursor_cid
+      )
+      select $channelColumns
+      from channels c, q
+      where c.deleted_at is null
+        and c.cid in (select m.cid from channel_members m
+                      where m.user_id in (select jsonb_array_elements_text(q.f_members)))
+        and (q.f_type is null or c.type = q.f_type)
+        and (q.f_custom is null or c.custom @> q.f_custom)
+        and (q.f_archived is null or c.archived = q.f_archived)
+        and (q.f_cursor_ts is null
+             or (coalesce(c.last_message_at, c.created_at), c.cid)
+                < (q.f_cursor_ts, q.f_cursor_cid))
+      order by coalesce(c.last_message_at, c.created_at) desc, c.cid desc
+      limit $int4
+    """.query(Codecs.channel)
+
+  /**
+   * How many channels the given members belong to, counted no further than
+   * `cap` (an index-only scan of at most `cap` entries). Params: members, cap.
+   */
+  val memberChannelCount: Query[(Json, Int), Long] =
+    sql"""
+      select count(*) from (
+        select 1 from channel_members
+        where user_id in (select jsonb_array_elements_text(${jsonb[Json]}))
+        limit $int4
+      ) s
+    """.query(int8)
+
+  /**
    * The seq of a message by its id within a channel, for resolving a `before_id`
    * pagination cursor. Ignores `deleted_at` so a tombstoned cursor message still
    * resolves and pagination stays stable. Params: cid, messageId.
