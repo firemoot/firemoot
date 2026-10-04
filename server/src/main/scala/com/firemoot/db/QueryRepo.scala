@@ -6,6 +6,7 @@ import com.firemoot.domain.{Channel, Message}
 import io.circe.Json
 import skunk.*
 import skunk.circe.codec.all.jsonb
+import skunk.data.Arr
 import skunk.codec.all.*
 import skunk.implicits.*
 
@@ -16,7 +17,8 @@ import skunk.implicits.*
  * Injection-safe by construction: every user-supplied value is a bound
  * parameter and the statement shape is fixed regardless of input - there is no
  * dynamic SQL assembly. List filters (`cid $in`, `members $in`) are passed as a
- * single jsonb array parameter and expanded with `jsonb_array_elements_text`;
+ * single jsonb array parameter and expanded with `jsonb_array_elements_text`
+ * (except [[channelsByMembers]], which takes a `text[]` - see there);
  * custom-field equality uses jsonb containment (`@>`). A filter bound to NULL
  * means "no constraint", so one prepared statement serves every filter
  * combination. Identifiers are never interpolated.
@@ -137,10 +139,16 @@ object QueryRepo:
    * activity-index walk stops after `limit` hits. [[QueryService]] routes on
    * [[memberChannelCount]]. Params: members, type, custom, archived, cursorTs,
    * cursorCid, limit.
+   *
+   * Members are a `text[]`, not the jsonb array the other statements take: the
+   * planner sizes a `jsonb_array_elements_text` set at a fixed 100 rows, so it
+   * expected hundreds of memberships, walked the whole activity index hunting
+   * for `limit` hits, and spent ~1s on a member of two channels. `= any($1)`
+   * is estimated from the actual values.
    */
   val channelsByMembers: Query[
     (
-        Json,
+        Arr[String],
         Option[String],
         Option[Json],
         Option[Boolean],
@@ -153,7 +161,7 @@ object QueryRepo:
     sql"""
       with q as (
         select
-          ${jsonb[Json]}     as f_members,
+          ${_text}           as f_members,
           ${text.opt}        as f_type,
           ${jsonb[Json].opt} as f_custom,
           ${bool.opt}        as f_archived,
@@ -164,7 +172,7 @@ object QueryRepo:
       from channels c, q
       where c.deleted_at is null
         and c.cid in (select m.cid from channel_members m
-                      where m.user_id in (select jsonb_array_elements_text(q.f_members)))
+                      where m.user_id = any(q.f_members))
         and (q.f_type is null or c.type = q.f_type)
         and (q.f_custom is null or c.custom @> q.f_custom)
         and (q.f_archived is null or c.archived = q.f_archived)
@@ -179,11 +187,11 @@ object QueryRepo:
    * How many channels the given members belong to, counted no further than
    * `cap` (an index-only scan of at most `cap` entries). Params: members, cap.
    */
-  val memberChannelCount: Query[(Json, Int), Long] =
+  val memberChannelCount: Query[(Arr[String], Int), Long] =
     sql"""
       select count(*) from (
         select 1 from channel_members
-        where user_id in (select jsonb_array_elements_text(${jsonb[Json]}))
+        where user_id = any(${_text})
         limit $int4
       ) s
     """.query(int8)

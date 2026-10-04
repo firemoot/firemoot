@@ -14,6 +14,7 @@ import com.firemoot.db.QueryRepo
 import com.firemoot.db.SessionSyntax.*
 import io.circe.syntax.*
 import skunk.Session
+import skunk.data.Arr
 
 /**
  * Read-only queries (SPEC.md §5, M1.9): channel filtering with cursor
@@ -70,7 +71,8 @@ final class QueryService(
               ),
             )
           case (None, Some(members)) =>
-            s.runUnique(QueryRepo.memberChannelCount, (members.asJson, heavyMemberThreshold))
+            val memberArr = Arr(members*)
+            s.runUnique(QueryRepo.memberChannelCount, (memberArr, heavyMemberThreshold))
               .flatMap { memberships =>
                 if memberships >= heavyMemberThreshold then
                   s.runList(QueryRepo.channels, genericParams)
@@ -78,7 +80,7 @@ final class QueryService(
                   s.runList(
                     QueryRepo.channelsByMembers,
                     (
-                      members.asJson,
+                      memberArr,
                       q.`type`,
                       q.custom,
                       q.archived,
