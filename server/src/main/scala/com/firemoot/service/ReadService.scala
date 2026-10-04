@@ -32,7 +32,8 @@ final class ReadService(pool: Resource[IO, Session[IO]], backplane: Backplane):
                 case Some(lastRead) =>
                   for
                     unread <- session.runUnique(ReadRepo.channelUnread, (userId, cid))
-                    total <- session.runUnique(ReadRepo.totalUnread, userId)
+                    total <-
+                      session.runUnique(ReadRepo.totalUnread, (userId, ReadRepo.TotalUnreadCap))
                     data = readData(cid, userId, lastRead, unread, total)
                     event <- ChannelEvents.persist(session, cid, "read.updated", data)
                   yield (Some(ReadState(lastRead, unread, total)), Some(event))

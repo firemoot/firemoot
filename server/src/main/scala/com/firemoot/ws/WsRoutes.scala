@@ -100,7 +100,7 @@ final class WsRoutes(
       lastPong <- IO.realTime.flatMap(Ref[IO].of)
       typing <- TypingTracker.create(userId, typingThrottle, typingExpiry)(backplane.publish)
       me <- lookupUser(userId)
-      totalUnread <- pool.use(_.runUnique(ReadRepo.totalUnread, userId))
+      totalUnread <- pool.use(_.runUnique(ReadRepo.totalUnread, (userId, ReadRepo.TotalUnreadCap)))
       now <- IO.realTimeInstant.map(_.atOffset(ZoneOffset.UTC))
       _ <- userActive(userId)
       first <- registry.register(connectionId, userId)

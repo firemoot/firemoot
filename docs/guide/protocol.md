@@ -16,7 +16,9 @@ On a successful upgrade the server sends a `hello` frame:
 { "type": "hello", "connectionId": "…", "serverTime": "…", "me": { … }, "totalUnread": 0 }
 ```
 
-`totalUnread` is the user's global unread badge across every channel.
+`totalUnread` is the user's global unread badge across every channel. It saturates
+at 1000: a value of `1000` means "1000 or more", so render it as `1000+` (or clamp
+further, e.g. `99+`).
 
 ## Heartbeat
 

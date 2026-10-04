@@ -75,9 +75,13 @@ class ReadServiceSuite extends CatsEffectSuite, TestContainerForAll:
             unreadBob <- pool.use(_.runUnique(ReadRepo.channelUnread, ("bob", cid)))
             unreadAlice <- pool.use(_.runUnique(ReadRepo.channelUnread, ("alice", cid)))
 
+            totalBobBefore <-
+              pool.use(_.runUnique(ReadRepo.totalUnread, ("bob", ReadRepo.TotalUnreadCap)))
+            totalBobCapped <- pool.use(_.runUnique(ReadRepo.totalUnread, ("bob", 1L)))
             marked <- reads.markRead(cid, "bob", None)
             unreadBobAfter <- pool.use(_.runUnique(ReadRepo.channelUnread, ("bob", cid)))
-            totalBobAfter <- pool.use(_.runUnique(ReadRepo.totalUnread, "bob"))
+            totalBobAfter <-
+              pool.use(_.runUnique(ReadRepo.totalUnread, ("bob", ReadRepo.TotalUnreadCap)))
             markedNonMember <- reads.markRead(cid, "stranger", None)
 
             _ <- IO.sleep(300.millis)
@@ -99,6 +103,8 @@ class ReadServiceSuite extends CatsEffectSuite, TestContainerForAll:
             assertEquals(oracle, 2)
             assertEquals(unreadBob, 2L, "SQL unread for bob matches the formula")
             assertEquals(unreadAlice, 1L, "alice's only unread is b1")
+            assertEquals(totalBobBefore, 2L)
+            assertEquals(totalBobCapped, 1L, "the total saturates at the cap")
             assert(marked.exists(_.unreadCount == 0L), "after markRead bob has 0 unread")
             assertEquals(unreadBobAfter, 0L)
             assertEquals(totalBobAfter, 0L)

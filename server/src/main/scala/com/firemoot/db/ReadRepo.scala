@@ -34,14 +34,26 @@ object ReadRepo:
         and m.type <> 'system' and m.deleted_at is null
     """.query(int8)
 
-  /** Total unread across all the viewer's channels (the badge count). */
-  val totalUnread: Query[String, Long] =
+  /** The badge count saturates here: a total of 1000 means "1000 or more". */
+  val TotalUnreadCap: Long = 1000
+
+  /**
+   * Total unread across all the viewer's channels (the badge count), capped at
+   * the given limit. Uncapped, this is a hash join over every message in every
+   * channel the viewer belongs to - cost grows with all history, and runs on
+   * each WS connect and markRead. The limit lets Postgres stop early for a
+   * member of thousands of unread channels.
+   */
+  val totalUnread: Query[(String, Long), Long] =
     sql"""
-      select count(*)
-      from messages m
-      join channel_members cm on cm.cid = m.cid
-      where cm.user_id = $text
-        and m.seq > cm.last_read_seq
-        and m.user_id is distinct from cm.user_id
-        and m.type <> 'system' and m.deleted_at is null
+      select count(*) from (
+        select
+        from messages m
+        join channel_members cm on cm.cid = m.cid
+        where cm.user_id = $text
+          and m.seq > cm.last_read_seq
+          and m.user_id is distinct from cm.user_id
+          and m.type <> 'system' and m.deleted_at is null
+        limit $int8
+      ) unread
     """.query(int8)
