@@ -51,6 +51,45 @@ Caddy fetches and renews the certificate itself and upgrades the WebSocket on
 `/v1/ws` transparently - there is no special WebSocket directive to add. Point
 clients at `wss://chat.example.com/v1/ws`.
 
+### Media on the same box
+
+On a single VPS, the simplest media setup is the compose stack's MinIO served
+from the **same hostname** as the API, path-style, under a path prefix that is
+the bucket name:
+
+```text
+chat.example.com {
+	handle /attachments/* {
+		reverse_proxy minio:9000
+	}
+	handle {
+		reverse_proxy firemoot:6668
+	}
+}
+```
+
+```sh
+FIREMOOT_S3_ENDPOINT=https://chat.example.com
+FIREMOOT_S3_BUCKET=attachments
+FIREMOOT_S3_ACCESS_KEY=<a MinIO user scoped to that bucket>
+FIREMOOT_S3_SECRET_KEY=<its secret>
+```
+
+Path-style addressing is the default, so object URLs come out as
+`https://chat.example.com/attachments/<key>`. Make the bucket publicly readable
+(`mc anonymous set download local/attachments`). Give Firemoot a MinIO user whose
+policy covers only that bucket, not the root credentials.
+
+This works because Caddy passes the `Host` header through unchanged, so the
+signatures on presigned PUTs still verify at MinIO. It also means the API, browser
+uploads and image reads all share one origin: a client's Content-Security-Policy
+and image allow-list need exactly one entry, and no extra DNS record is involved.
+
+If the Caddyfile is a single-file bind mount, an edit that replaces the file (an
+editor's atomic save, or `mv`) leaves the running container reading the old
+inode, and `caddy reload` reloads the old config. Recreate the Caddy container
+after such an edit, or mount the containing directory instead.
+
 ## Fly.io
 
 Fly is a first-class target, and `deploy/fly/fly.toml` is a working config. The
@@ -151,6 +190,32 @@ curl https://<app>.fly.dev/readyz   # also checks Postgres
 
 Then point a client at `wss://<app>.fly.dev/v1/ws`; Fly's proxy upgrades the
 WebSocket transparently over the `force_https` listener.
+
+Point any external uptime monitor at `/readyz`, not `/healthz`. `/healthz` never
+touches the database, so it stays green while a starved Postgres stalls every
+real request.
+
+### Size for sustained load, not bursts
+
+Fly's `shared-cpu-Nx` machines guarantee only **1/16 of a core per vCPU**. Above
+that they spend burst credits. When the credits run out, the kernel clamps the
+machine back to that baseline until load drops and credit rebuilds. JVM cold
+starts and query-heavy bursts (a CI suite running in parallel shards, say) drain
+credit fast.
+
+The usual casualty is Postgres on `shared-cpu-1x`. Queries that normally take
+milliseconds stretch to seconds while `/healthz` stays fast. Throttling has a
+tell: the machine gets slower under *less* load, because the clamp tracks
+cumulative burn, not current traffic.
+
+Check Fly's metrics before blaming the code. `fly_instance_cpu_balance` near
+zero and a non-zero `fly_instance_cpu_throttle` mean the machine is being
+clamped. The remedy is more shared vCPUs (each adds baseline and credit) or a
+`performance` machine.
+
+`fly deploy` re-applies the `[[vm]]` size in `fly.toml`. A machine resized with
+`fly machine update` or `fly scale vm` silently reverts on the next deploy unless
+you copy the new size into `fly.toml` too.
 
 ## v1 is single-node
 

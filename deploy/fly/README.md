@@ -63,8 +63,7 @@ hashed (Argon2id) into the DB on first boot; the dashboard stays locked until se
 
 ## 4. Deploy
 
-`fly.toml` pins `image = "firemoot/firemoot:latest"`, so once that image exists on
-Docker Hub (PLAN §12) the deploy is just:
+`fly.toml` pins `image = "ghcr.io/firemoot/firemoot:latest"`, so the deploy is just:
 
 ```sh
 fly apps create firemoot        # once; or `fly launch --copy-config --no-deploy`
@@ -77,7 +76,13 @@ with the first - two users on the same channel can land on different machines an
 never see each other. One machine until the Postgres `LISTEN`/`NOTIFY` backplane
 lands.
 
-### Interim: before Docker Hub
+Size for sustained load. Shared-CPU machines guarantee 1/16 of a core per vCPU and
+are clamped to that once their burst credit runs out - Postgres on `shared-cpu-1x`
+is the usual casualty under parallel load. The [hosting guide](../../docs/guide/hosting.md)
+covers spotting it in Fly's metrics. `fly deploy` re-applies `fly.toml`'s `[[vm]]`
+size, so copy any `fly scale vm` change back into it.
+
+### Deploying an unreleased build
 
 Firemoot's image is built by sbt-native-packager (a runtime-only image that COPYs
 pre-staged artifacts), so Fly's remote builder cannot build it from a fresh
@@ -90,8 +95,6 @@ docker tag firemoot:latest registry.fly.io/firemoot:latest
 docker push registry.fly.io/firemoot:latest
 fly deploy --ha=false --image registry.fly.io/firemoot:latest
 ```
-
-(or point `[build] image` at any registry Fly can pull from).
 
 ## 5. Verify
 

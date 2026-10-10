@@ -15,10 +15,9 @@ primary_region = "lhr"
 
 [build]
   # Firemoot ships as a prebuilt image (sbt-native-packager output); Fly pulls it
-  # rather than building from source. Once published to Docker Hub (PLAN.md §12)
-  # this is the whole build config. Until then, push the locally built image to
-  # Fly's registry and deploy that - see README.md ("Interim: before Docker Hub").
-  image = "firemoot/firemoot:latest"
+  # rather than building from source. This is the whole build config; to run an
+  # unreleased build, see README.md ("Deploying an unreleased build").
+  image = "ghcr.io/firemoot/firemoot:latest"
 
 [env]
   FIREMOOT_HTTP_HOST = "0.0.0.0"
@@ -52,6 +51,9 @@ primary_region = "lhr"
 
 # Cold-boot is a few seconds, so a 1GB shared machine fits the "$7 VPS" envelope;
 # the JVM caps its heap at 75% of this via -XX:MaxRAMPercentage (baked into the image).
+# Shared CPUs guarantee 1/16 of a core per vCPU and clamp to that once burst credit
+# runs out - size for sustained load (see docs/guide/hosting.md). `fly deploy`
+# re-applies this block, so keep it in step with any `fly scale vm` change.
 [[vm]]
   size = "shared-cpu-1x"
   memory = "1gb"
