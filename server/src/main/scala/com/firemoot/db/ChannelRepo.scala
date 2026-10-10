@@ -13,12 +13,18 @@ object ChannelRepo:
     sql"""cid, type, id, created_by, custom, frozen, archived, current_seq,
           last_message_at, created_at, updated_at, deleted_at"""
 
-  val insert: Query[(String, String, String, Option[String], Json), Channel] =
+  /** Inserts the channel; none if the cid already exists (live or soft-deleted). */
+  val insertIfAbsent: Query[(String, String, String, Option[String], Json), Channel] =
     sql"""
       insert into channels (cid, type, id, created_by, custom)
       values ($text, $text, $text, ${text.opt}, ${jsonb[Json]})
+      on conflict (cid) do nothing
       returning $columns
     """.query(Codecs.channel)
+
+  /** The channel row whether or not it is soft-deleted. */
+  val anyByCid: Query[String, Channel] =
+    sql"select $columns from channels where cid = $text".query(Codecs.channel)
 
   val byCid: Query[String, Channel] =
     sql"select $columns from channels where cid = $text and deleted_at is null".query(

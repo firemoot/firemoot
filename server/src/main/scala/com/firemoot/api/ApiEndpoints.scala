@@ -50,6 +50,10 @@ object ApiEndpoints:
       .out(statusCode(StatusCode.Created))
       .out(jsonBody[Channel])
       .summary("Create a channel")
+      .description(
+        "Idempotent on type:id - an existing channel is returned unchanged, so concurrent " +
+          "creates all succeed. 409 if the channel was deleted."
+      )
 
   private val channelPath = "channels" / path[String]("type") / path[String]("id")
 

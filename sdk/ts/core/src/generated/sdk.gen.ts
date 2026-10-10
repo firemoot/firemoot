@@ -37,6 +37,8 @@ export const deleteV1UsersId = <ThrowOnError extends boolean = false>(options: O
 
 /**
  * Create a channel
+ *
+ * Idempotent on type:id - an existing channel is returned unchanged, so concurrent creates all succeed. 409 if the channel was deleted.
  */
 export const postV1Channels = <ThrowOnError extends boolean = false>(options: Options<PostV1ChannelsData, ThrowOnError>): RequestResult<PostV1ChannelsResponses, PostV1ChannelsErrors, ThrowOnError> => (options.client ?? client).post<PostV1ChannelsResponses, PostV1ChannelsErrors, ThrowOnError>({
     url: '/v1/channels',

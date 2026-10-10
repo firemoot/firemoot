@@ -108,3 +108,37 @@ class ChannelServiceSuite extends CatsEffectSuite, TestContainerForAll:
       }
     }
   }
+
+  test("create is idempotent on cid: repeats and concurrent creates succeed; deleted is refused") {
+    withContainers { pg =>
+      val cfg = dbConfig(pg)
+      Backplane.inProcess.flatMap { backplane =>
+        Migrations.run(cfg) >> Database.pool(cfg).use { pool =>
+          val users = UserService(pool)
+          val channels = ChannelService(pool, backplane)
+          val red = Json.obj("colour" -> Json.fromString("red"))
+          val blue = Json.obj("colour" -> Json.fromString("blue"))
+
+          for
+            _ <- users.upsert("dora", None, None, "user", Json.obj())
+            _ <- users.upsert("eve", None, None, "user", Json.obj())
+            first <- channels.create("messaging", "idem", Some("dora"), red)
+            again <- channels.create("messaging", "idem", Some("eve"), blue)
+            eveRole <- channels.memberRole("messaging:idem", "eve")
+            racers <- (1 to 8).toList.parTraverse(_ =>
+              channels.create("messaging", "race", Some("dora"), Json.obj())
+            )
+            _ <- channels.create("messaging", "gone", Some("dora"), Json.obj())
+            _ <- channels.softDelete("messaging:gone")
+            recreate <- channels.create("messaging", "gone", Some("dora"), Json.obj())
+          yield
+            assertEquals(again, first, "a repeat create returns the existing channel unchanged")
+            assertEquals(again.map(_.custom), Right(red))
+            assertEquals(eveRole, None, "a repeat create does not add its creator as a member")
+            assert(racers.forall(_.isRight), s"concurrent creates all succeed: $racers")
+            assertEquals(racers.map(_.map(_.cid)).distinct, List(Right("messaging:race")))
+            assertEquals(recreate, Left(CreateChannelError.Deleted))
+        }
+      }
+    }
+  }

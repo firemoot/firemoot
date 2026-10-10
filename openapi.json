@@ -87,6 +87,7 @@
     "/v1/channels" : {
       "post" : {
         "summary" : "Create a channel",
+        "description" : "Idempotent on type:id - an existing channel is returned unchanged, so concurrent creates all succeed. 409 if the channel was deleted.",
         "operationId" : "postV1Channels",
         "requestBody" : {
           "content" : {

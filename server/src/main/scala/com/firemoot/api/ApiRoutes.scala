@@ -7,6 +7,7 @@ import com.firemoot.media.{MediaService, UploadError}
 import com.firemoot.ratelimit.{RateGuard, RateLimitDecision}
 import com.firemoot.service.{
   ChannelService,
+  CreateChannelError,
   HydrationService,
   MessageService,
   ModerationService,
@@ -289,7 +290,9 @@ final class ApiRoutes(
       serverOnly(principal) {
         channels
           .create(req.`type`, req.id, req.createdBy, req.custom.getOrElse(Json.obj()))
-          .map(Right(_))
+          .map(_.left.map { case CreateChannelError.Deleted =>
+            Problem.of(409, "Conflict", Some(s"channel '${cid(req.`type`, req.id)}' was deleted"))
+          })
       }
     }
 

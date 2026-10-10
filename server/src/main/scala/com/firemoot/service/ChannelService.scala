@@ -10,28 +10,42 @@ import io.circe.Json
 import io.circe.syntax.*
 import skunk.Session
 
+/** Why a create was refused. */
+enum CreateChannelError:
+  case Deleted
+
 final class ChannelService(pool: Resource[IO, Session[IO]], backplane: Backplane):
 
   /**
    * Creates a channel (`cid = type:id`) and, when a creator is given, adds them
    * as the owning member - both in one transaction.
+   *
+   * Idempotent on `cid` (Stream's get-or-create): if the channel already exists
+   * it is returned unchanged - its custom data and members are not touched - so
+   * concurrent creates of the same channel all succeed. A soft-deleted cid is
+   * refused rather than resurrected.
    */
   def create(
       channelType: String,
       id: String,
       createdBy: Option[String],
       custom: Json,
-  ): IO[Channel] =
+  ): IO[Either[CreateChannelError, Channel]] =
     val cid = s"$channelType:$id"
     pool.use { session =>
       session.transaction.use { _ =>
-        for
-          channel <-
-            session.runUnique(ChannelRepo.insert, (cid, channelType, id, createdBy, custom))
-          _ <- createdBy.traverse_(uid =>
-            session.runOption(ChannelRepo.addMember, (cid, uid, "owner"))
-          )
-        yield channel
+        session
+          .runOption(ChannelRepo.insertIfAbsent, (cid, channelType, id, createdBy, custom))
+          .flatMap {
+            case Some(channel) =>
+              createdBy
+                .traverse_(uid => session.runOption(ChannelRepo.addMember, (cid, uid, "owner")))
+                .as(Right(channel))
+            case None =>
+              session.runUnique(ChannelRepo.anyByCid, cid).map { existing =>
+                Either.cond(existing.deletedAt.isEmpty, existing, CreateChannelError.Deleted)
+              }
+          }
       }
     }
 
