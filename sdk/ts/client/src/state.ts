@@ -55,7 +55,7 @@ function advanceSeq(state: ChannelState, seq: number): number {
   return seq > state.lastSeq ? seq : state.lastSeq;
 }
 
-function upsertBySeq(messages: Message[], message: Message): Message[] {
+export function upsertBySeq(messages: Message[], message: Message): Message[] {
   const index = messages.findIndex((m) => m.id === message.id);
   if (index >= 0) {
     const next = messages.slice();
@@ -158,6 +158,7 @@ export function applyEvent(
         lastSeq: advanceSeq(state, event.seq),
         members: state.members.filter((m) => m.userId !== event.data.userId),
         reads,
+        read: event.data.userId === selfUserId ? null : state.read,
       };
     }
     default:

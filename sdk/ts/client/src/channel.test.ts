@@ -1,4 +1,10 @@
-import type { Channel as ChannelData, Message } from "@firemoot/core";
+import type {
+  Channel as ChannelData,
+  ChannelQuery,
+  ChannelState as HydratedChannel,
+  ChannelStatePage,
+  Message,
+} from "@firemoot/core";
 import { describe, expect, test } from "vitest";
 
 import { Channel, type ChannelDeps } from "./channel.js";
@@ -44,10 +50,14 @@ function fakeRest(over: Partial<RestApi> = {}): RestApi {
     addReaction: reject,
     removeReaction: reject,
     markRead: reject,
-    queryChannels: () => Promise.resolve({ channels: [] }),
+    queryChannels: () => Promise.resolve({ channels: [{ channel: channelData, members: [] }] }),
     createUpload: reject,
     ...over,
   };
+}
+
+function found(state: HydratedChannel): Promise<ChannelStatePage> {
+  return Promise.resolve({ channels: [state] });
 }
 
 interface Harness {
@@ -162,6 +172,78 @@ describe("Channel watch", () => {
       JSON.stringify({ type: "subscribe", channels: { "messaging:general": 4 } }),
     );
   });
+
+  test("seeds members, read receipts and the caller's read state", async () => {
+    const queries: ChannelQuery[] = [];
+    const { channel } = mk({
+      queryChannels: (query) => {
+        queries.push(query);
+        return found({
+          channel: { ...channelData, currentSeq: 9 },
+          members: [
+            { userId: "alice", role: "owner", lastReadSeq: 3 },
+            { userId: "bob", role: "member", lastReadSeq: 4 },
+          ],
+          read: { lastReadSeq: 3, unreadCount: 1 },
+        });
+      },
+      getMessages: () => Promise.resolve({ messages: [msg("b", 4), msg("a", 3)] }),
+    });
+    await channel.watch();
+    expect(queries).toEqual([{ type: "messaging", cids: [CID], limit: 1 }]);
+    expect(channel.members).toEqual([
+      { userId: "alice", role: "owner" },
+      { userId: "bob", role: "member" },
+    ]);
+    expect(channel.readReceipts).toEqual({ alice: 3, bob: 4 });
+    expect(channel.read).toEqual({ lastReadSeq: 3, unreadCount: 1, totalUnread: 0 });
+    expect(channel.lastSeq).toBe(4);
+  });
+
+  test("rejects, without subscribing, when the channel isn't visible to the caller", async () => {
+    const { channel, sends } = mk({ queryChannels: () => Promise.resolve({ channels: [] }) });
+    await expect(channel.watch()).rejects.toThrow("channel 'messaging:general' not found");
+    expect(channel.isWatching).toBe(false);
+    expect(sends).toEqual([]);
+  });
+
+  test("resync re-seeds from a fresh snapshot, keeping the total unread badge", async () => {
+    let unread = 1;
+    const { channel } = mk({
+      queryChannels: () =>
+        found({
+          channel: channelData,
+          members: [{ userId: "alice", role: "owner", lastReadSeq: 3 }],
+          read: { lastReadSeq: 3, unreadCount: unread },
+        }),
+    });
+    await channel.watch();
+    channel.handleEvent({
+      type: "read.updated",
+      cid: CID,
+      seq: 4,
+      data: { cid: CID, userId: "alice", lastReadSeq: 3, unreadCount: 1, totalUnread: 6 },
+    });
+    unread = 2;
+    await channel.resync();
+    expect(channel.read).toEqual({ lastReadSeq: 3, unreadCount: 2, totalUnread: 6 });
+    expect(channel.readReceipts).toEqual({ alice: 3 });
+  });
+
+  test("resync confirms an optimistic send the reloaded page already holds", async () => {
+    const gate = deferred<Message>();
+    const { channel } = mk({
+      sendMessage: () => gate.promise,
+      getMessages: () => Promise.resolve({ messages: [msg("real", 5, "n1")] }),
+    });
+    const promise = channel.sendMessage({ text: "hi" });
+    await channel.resync();
+    expect(channel.pendingSends).toHaveLength(0);
+    expect(channel.messages.map((m) => m.id)).toEqual(["real"]);
+    gate.resolve(msg("real", 5, "n1"));
+    await promise;
+    expect(channel.messages.map((m) => m.id)).toEqual(["real"]);
+  });
 });
 
 describe("Channel removeReaction", () => {
@@ -242,6 +324,19 @@ describe("Channel hydrate", () => {
     expect(channel.lastSeq).toBe(9);
   });
 
+  test("confirms an optimistic send that arrives as the latest message", () => {
+    const gate = deferred<Message>();
+    const { channel } = mk({ sendMessage: () => gate.promise });
+    void channel.sendMessage({ text: "hi" });
+    channel.hydrate({
+      channel: { ...channelData, currentSeq: 5 },
+      members: [],
+      latestMessage: msg("real", 5, "n1"),
+    });
+    expect(channel.pendingSends).toHaveLength(0);
+    expect(channel.messages.map((m) => m.id)).toEqual(["real"]);
+  });
+
   test("watchFromHydrated subscribes from the channel's current seq", () => {
     const { channel, sends } = mk();
     channel.hydrate({ channel: { ...channelData, currentSeq: 9 }, members: [] });
@@ -250,5 +345,100 @@ describe("Channel hydrate", () => {
     expect(sends).toContain(
       JSON.stringify({ type: "subscribe", channels: { "messaging:general": 9 } }),
     );
+  });
+});
+
+describe("Channel hydrate while watching", () => {
+  async function watched(): Promise<Channel> {
+    const { channel } = mk({
+      queryChannels: () =>
+        found({
+          channel: { ...channelData, currentSeq: 4 },
+          members: [{ userId: "alice", role: "owner", lastReadSeq: 4 }],
+          read: { lastReadSeq: 4, unreadCount: 0 },
+        }),
+      getMessages: () => Promise.resolve({ messages: [msg("b", 4), msg("a", 3)] }),
+    });
+    await channel.watch();
+    return channel;
+  }
+
+  function snapshot(over: Partial<HydratedChannel> = {}): HydratedChannel {
+    return {
+      channel: { ...channelData, currentSeq: 9 },
+      members: [{ userId: "alice", role: "owner", lastReadSeq: 4 }],
+      read: { lastReadSeq: 4, unreadCount: 0 },
+      ...over,
+    };
+  }
+
+  test("keeps loaded history and the resume seq, adding an undelivered latest message", async () => {
+    const channel = await watched();
+    channel.hydrate(snapshot({ latestMessage: msg("d", 6) }));
+    expect(channel.messages.map((m) => m.id)).toEqual(["a", "b", "d"]);
+    expect(channel.lastSeq).toBe(4);
+
+    channel.handleEvent({ type: "message.new", cid: CID, seq: 5, data: msg("c", 5) });
+    channel.handleEvent({ type: "message.new", cid: CID, seq: 6, data: msg("d", 6) });
+    expect(channel.messages.map((m) => m.id)).toEqual(["a", "b", "c", "d"]);
+  });
+
+  test("never reverts a message the stream has already updated", async () => {
+    const channel = await watched();
+    channel.handleEvent({
+      type: "message.updated",
+      cid: CID,
+      seq: 5,
+      data: { ...msg("b", 4), text: "edited" },
+    });
+    channel.hydrate(snapshot({ latestMessage: { ...msg("b", 4), text: "original" } }));
+    expect(channel.messages.find((m) => m.id === "b")?.text).toBe("edited");
+  });
+
+  test("keeps stream-maintained members, receipts and meta", async () => {
+    const channel = await watched();
+    channel.handleEvent({
+      type: "member.added",
+      cid: CID,
+      seq: 5,
+      data: { cid: CID, userId: "bob", role: "member" },
+    });
+    channel.hydrate(snapshot({ channel: { ...channelData, custom: { stale: true } } }));
+    expect(channel.members.map((m) => m.userId)).toEqual(["alice", "bob"]);
+    expect(channel.readReceipts).toEqual({ alice: 4, bob: 0 });
+    expect(channel.meta?.custom).toEqual({});
+  });
+
+  test("refreshes the unread count, ignoring a snapshot older than an applied read", async () => {
+    const channel = await watched();
+    channel.hydrate(snapshot({ read: { lastReadSeq: 4, unreadCount: 2 } }));
+    expect(channel.read?.unreadCount).toBe(2);
+
+    channel.handleEvent({
+      type: "read.updated",
+      cid: CID,
+      seq: 7,
+      data: { cid: CID, userId: "alice", lastReadSeq: 6, unreadCount: 0, totalUnread: 0 },
+    });
+    channel.hydrate(snapshot({ read: { lastReadSeq: 4, unreadCount: 2 } }));
+    expect(channel.read).toEqual({ lastReadSeq: 6, unreadCount: 0, totalUnread: 0 });
+  });
+
+  test("takes a re-added caller's restarted read pointer", async () => {
+    const channel = await watched();
+    channel.handleEvent({
+      type: "member.removed",
+      cid: CID,
+      seq: 5,
+      data: { cid: CID, userId: "alice" },
+    });
+    channel.handleEvent({
+      type: "member.added",
+      cid: CID,
+      seq: 6,
+      data: { cid: CID, userId: "alice", role: "member" },
+    });
+    channel.hydrate(snapshot({ read: { lastReadSeq: 0, unreadCount: 3 } }));
+    expect(channel.read).toEqual({ lastReadSeq: 0, unreadCount: 3, totalUnread: 0 });
   });
 });

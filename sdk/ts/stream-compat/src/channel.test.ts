@@ -486,7 +486,7 @@ describe("browser mode: query", () => {
   test("query() watches the channel and returns its state", async () => {
     const messages: Message[] = [message("m1", 1), message("m2", 2)];
     const { facade, sent } = browserFacade({
-      getChannel: () => Promise.resolve(channelState("general").channel),
+      queryChannels: () => Promise.resolve({ channels: [channelState("general")] }),
       getMessages: () => Promise.resolve({ messages }),
     });
 

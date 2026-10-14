@@ -44,6 +44,8 @@ describe.runIf(RUN)("dogfood: @firemoot/client against a real Firemoot", () => {
       if (typeof event.data.text === "string") received.push(event.data.text);
     });
     await channel.watch();
+    expect(channel.members.map((m) => m.userId).sort()).toEqual(["alice", "bob"]);
+    expect(channel.read).not.toBeNull();
 
     const sent = await channel.sendMessage({ text: "hello from dogfood" });
     expect(sent.userId).toBe("alice");

@@ -1,4 +1,4 @@
-import type { Message } from "@firemoot/core";
+import type { Channel as ChannelData, Message } from "@firemoot/core";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { FiremootClient } from "./client.js";
@@ -53,19 +53,20 @@ class FakeSocket implements Socket {
   }
 }
 
+const channelData: ChannelData = {
+  cid: CID,
+  type: "messaging",
+  id: "general",
+  custom: {},
+  frozen: false,
+  archived: false,
+  currentSeq: 0,
+  createdAt: "t",
+  updatedAt: "t",
+};
+
 const rest: RestApi = {
-  getChannel: () =>
-    Promise.resolve({
-      cid: CID,
-      type: "messaging",
-      id: "general",
-      custom: {},
-      frozen: false,
-      archived: false,
-      currentSeq: 0,
-      createdAt: "t",
-      updatedAt: "t",
-    }),
+  getChannel: () => Promise.resolve(channelData),
   getMessages: () => Promise.resolve({ messages: [] }),
   sendMessage: () => Promise.reject(new Error("unused")),
   editMessage: () => Promise.reject(new Error("unused")),
@@ -73,7 +74,7 @@ const rest: RestApi = {
   addReaction: () => Promise.reject(new Error("unused")),
   removeReaction: () => Promise.reject(new Error("unused")),
   markRead: () => Promise.reject(new Error("unused")),
-  queryChannels: () => Promise.reject(new Error("unused")),
+  queryChannels: () => Promise.resolve({ channels: [{ channel: channelData, members: [] }] }),
   createUpload: () => Promise.reject(new Error("unused")),
 };
 
@@ -144,17 +145,7 @@ describe("FiremootClient routing", () => {
           Promise.resolve({
             channels: [
               {
-                channel: {
-                  cid: CID,
-                  type: "messaging",
-                  id: "general",
-                  custom: {},
-                  frozen: false,
-                  archived: false,
-                  currentSeq: 4,
-                  createdAt: "t",
-                  updatedAt: "t",
-                },
+                channel: { ...channelData, currentSeq: 4 },
                 members: [{ userId: "alice", role: "owner", lastReadSeq: 4 }],
                 read: { lastReadSeq: 4, unreadCount: 0 },
                 latestMessage: msg("last", 3),
@@ -176,6 +167,58 @@ describe("FiremootClient routing", () => {
     expect(sockets[0]?.sent).toContain(
       JSON.stringify({ type: "subscribe", channels: { [CID]: 4 } }),
     );
+  });
+
+  test("queryChannels keeps a watched channel's history and resume seq", async () => {
+    const sockets: FakeSocket[] = [];
+    const client = new FiremootClient({
+      baseUrl: "http://localhost:6668",
+      userId: "alice",
+      token: "tok",
+      socketFactory: () => {
+        const socket = new FakeSocket();
+        sockets.push(socket);
+        return socket;
+      },
+      rest: {
+        ...rest,
+        getMessages: () => Promise.resolve({ messages: [msg("c", 3), msg("b", 2), msg("a", 1)] }),
+        queryChannels: (query) =>
+          Promise.resolve({
+            channels: [
+              query.cids
+                ? {
+                    channel: { ...channelData, currentSeq: 3 },
+                    members: [{ userId: "alice", role: "owner", lastReadSeq: 3 }],
+                    read: { lastReadSeq: 3, unreadCount: 0 },
+                  }
+                : {
+                    channel: { ...channelData, currentSeq: 5 },
+                    members: [{ userId: "alice", role: "owner", lastReadSeq: 3 }],
+                    read: { lastReadSeq: 3, unreadCount: 2 },
+                    latestMessage: msg("e", 5),
+                  },
+            ],
+          }),
+      },
+    });
+    const promise = client.connect();
+    await Promise.resolve();
+    sockets[0]?.hello();
+    await promise;
+
+    const channel = client.channel("messaging", "general");
+    await channel.watch();
+    await client.queryChannels({}, { watch: true });
+
+    expect(channel.messages.map((m) => m.id)).toEqual(["a", "b", "c", "e"]);
+    expect(channel.read?.unreadCount).toBe(2);
+    expect(channel.lastSeq).toBe(3);
+    const subscribes = sockets[0]?.sent.filter((f) => f.includes('"subscribe"'));
+    expect(subscribes).toEqual([
+      JSON.stringify({ type: "subscribe", channels: { [CID]: 3 } }),
+      JSON.stringify({ type: "subscribe", channels: { [CID]: 3 } }),
+    ]);
   });
 
   test("resubscribes watched channels with their resume seq after a reconnect", async () => {

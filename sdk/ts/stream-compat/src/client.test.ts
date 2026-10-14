@@ -361,7 +361,7 @@ describe("flagMessage", () => {
     const flags: Array<{ type: string; id: string; messageId: string; userId: string }> = [];
     const { client, socket } = await connected(
       {
-        getChannel: () => Promise.resolve(channelMeta("general")),
+        queryChannels: () => Promise.resolve({ channels: [channelState("general")] }),
         getMessages: () => Promise.resolve({ messages: [message("m1", 1)] }),
       },
       {

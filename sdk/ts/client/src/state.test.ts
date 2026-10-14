@@ -150,6 +150,25 @@ describe("applyEvent", () => {
     expect(s.reads).toEqual({ alice: 0 });
   });
 
+  test("member.removed clears the read state only when it removes self", () => {
+    let s = {
+      ...emptyChannelState("c"),
+      read: { lastReadSeq: 9, unreadCount: 0, totalUnread: 4 },
+    };
+    s = applyEvent(
+      s,
+      { type: "member.removed", cid: "c", seq: 10, data: { cid: "c", userId: "bob" } },
+      "alice",
+    );
+    expect(s.read).toEqual({ lastReadSeq: 9, unreadCount: 0, totalUnread: 4 });
+    s = applyEvent(
+      s,
+      { type: "member.removed", cid: "c", seq: 11, data: { cid: "c", userId: "alice" } },
+      "alice",
+    );
+    expect(s.read).toBeNull();
+  });
+
   test("typing tracks others, ignores self, does not advance seq", () => {
     let s = emptyChannelState("c");
     s = applyEvent(s, { type: "typing.start", cid: "c", seq: 0, data: { userId: "bob" } }, "me");

@@ -19,6 +19,7 @@ import {
   emptyChannelState,
   type Member,
   type ReadState,
+  upsertBySeq,
 } from "./state.js";
 
 export interface SendMessageInput {
@@ -154,35 +155,38 @@ export class Channel {
   }
 
   /**
-   * Seeds this channel from a hydrated `channels/query` (or get-channel) result:
-   * channel meta, members and their read positions, the caller's read state and
-   * the latest message (a conversation preview). `lastSeq` becomes the channel's
-   * current seq, so a subsequent `watchFromHydrated()` goes straight to live
-   * without replaying history.
+   * Seeds this channel from a hydrated `channels/query` (or get-channel) result.
+   *
+   * Unwatched, it becomes a preview: channel meta, members and their read
+   * positions, the caller's read state and the latest message, with `lastSeq` at
+   * the channel's current seq so a subsequent `watchFromHydrated()` goes straight
+   * to live without replaying history.
+   *
+   * Watched, the event stream owns the state, so loaded history, members, meta
+   * and the resume `lastSeq` are kept. The snapshot only adds a `latestMessage`
+   * the stream hasn't delivered yet and refreshes the caller's unread count,
+   * which no event moves when other members post.
    */
   hydrate(dto: HydratedChannel): void {
-    const members: Member[] = (dto.members ?? []).map((m) => ({
-      userId: m.userId,
-      role: m.role,
-    }));
-    const reads: Record<string, number> = {};
-    for (const m of dto.members ?? []) reads[m.userId] = m.lastReadSeq;
     const latest = dto.latestMessage;
-    this.state = {
-      ...emptyChannelState(this.cid),
-      channel: dto.channel,
-      messages: latest ? [latest] : [],
-      members,
-      reads,
-      read: dto.read
-        ? {
-            lastReadSeq: dto.read.lastReadSeq,
-            unreadCount: dto.read.unreadCount,
-            totalUnread: this.state.read?.totalUnread ?? 0,
-          }
-        : null,
-      lastSeq: dto.channel.currentSeq,
-    };
+    if (latest) this.outbox.confirm(latest);
+    if (this.watching) {
+      const { messages } = this.state;
+      this.state = {
+        ...this.state,
+        messages:
+          latest && !messages.some((m) => m.id === latest.id)
+            ? upsertBySeq(messages, latest)
+            : messages,
+        read: this.readFrom(dto),
+      };
+    } else {
+      this.state = {
+        ...this.seededFrom(dto),
+        messages: latest ? [latest] : [],
+        lastSeq: dto.channel.currentSeq,
+      };
+    }
     this.emitter.emit("change", undefined);
   }
 
@@ -193,19 +197,47 @@ export class Channel {
   }
 
   private async loadInitial(limit: number): Promise<void> {
-    const [channel, page] = await Promise.all([
-      this.deps.rest.getChannel(this.type, this.id),
+    const [query, page] = await Promise.all([
+      this.deps.rest.queryChannels({ type: this.type, cids: [this.cid], limit: 1 }),
       this.deps.rest.getMessages(this.type, this.id, { limit }),
     ]);
+    const hydrated = query.channels?.[0];
+    if (!hydrated) throw new Error(`channel '${this.cid}' not found`);
     const messages = (page.messages ?? []).slice().sort((a, b) => a.seq - b.seq);
-    const last = messages.at(-1);
+    for (const message of messages) this.outbox.confirm(message);
     this.state = {
-      ...emptyChannelState(this.cid),
-      channel,
+      ...this.seededFrom(hydrated),
       messages,
-      lastSeq: last ? last.seq : 0,
+      lastSeq: messages.at(-1)?.seq ?? 0,
     };
     this.emitter.emit("change", undefined);
+  }
+
+  private seededFrom(dto: HydratedChannel): ChannelState {
+    const members = dto.members ?? [];
+    return {
+      ...emptyChannelState(this.cid),
+      channel: dto.channel,
+      members: members.map((m): Member => ({ userId: m.userId, role: m.role })),
+      reads: Object.fromEntries(members.map((m) => [m.userId, m.lastReadSeq])),
+      read: this.readFrom(dto),
+    };
+  }
+
+  /**
+   * The caller's read state from a snapshot, unless the snapshot predates a read
+   * already applied here. The server only advances `lastReadSeq` while the caller
+   * stays a member; a re-add restarts it at 0, which is why the reducer drops
+   * `read` on the caller's own `member.removed`.
+   */
+  private readFrom(dto: HydratedChannel): ReadState | null {
+    const current = this.state.read;
+    if (!dto.read || (current && dto.read.lastReadSeq < current.lastReadSeq)) return current;
+    return {
+      lastReadSeq: dto.read.lastReadSeq,
+      unreadCount: dto.read.unreadCount,
+      totalUnread: current?.totalUnread ?? 0,
+    };
   }
 
   private subscribe(): void {
