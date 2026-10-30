@@ -1,5 +1,12 @@
 # @firemoot/test
 
+## 1.0.2
+
+### Patch Changes
+
+- Updated dependencies [7409dbb]
+  - @firemoot/client@1.0.2
+
 ## 1.0.1
 
 ### Patch Changes
