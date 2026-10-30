@@ -162,6 +162,7 @@ describe("Channel typing throttle", () => {
 describe("Channel watch", () => {
   test("loads recent state and subscribes with the resume seq", async () => {
     const { channel, sends } = mk({
+      queryChannels: () => found({ channel: { ...channelData, currentSeq: 4 }, members: [] }),
       getMessages: () => Promise.resolve({ messages: [msg("b", 4), msg("a", 3)] }),
     });
     await channel.watch();
@@ -171,6 +172,64 @@ describe("Channel watch", () => {
     expect(sends).toContain(
       JSON.stringify({ type: "subscribe", channels: { "messaging:general": 4 } }),
     );
+  });
+
+  test("resumes from a snapshot older than the page, so the events between replay", async () => {
+    const { channel, sends } = mk({
+      queryChannels: () =>
+        found({
+          channel: { ...channelData, currentSeq: 3 },
+          members: [{ userId: "bob", role: "member", lastReadSeq: 1 }],
+        }),
+      getMessages: () => Promise.resolve({ messages: [msg("b", 5), msg("a", 3)] }),
+    });
+    await channel.watch();
+    expect(channel.lastSeq).toBe(3);
+    expect(sends).toContain(
+      JSON.stringify({ type: "subscribe", channels: { "messaging:general": 3 } }),
+    );
+
+    channel.handleEvent({
+      type: "read.updated",
+      cid: CID,
+      seq: 4,
+      data: { cid: CID, userId: "bob", lastReadSeq: 3, unreadCount: 0, totalUnread: 0 },
+    });
+    channel.handleEvent({ type: "message.new", cid: CID, seq: 5, data: msg("b", 5) });
+    expect(channel.readReceipts).toEqual({ bob: 3 });
+    expect(channel.messages.map((m) => m.id)).toEqual(["a", "b"]);
+    expect(channel.lastSeq).toBe(5);
+  });
+
+  test("a receipt racing a resync is replayed rather than lost", async () => {
+    let page = [msg("a", 3)];
+    const { channel, sends } = mk({
+      queryChannels: () =>
+        found({
+          channel: { ...channelData, currentSeq: 3 },
+          members: [{ userId: "bob", role: "member", lastReadSeq: 1 }],
+        }),
+      getMessages: () => Promise.resolve({ messages: page }),
+    });
+    await channel.watch();
+
+    page = [msg("b", 5), msg("a", 3)];
+    const resyncing = channel.resync();
+    const receipt = {
+      type: "read.updated",
+      cid: CID,
+      seq: 4,
+      data: { cid: CID, userId: "bob", lastReadSeq: 3, unreadCount: 0, totalUnread: 0 },
+    } as const;
+    channel.handleEvent(receipt);
+    channel.handleEvent({ type: "message.new", cid: CID, seq: 5, data: msg("b", 5) });
+    await resyncing;
+    expect(sends.at(-1)).toBe(
+      JSON.stringify({ type: "subscribe", channels: { "messaging:general": 3 } }),
+    );
+
+    channel.handleEvent(receipt);
+    expect(channel.readReceipts).toEqual({ bob: 3 });
   });
 
   test("seeds members, read receipts and the caller's read state", async () => {

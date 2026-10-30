@@ -208,7 +208,9 @@ export class Channel {
     this.state = {
       ...this.seededFrom(hydrated),
       messages,
-      lastSeq: messages.at(-1)?.seq ?? 0,
+      // Resume from the older of the two parallel snapshots, so every event past
+      // it replays over the rebuilt state (an empty page has no known as-of).
+      lastSeq: Math.min(hydrated.channel.currentSeq, messages.at(-1)?.seq ?? 0),
     };
     this.emitter.emit("change", undefined);
   }
