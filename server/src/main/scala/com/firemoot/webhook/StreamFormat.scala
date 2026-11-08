@@ -192,8 +192,11 @@ object StreamFormat:
       case "message.new" =>
         event.data.as[Message].toOption.traverse { m =>
           for
-            members <- s.runList(LookupRepo.members, Arr(event.cid))
-            listed = Option.when(members.size <= MaxMembersOnMessageNew)(members)
+            count <- s.runUnique(LookupRepo.memberCount, event.cid)
+            listed <-
+              if count <= MaxMembersOnMessageNew then
+                s.runList(LookupRepo.members, Arr(event.cid)).map(Some(_))
+              else IO.pure(None)
             users <- lookupUsers(s, m.userId.toList ++ listed.toList.flatten.map(_.userId))
           yield body(
             "message" -> message(m, users, Map.empty, Nil),

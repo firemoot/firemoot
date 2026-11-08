@@ -258,3 +258,26 @@ class StreamFormatSuite extends CatsEffectSuite, TestContainerForEach:
         assertEquals(missing, None)
     }
   }
+
+  test("message.new lists members only for channels of up to 100") {
+    withPipeline { (pool, backplane, _) =>
+      val users = UserService(pool)
+      val channels = ChannelService(pool, backplane)
+      val messages = MessageService(pool, backplane)
+      val big = "messaging:big"
+      for
+        _ <- (1 to 101).toList.traverse_(i => users.upsert(s"u$i", None, None, "user", Json.obj()))
+        _ <- channels.create("messaging", "big", Some("u1"), Json.obj())
+        _ <- (2 to 101).toList.traverse_(i => channels.addMember(big, s"u$i", "member"))
+        sent <- messages.send(big, Some("u1"), Some("hi all"), Json.obj(), Json.arr(), None)
+          .map(_.toOption.get)
+        now <- IO.realTimeInstant.map(_.atOffset(java.time.ZoneOffset.UTC))
+        rendered <- pool.use { s =>
+          StreamFormat.render(s, Event("message.new", big, sent.seq, sent.asJson), now)
+        }
+      yield
+        val body = rendered.getOrElse(fail("message.new should render"))
+        assertEquals(str(body, "message", "text"), Some("hi all"))
+        assert(!has(body, "members"), "101 members is over the cap, so none are listed")
+    }
+  }
