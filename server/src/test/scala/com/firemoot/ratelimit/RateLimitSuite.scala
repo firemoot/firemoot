@@ -28,7 +28,7 @@ class RateLimitSuite extends CatsEffectSuite, TestContainerForAll:
   private val apiKey = "test-key"
   private val secret = "test-secret"
   private val serverCfg = ServerConfig(apiKey, Secret(secret))
-  private val generous = RateLimitConfig(10_000, 10_000.0)
+  private val generous = Some(RateLimitConfig(10_000, 10_000.0))
 
   private def dbConfig(pg: PostgreSQLContainer): DbConfig =
     DbConfig(
@@ -68,7 +68,7 @@ class RateLimitSuite extends CatsEffectSuite, TestContainerForAll:
       val cfg = dbConfig(pg)
       val limits =
         RateLimits(
-          apiKey = RateLimitConfig(1, 0.001),
+          apiKey = Some(RateLimitConfig(1, 0.001)),
           send = generous,
           connect = generous,
           upload = generous,
@@ -99,7 +99,7 @@ class RateLimitSuite extends CatsEffectSuite, TestContainerForAll:
       val limits =
         RateLimits(
           apiKey = generous,
-          send = RateLimitConfig(1, 0.001),
+          send = Some(RateLimitConfig(1, 0.001)),
           connect = generous,
           upload = generous,
         )

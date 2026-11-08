@@ -37,3 +37,27 @@ class RateLimiterSuite extends CatsEffectSuite:
       .traverse(_ => RateLimiter.noop.check("x", cfg))
       .map(ds => assert(ds.forall(allowed), "noop allows every call"))
   }
+
+  test("a bucket that is switched off allows everything; the others still limit") {
+    val tight = Some(RateLimitConfig(capacity = 1, refillPerSecond = 0.001))
+    RateGuard.inMemory(RateLimits(apiKey = None, send = tight, connect = tight, upload = tight))
+      .flatMap { rate =>
+        for
+          keyCalls <- (1 to 50).toList.traverse(_ => rate.apiKey("ci"))
+          sends <- (1 to 2).toList.traverse(_ => rate.send("u1"))
+        yield
+          assert(keyCalls.forall(allowed), "the api-key bucket is off")
+          assertEquals(sends.map(allowed), List(true, false), "send still limits")
+      }
+  }
+
+  test("the defaults are unchanged and describe themselves for the startup log") {
+    assertEquals(
+      RateLimits.default.describe,
+      "apiKey 200/100.0, send 30/10.0, connect 10/1.0, upload 20/2.0",
+    )
+    assertEquals(
+      RateLimits.default.copy(apiKey = None).describe,
+      "apiKey off, send 30/10.0, connect 10/1.0, upload 20/2.0",
+    )
+  }

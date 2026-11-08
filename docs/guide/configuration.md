@@ -89,6 +89,23 @@ returns `403` - need it set to `false` so presigned PUTs and public GETs share
 the same bucket-subdomain origin. Pair that with an explicit
 `FIREMOOT_S3_PUBLIC_URL` on the same origin.
 
+## Rate limits
+
+Every bucket is a token bucket: a burst it can absorb, refilling at a steady
+rate. Each takes `off`, or `<burst>/<per-second>`; unset keeps the default.
+
+| Variable | Default | What it limits |
+| --- | --- | --- |
+| `FIREMOOT_RATE_LIMIT_API_KEY` | `200/100` | All server REST per API key - the brake on a runaway backend. |
+| `FIREMOOT_RATE_LIMIT_SEND` | `30/10` | Message sends per user, including server-key sends made as that user. |
+| `FIREMOOT_RATE_LIMIT_CONNECT` | `10/1` | WebSocket connects per user. |
+| `FIREMOOT_RATE_LIMIT_UPLOAD` | `20/2` | Upload presigns per user, including server-key ones. |
+
+A limited request gets a `429`. The defaults suit one app's production traffic;
+an instance shared by many test runs at once (one CI key, a few fixed system
+users) outgrows them, so raise or switch off the buckets there and size the box
+instead. The effective limits are logged at startup.
+
 ## Unread reminders
 
 Reminders are **off** until an interval is set. See [webhooks](./webhooks#unread-reminders)

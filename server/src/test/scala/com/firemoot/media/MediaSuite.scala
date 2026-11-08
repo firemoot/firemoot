@@ -173,12 +173,12 @@ class MediaSuite extends CatsEffectSuite, TestContainerForAll:
   test("the per-user upload budget returns 429 once exhausted") {
     withContainers { pg =>
       val cfg = dbConfig(pg)
-      val generous = RateLimitConfig(10_000, 10_000.0)
+      val generous = Some(RateLimitConfig(10_000, 10_000.0))
       val limits = RateLimits(
         apiKey = generous,
         send = generous,
         connect = generous,
-        upload = RateLimitConfig(1, 0.001),
+        upload = Some(RateLimitConfig(1, 0.001)),
       )
       Backplane.inProcess.flatMap { backplane =>
         Migrations.run(cfg) >> Database.pool(cfg).use { pool =>

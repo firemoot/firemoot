@@ -5,6 +5,7 @@ import scala.concurrent.duration.*
 import cats.effect.IO
 import cats.syntax.all.*
 import ciris.*
+import com.firemoot.ratelimit.{RateLimitConfig, RateLimits}
 
 final case class HttpConfig(host: String, port: Int)
 
@@ -63,6 +64,7 @@ final case class AppConfig(
     media: Option[MediaConfig],
     adminPassword: Option[String],
     unreadReminders: Option[UnreadReminderConfig],
+    rateLimits: RateLimits,
 )
 
 object AppConfig:
@@ -191,7 +193,46 @@ object AppConfig:
         ).parMapN((interval, maxMembers) => Some(UnreadReminderConfig(interval, maxMembers)))
     }
 
+  /**
+   * A rate-limit bucket setting: `off`, or `<burst>/<per-second>` (e.g. `200/100`
+   * - a burst of 200 requests, refilling at 100 a second).
+   */
+  private[config] def rateLimit(
+      name: String,
+      raw: String,
+  ): Either[String, Option[RateLimitConfig]] =
+    val invalid = s"$name must be 'off' or '<burst>/<per-second>' (e.g. 200/100), got '$raw'"
+    raw.trim.toLowerCase match
+      case "off" => Right(None)
+      case value =>
+        value.split("/", -1).map(_.trim) match
+          case Array(burst, perSecond) =>
+            (
+              burst.toIntOption.filter(_ >= 1),
+              perSecond.toDoubleOption.filter(d => d > 0 && !d.isInfinite),
+            ) match
+              case (Some(capacity), Some(refill)) => Right(Some(RateLimitConfig(capacity, refill)))
+              case _ => Left(invalid)
+          case _ => Left(invalid)
+
+  private def rateLimitBucket(
+      name: String,
+      fallback: Option[RateLimitConfig],
+  ): ConfigValue[Effect, Option[RateLimitConfig]] =
+    env(name).option.map(blankToNone).flatMap {
+      case None => default(fallback)
+      case Some(raw) => validated(rateLimit(name, raw))
+    }
+
+  private val rateLimits: ConfigValue[Effect, RateLimits] =
+    (
+      rateLimitBucket("FIREMOOT_RATE_LIMIT_API_KEY", RateLimits.default.apiKey),
+      rateLimitBucket("FIREMOOT_RATE_LIMIT_SEND", RateLimits.default.send),
+      rateLimitBucket("FIREMOOT_RATE_LIMIT_CONNECT", RateLimits.default.connect),
+      rateLimitBucket("FIREMOOT_RATE_LIMIT_UPLOAD", RateLimits.default.upload),
+    ).parMapN(RateLimits.apply)
+
   val load: IO[AppConfig] =
-    (http, db, server, devDemo, media, adminPassword, unreadReminders)
+    (http, db, server, devDemo, media, adminPassword, unreadReminders, rateLimits)
       .parMapN(AppConfig.apply)
       .load[IO]

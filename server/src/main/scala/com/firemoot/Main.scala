@@ -57,7 +57,8 @@ object Main extends IOApp.Simple:
             lastActive <- LastActiveTracker.create(60.seconds) { userId =>
               pool.use(_.run(UserRepo.touchLastActive, userId))
             }
-            rate <- RateGuard.inMemory()
+            _ <- log.info(s"Rate limits: ${cfg.rateLimits.describe}")
+            rate <- RateGuard.inMemory(cfg.rateLimits)
             // Install/reset the admin password from the environment (no default).
             _ <- cfg.adminPassword.traverse_(AdminService(
               pool,

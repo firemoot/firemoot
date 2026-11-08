@@ -34,3 +34,29 @@ class AppConfigSuite extends FunSuite:
       assert(AppConfig.reminderMaxMembers(raw).isLeft, s"'$raw' should be rejected")
     }
   }
+
+  test("rateLimit reads 'off' or '<burst>/<per-second>'") {
+    import com.firemoot.ratelimit.RateLimitConfig
+    assertEquals(AppConfig.rateLimit("X", "off"), Right(None))
+    assertEquals(AppConfig.rateLimit("X", " OFF "), Right(None))
+    assertEquals(AppConfig.rateLimit("X", "200/100"), Right(Some(RateLimitConfig(200, 100.0))))
+    assertEquals(AppConfig.rateLimit("X", "400 / 130.5"), Right(Some(RateLimitConfig(400, 130.5))))
+    List(
+      "200",
+      "200/",
+      "/100",
+      "0/100",
+      "200/0",
+      "200/-1",
+      "200/abc",
+      "1.5/10",
+      "200/100/1",
+      "200/Infinity",
+      "200/NaN",
+      "unlimited",
+    ).foreach { raw =>
+      val result = AppConfig.rateLimit("FIREMOOT_RATE_LIMIT_SEND", raw)
+      assert(result.isLeft, s"'$raw' should be rejected")
+      assert(result.left.exists(_.contains("FIREMOOT_RATE_LIMIT_SEND")), "the error names the var")
+    }
+  }
