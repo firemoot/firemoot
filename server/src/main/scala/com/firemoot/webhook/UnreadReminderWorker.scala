@@ -96,7 +96,7 @@ final class UnreadReminderWorker(
   def sweepAt(now: OffsetDateTime): IO[Int] =
     val dueBefore = now.minus(cfg.interval.toJava)
     val windowStart = dueBefore.minus(tuning.lookback.toJava)
-    val claimArgs = (windowStart, windowStart, dueBefore, cfg.maxMembers, tuning.batchSize)
+    val claimArgs = (windowStart, cfg.maxMembers, windowStart, dueBefore, tuning.batchSize)
 
     val batch: IO[(Int, Int)] =
       pool.use { s =>

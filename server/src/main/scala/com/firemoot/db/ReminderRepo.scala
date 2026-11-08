@@ -20,33 +20,45 @@ object ReminderRepo:
   /**
    * Claims up to `limit` due (userId, cid) pairs. Only messages created after
    * `windowStart` count, so turning reminders on (or a long outage) never
-   * replays reminders for old unread history; the channel-activity predicate
-   * lets `channels_activity_idx` bound the scan to recently active channels.
-   * The update re-checks the unread condition against the row it locks, so a
-   * read that commits mid-sweep cancels the reminder rather than racing it.
+   * replays reminders for old unread history. The update re-checks the unread
+   * condition against the row it locks, so a read that commits mid-sweep
+   * cancels the reminder rather than racing it.
    *
-   * Params: windowStart, windowStart, dueBefore, maxMembers, limit.
+   * The plan is pinned on purpose. Postgres underestimates rows in a recent
+   * `created_at` window (newer than its histogram), and left to itself picks a
+   * hash join that seq-scans `messages` and `channel_members` - cost that grows
+   * with all history. The materialized CTE walks `channels_activity_idx` for the
+   * recently active channels, and the `limit 1` lateral forces a per-member
+   * probe of `messages (cid, seq)`, so a sweep costs in proportion to recent
+   * activity instead.
+   *
+   * Params: windowStart, maxMembers, windowStart, dueBefore, limit.
    */
   val claimDue
-      : Query[(OffsetDateTime, OffsetDateTime, OffsetDateTime, Int, Int), (String, String)] =
+      : Query[(OffsetDateTime, Int, OffsetDateTime, OffsetDateTime, Int), (String, String)] =
     sql"""
-      with due as (
-        select cm.cid, cm.user_id
+      with recent as materialized (
+        select c.cid, c.current_seq
         from channels c
-        join channel_members cm on cm.cid = c.cid
         where coalesce(c.last_message_at, c.created_at) > $timestamptz
           and c.deleted_at is null
-          and c.current_seq > greatest(cm.last_read_seq, cm.reminded_seq)
-          and exists (
-            select 1 from messages m
-            where m.cid = cm.cid
-              and m.seq > greatest(cm.last_read_seq, cm.reminded_seq)
-              and m.user_id is distinct from cm.user_id
-              and m.type <> 'system' and m.deleted_at is null
-              and m.created_at > $timestamptz
-              and m.created_at <= $timestamptz
-          )
           and (select count(*) from channel_members x where x.cid = c.cid) <= $int4
+      ),
+      due as (
+        select cm.cid, cm.user_id
+        from recent c
+        join channel_members cm on cm.cid = c.cid
+        cross join lateral (
+          select 1 from messages m
+          where m.cid = cm.cid
+            and m.seq > greatest(cm.last_read_seq, cm.reminded_seq)
+            and m.user_id is distinct from cm.user_id
+            and m.type <> 'system' and m.deleted_at is null
+            and m.created_at > $timestamptz
+            and m.created_at <= $timestamptz
+          limit 1
+        ) unread
+        where c.current_seq > greatest(cm.last_read_seq, cm.reminded_seq)
         limit $int4
       )
       update channel_members cm
