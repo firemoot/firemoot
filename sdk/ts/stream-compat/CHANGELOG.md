@@ -1,5 +1,18 @@
 # @firemoot/stream-compat
 
+## 1.1.0
+
+### Minor Changes
+
+- 44d4f01: Webhook endpoints now have a `format`. `stream` (the default for new endpoints) delivers getstream.io's own webhook payloads, so a handler written against Stream needs no translation; `firemoot` is the old `{ type, cid, seq, data }` envelope and is deprecated. `@firemoot/core` gains `format` on the webhook types and `updateWebhook` (`PATCH /v1/webhooks/{id}`) to flip an existing endpoint without changing its secret. `normalizeWebhookEvent()` now returns a Stream payload unchanged and is deprecated.
+- fe6aba1: `normalizeWebhookEvent()` now rebuilds the server's new `user.unread_message_reminder` webhook in Stream's shape: `user`, plus `channels` keyed by cid, each with the member list nested in `channel` and its newest messages carrying `user.id`. A reminder handler written against Stream reads it unchanged.
+
+### Patch Changes
+
+- Updated dependencies [44d4f01]
+  - @firemoot/core@1.1.0
+  - @firemoot/client@1.0.3
+
 ## 1.0.2
 
 ### Patch Changes
