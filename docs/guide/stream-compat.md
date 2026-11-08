@@ -292,8 +292,11 @@ const event = normalizeWebhookEvent(JSON.parse(rawBody));
 // { type: "message.new", cid, message: { id, text, user: { id } } }
 ```
 
-`message.new` stays `message.new` and `read.updated` becomes Stream's
-`message.read`; other events pass through under their own type. There is also a
+`message.new` stays `message.new`, `read.updated` becomes Stream's
+`message.read`, and `user.unread_message_reminder` comes back in Stream's shape -
+`user`, plus `channels` keyed by cid with the member list inside each `channel`
+and `messages[n].user.id` - so a reminder handler ported from Stream reads it
+unchanged. Other events pass through under their own type. There is also a
 standalone `verifyWebhookSignature(secret, rawBody, header)` if you would rather
 not construct a client just to check a signature.
 

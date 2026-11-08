@@ -89,6 +89,16 @@ returns `403` - need it set to `false` so presigned PUTs and public GETs share
 the same bucket-subdomain origin. Pair that with an explicit
 `FIREMOOT_S3_PUBLIC_URL` on the same origin.
 
+## Unread reminders
+
+Reminders are **off** until an interval is set. See [webhooks](./webhooks#unread-reminders)
+for what they send and when.
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `FIREMOOT_UNREAD_REMINDER_INTERVAL_SECONDS` | *(unset)* | How long a message stays unread before `user.unread_message_reminder` fires, from `60` to `86400`. Setting it enables reminders. |
+| `FIREMOOT_UNREAD_REMINDER_MAX_MEMBERS` | `10` | Channels with more members than this never send reminders. |
+
 ## Development
 
 | Variable | Default | What it does |

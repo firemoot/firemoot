@@ -48,6 +48,13 @@ final case class MediaConfig(
       case Some(base) => s"${base.stripSuffix("/")}/$key"
       case None => s"${endpoint.stripSuffix("/")}/$bucket/$key"
 
+/**
+ * Unread-message reminders (the `user.unread_message_reminder` webhook). Absent
+ * config means reminders are off. `maxMembers` skips larger channels, where a
+ * reminder per member would be a notification storm rather than a nudge.
+ */
+final case class UnreadReminderConfig(interval: FiniteDuration, maxMembers: Int)
+
 final case class AppConfig(
     http: HttpConfig,
     db: DbConfig,
@@ -55,6 +62,7 @@ final case class AppConfig(
     devDemo: Boolean,
     media: Option[MediaConfig],
     adminPassword: Option[String],
+    unreadReminders: Option[UnreadReminderConfig],
 )
 
 object AppConfig:
@@ -151,5 +159,39 @@ object AppConfig:
         }
     }
 
+  /** Stream's bounds for `reminders_interval`: one minute to one day. */
+  private[config] def reminderInterval(raw: String): Either[String, FiniteDuration] =
+    raw.toIntOption match
+      case Some(seconds) if seconds >= 60 && seconds <= 86400 => Right(seconds.seconds)
+      case _ =>
+        Left(
+          s"FIREMOOT_UNREAD_REMINDER_INTERVAL_SECONDS must be a whole number of seconds " +
+            s"from 60 to 86400, got '$raw'"
+        )
+
+  private[config] def reminderMaxMembers(raw: String): Either[String, Int] =
+    raw.toIntOption.filter(_ >= 2).toRight(
+      s"FIREMOOT_UNREAD_REMINDER_MAX_MEMBERS must be a whole number of at least 2, got '$raw'"
+    )
+
+  private def validated[A](result: Either[String, A]): ConfigValue[Effect, A] =
+    result.fold(msg => ConfigValue.failed(ConfigError(msg)), default(_))
+
+  // Reminders are enabled iff an interval is configured.
+  private val unreadReminders: ConfigValue[Effect, Option[UnreadReminderConfig]] =
+    env("FIREMOOT_UNREAD_REMINDER_INTERVAL_SECONDS").option.map(blankToNone).flatMap {
+      case None => default(Option.empty[UnreadReminderConfig])
+      case Some(rawInterval) =>
+        (
+          validated(reminderInterval(rawInterval)),
+          env("FIREMOOT_UNREAD_REMINDER_MAX_MEMBERS").option.map(blankToNone).flatMap {
+            case None => default(10)
+            case Some(rawMax) => validated(reminderMaxMembers(rawMax))
+          },
+        ).parMapN((interval, maxMembers) => Some(UnreadReminderConfig(interval, maxMembers)))
+    }
+
   val load: IO[AppConfig] =
-    (http, db, server, devDemo, media, adminPassword).parMapN(AppConfig.apply).load[IO]
+    (http, db, server, devDemo, media, adminPassword, unreadReminders)
+      .parMapN(AppConfig.apply)
+      .load[IO]

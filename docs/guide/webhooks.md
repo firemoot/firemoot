@@ -106,7 +106,55 @@ directly by moderation with `data` of `{ messageId, flaggedUser, flaggedBy,
 reason }`.
 
 Ephemeral and user-directed events are **not** delivered: `typing.start`,
-`typing.stop`, `presence.changed`, and the per-user unread notifications.
+`typing.stop`, `presence.changed`, and the per-user unread notifications. The
+one user-level event that *is* delivered is the unread reminder below.
+
+## Unread reminders
+
+`user.unread_message_reminder` tells you a user has left a message unread for a
+while, so you can email them, push, or text. It is Stream's event of the same
+name, and it is **off** until you set an interval:
+
+```sh
+FIREMOOT_UNREAD_REMINDER_INTERVAL_SECONDS=300   # 60 to 86400
+```
+
+A member is reminded when their oldest unread message - not their own, not a
+system message, not deleted - has waited that long. Each unread burst is
+reminded **once**; the next message after a reminder starts a fresh clock, and
+reading the channel cancels a pending one. Up to ten of a user's channels are
+batched into one event (more spill into a second), and channels with more than
+`FIREMOOT_UNREAD_REMINDER_MAX_MEMBERS` (default 10) members are skipped, so a
+busy group channel cannot turn into a reminder per member. A sweep runs every
+15 seconds, so a reminder lands up to that long after it falls due.
+
+The event is user-level, so the envelope has no `cid` or `seq`:
+
+```json
+{
+  "type": "user.unread_message_reminder",
+  "data": {
+    "user": { "id": "bob", "name": "Bob", … },
+    "channels": [
+      {
+        "channel": { "cid": "messaging:dm", "type": "messaging", "id": "dm", … },
+        "members": [{ "userId": "alice", "role": "owner", "lastReadSeq": 7 }, …],
+        "messages": [{ "id": "…", "userId": "alice", "type": "regular", "text": "…", … }]
+      }
+    ]
+  }
+}
+```
+
+`messages` is the channel's newest five live messages, newest first - including
+the recipient's own and system messages, so you can see the conversation as it
+stands. Check `messages[0].userId` if you only want to notify when the other side
+spoke last.
+
+Reminders only look back an hour past due. Turning the feature on does not
+remind everyone about their old unread history, and after an outage longer than
+that, reminders that fell due while the server was down are skipped rather than
+sent late.
 
 ## Retries and dead-letters
 

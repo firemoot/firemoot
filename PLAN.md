@@ -583,6 +583,16 @@ soak regressions.
       promise-only and a browser bundle must not resolve `node:crypto`). Uncovered
       methods throw a named `FiremootCompatError` rather than no-op silently; three
       documented exceptions are genuine no-ops. 98 tests green.
+- [x] **M4.12 Unread-message reminders** (added 08/11/2026, closes the M4.2 gap):
+      `user.unread_message_reminder`, off unless
+      `FIREMOOT_UNREAD_REMINDER_INTERVAL_SECONDS` is set. V008 adds
+      `channel_members.reminded_seq`; `UnreadReminderWorker` sweeps every 15s,
+      claims due members with one `update … returning` and enqueues one event per
+      user per ten channels into `webhook_deliveries` in the same transaction.
+      Once per unread burst, member cap (default 10), one-hour lookback. Payload
+      carries the user and each channel's members and newest five messages;
+      `normalizeWebhookEvent` rebuilds Stream's shape. `UnreadReminderSuite` drives
+      `sweepAt(now)` with backdated messages - no sleeps. See SPEC §2.
 
 ---
 

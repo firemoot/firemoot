@@ -92,6 +92,97 @@ describe("normalizeWebhookEvent", () => {
     });
   });
 
+  test("user.unread_message_reminder is rebuilt in Stream's shape", () => {
+    const reminder = {
+      type: "user.unread_message_reminder",
+      data: {
+        user: { id: "bob", name: "Bob", image: null, role: "user", custom: { tier: "gold" } },
+        channels: [
+          {
+            channel: {
+              cid: "messaging:dm",
+              type: "messaging",
+              id: "dm",
+              createdBy: "alice",
+              custom: { topic: "booking" },
+              frozen: false,
+              createdAt: "2026-11-08T10:00:00Z",
+              updatedAt: "2026-11-08T10:00:00Z",
+              lastMessageAt: "2026-11-08T10:05:00Z",
+            },
+            members: [
+              { userId: "alice", role: "owner", lastReadSeq: 2 },
+              { userId: "bob", role: "member", lastReadSeq: 0 },
+            ],
+            messages: [
+              {
+                id: "m2",
+                userId: "alice",
+                type: "regular",
+                text: "still there?",
+                custom: {},
+                attachments: [],
+                parentMessageId: null,
+                createdAt: "2026-11-08T10:05:00Z",
+              },
+              {
+                id: "m1",
+                userId: null,
+                type: "system",
+                text: "booking confirmed",
+                custom: {},
+                attachments: [],
+                parentMessageId: null,
+                createdAt: "2026-11-08T10:00:00Z",
+              },
+            ],
+          },
+        ],
+      },
+    };
+    expect(normalizeWebhookEvent(reminder)).toEqual({
+      type: "user.unread_message_reminder",
+      user: { id: "bob", name: "Bob", role: "user", tier: "gold" },
+      channels: {
+        "messaging:dm": {
+          channel: {
+            topic: "booking",
+            cid: "messaging:dm",
+            id: "dm",
+            type: "messaging",
+            created_at: "2026-11-08T10:00:00Z",
+            updated_at: "2026-11-08T10:00:00Z",
+            last_message_at: "2026-11-08T10:05:00Z",
+            created_by: { id: "alice" },
+            frozen: false,
+            member_count: 2,
+            members: [
+              { user_id: "alice", user: { id: "alice" }, role: "owner" },
+              { user_id: "bob", user: { id: "bob" }, role: "member" },
+            ],
+          },
+          messages: [
+            {
+              id: "m2",
+              type: "regular",
+              text: "still there?",
+              created_at: "2026-11-08T10:05:00Z",
+              user: { id: "alice" },
+              attachments: [],
+            },
+            {
+              id: "m1",
+              type: "system",
+              text: "booking confirmed",
+              created_at: "2026-11-08T10:00:00Z",
+              attachments: [],
+            },
+          ],
+        },
+      },
+    });
+  });
+
   test("any other event passes through under its own type", () => {
     expect(
       normalizeWebhookEvent({ type: "member.added", cid: "messaging:general", data: {} }),

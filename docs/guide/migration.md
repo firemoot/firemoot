@@ -139,7 +139,8 @@ expects; `X-Firemoot-Signature` is the same digest with a `sha256=` prefix. The
 
 The body is Firemoot's envelope (`{ type, cid, seq, data }`, camelCase) rather
 than Stream's; the adapter ships `normalizeWebhookEvent()` if your handler reads
-Stream's shape.
+Stream's shape. It covers `message.new`, `message.read` and
+`user.unread_message_reminder`.
 
 Note also that there is no per-endpoint event subscription in v1 - every enabled
 endpoint gets every deliverable event and filters on `type` at your end.
@@ -154,9 +155,11 @@ endpoint gets every deliverable event and filters on `type` at your end.
   a moment later via `message.updated`. Subscribe to `message.updated` to pick it
   up, and fall back to the full image until then. Write the object URL under a
   `url` key in your attachment JSON - that is what the thumbnailer matches.
-- **Scheduled "unread reminder" webhooks** have no v1 equivalent. If you relied on
-  Stream's `user.unread_message_reminder`, run it as a cron in your own app
-  against the read state.
+- **Unread reminders** are configured by environment, not app settings. Stream's
+  `updateAppSettings({ reminders_interval })` and per-channel-type `reminders`
+  become `FIREMOOT_UNREAD_REMINDER_INTERVAL_SECONDS` on the server; channel size
+  is capped by `FIREMOOT_UNREAD_REMINDER_MAX_MEMBERS` (default 10, Stream's own
+  limit). Each unread burst is reminded once - see [webhooks](./webhooks#unread-reminders).
 - **`stopWatching` is client-local.** There is no server-side unsubscribe in v1;
   idle watched channels keep streaming until the socket closes. That is bandwidth,
   not correctness.

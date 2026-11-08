@@ -53,6 +53,8 @@ services:
       FIREMOOT_API_SECRET: ${FIREMOOT_API_SECRET:-change-me}
       # Blank counts as unset, so the admin dashboard stays locked until set.
       FIREMOOT_ADMIN_PASSWORD: ${FIREMOOT_ADMIN_PASSWORD:-}
+      # Set to 60-86400 to send user.unread_message_reminder webhooks; unset = off.
+      FIREMOOT_UNREAD_REMINDER_INTERVAL_SECONDS: ${FIREMOOT_UNREAD_REMINDER_INTERVAL_SECONDS:-}
       # Set FIREMOOT_DEV_DEMO=true to serve the dev demo page at /demo (never in prod).
       FIREMOOT_DEV_DEMO: ${FIREMOOT_DEV_DEMO:-false}
       # Media is off unless an S3 endpoint is set. Point at the minio service to enable:

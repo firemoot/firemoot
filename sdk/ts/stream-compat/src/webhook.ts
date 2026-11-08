@@ -25,10 +25,11 @@ export function verifyWebhookSignature(
  * Stream-shaped event object a webhook handler written against Stream consumes
  * (`type`, `cid`, `message.text`, `message.user.id`, `user.id`).
  *
- * `message.new` stays `message.new` and `read.updated` becomes Stream's
- * `message.read`; anything else passes through under its own type, which a
- * Stream-shaped handler will simply not match. The cid format (`type:id`) already
- * matches Stream's.
+ * `message.new` stays `message.new`, `read.updated` becomes Stream's
+ * `message.read`, and `user.unread_message_reminder` is rebuilt in Stream's
+ * shape (`user`, plus `channels` keyed by cid); anything else passes through
+ * under its own type, which a Stream-shaped handler will simply not match. The
+ * cid format (`type:id`) already matches Stream's.
  */
 export function normalizeWebhookEvent(parsed: unknown): Record<string, unknown> {
   const event = asRecord(parsed);
@@ -52,5 +53,89 @@ export function normalizeWebhookEvent(parsed: unknown): Record<string, unknown> 
       ...(userId ? { user: { id: userId } } : {}),
     };
   }
+  if (type === "user.unread_message_reminder") {
+    return { type, ...toStreamReminder(data) };
+  }
   return { type, ...(cid ? { cid } : {}) };
+}
+
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function stringField(
+  source: Record<string, unknown>,
+  from: string,
+  to: string = from,
+): Record<string, string> {
+  const value = source[from];
+  return typeof value === "string" ? { [to]: value } : {};
+}
+
+function toStreamUser(user: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...asRecord(user["custom"]),
+    ...stringField(user, "id"),
+    ...stringField(user, "name"),
+    ...stringField(user, "image"),
+    ...stringField(user, "role"),
+  };
+}
+
+function toStreamReminderMessage(message: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...asRecord(message["custom"]),
+    ...stringField(message, "id"),
+    ...stringField(message, "type"),
+    ...stringField(message, "text"),
+    ...stringField(message, "createdAt", "created_at"),
+    ...stringField(message, "parentMessageId", "parent_id"),
+    ...(typeof message["userId"] === "string" ? { user: { id: message["userId"] } } : {}),
+    attachments: asArray(message["attachments"]),
+  };
+}
+
+/**
+ * Firemoot sends the reminder's content in its own camelCase shapes, with
+ * `channels` as a list of `{ channel, members, messages }`. Stream keys
+ * `channels` by cid and nests the member list inside the channel, so a handler
+ * reading `event.channels[cid].channel.members` or `messages[0].user.id` works
+ * unchanged.
+ */
+function toStreamReminder(data: Record<string, unknown>): Record<string, unknown> {
+  const channels: Record<string, unknown> = {};
+  for (const entry of asArray(data["channels"])) {
+    const wrapper = asRecord(entry);
+    const channel = asRecord(wrapper["channel"]);
+    const cid = channel["cid"];
+    if (typeof cid !== "string") continue;
+    const members = asArray(wrapper["members"])
+      .map(asRecord)
+      .filter((m) => typeof m["userId"] === "string")
+      .map((m) => ({
+        user_id: m["userId"],
+        user: { id: m["userId"] },
+        ...stringField(m, "role"),
+      }));
+    channels[cid] = {
+      channel: {
+        ...asRecord(channel["custom"]),
+        cid,
+        ...stringField(channel, "id"),
+        ...stringField(channel, "type"),
+        ...stringField(channel, "createdAt", "created_at"),
+        ...stringField(channel, "updatedAt", "updated_at"),
+        ...stringField(channel, "lastMessageAt", "last_message_at"),
+        ...(typeof channel["createdBy"] === "string"
+          ? { created_by: { id: channel["createdBy"] } }
+          : {}),
+        frozen: channel["frozen"] === true,
+        member_count: members.length,
+        members,
+      },
+      messages: asArray(wrapper["messages"]).map((m) => toStreamReminderMessage(asRecord(m))),
+    };
+  }
+  const user = asRecord(data["user"]);
+  return { ...(typeof user["id"] === "string" ? { user: toStreamUser(user) } : {}), channels };
 }

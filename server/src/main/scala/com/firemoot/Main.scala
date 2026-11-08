@@ -14,7 +14,7 @@ import com.firemoot.media.{MediaService, ObjectStore, ThumbnailWorker}
 import com.firemoot.metrics.{CcuSampler, MetricsService, RollupWorker}
 import com.firemoot.ratelimit.RateGuard
 import com.firemoot.service.{LastActiveTracker, MessageService, WebhookService}
-import com.firemoot.webhook.{WebhookConfig, WebhookDispatcher}
+import com.firemoot.webhook.{UnreadReminderWorker, WebhookConfig, WebhookDispatcher}
 import com.firemoot.ws.ConnectionRegistry
 import fs2.Stream
 import org.http4s.ember.client.EmberClientBuilder
@@ -50,6 +50,10 @@ object Main extends IOApp.Simple:
           for
             _ <-
               log.info(s"Media uploads ${if mediaService.isDefined then "enabled" else "disabled"}")
+            _ <- log.info(cfg.unreadReminders.fold("Unread reminders disabled") { rc =>
+              s"Unread reminders enabled: ${rc.interval.toSeconds}s, channels of up to " +
+                s"${rc.maxMembers} members"
+            })
             lastActive <- LastActiveTracker.create(60.seconds) { userId =>
               pool.use(_.run(UserRepo.touchLastActive, userId))
             }
@@ -83,8 +87,12 @@ object Main extends IOApp.Simple:
               rate,
               mediaService,
             )
+            reminders = cfg.unreadReminders.fold(Stream.empty.covary[IO]) { rc =>
+              UnreadReminderWorker(pool, rc, log).stream
+            }
             workers = dispatcher.stream
               .merge(enqueue)
+              .merge(reminders)
               .merge(thumbnails)
               .merge(ccuSampler.stream)
               .merge(rollup.stream)
