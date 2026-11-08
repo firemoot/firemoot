@@ -61,3 +61,11 @@ class RateLimiterSuite extends CatsEffectSuite:
       "apiKey off, send 30/10.0, connect 10/1.0, upload 20/2.0",
     )
   }
+
+  test("Retry-After rounds a wait up to whole seconds and never says 0") {
+    assertEquals(RateLimitDecision.retryAfterSeconds(0.millis), 1L)
+    assertEquals(RateLimitDecision.retryAfterSeconds(10.millis), 1L)
+    assertEquals(RateLimitDecision.retryAfterSeconds(1000.millis), 1L)
+    assertEquals(RateLimitDecision.retryAfterSeconds(1001.millis), 2L)
+    assertEquals(RateLimitDecision.retryAfterSeconds(2500.millis), 3L)
+  }

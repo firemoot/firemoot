@@ -11,6 +11,15 @@ enum RateLimitDecision:
   case Allowed
   case Retry(after: FiniteDuration)
 
+object RateLimitDecision:
+
+  /**
+   * Whole seconds for `Retry-After`, rounded up and never below 1: a sub-second
+   * wait truncated to 0 tells a client to retry at once, straight into another
+   * 429.
+   */
+  def retryAfterSeconds(after: FiniteDuration): Long = math.max(1L, (after.toMillis + 999) / 1000)
+
 /**
  * Per-key rate limiting (SPEC.md §13, M1.12). The seam is the trait; v1 ships an
  * in-memory token-bucket implementation. The bucket config travels with each

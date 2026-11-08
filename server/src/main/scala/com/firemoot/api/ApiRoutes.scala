@@ -54,17 +54,10 @@ final class ApiRoutes(
   private val unauthenticated: Problem =
     Problem.of(401, "Unauthorized", Some("authentication required"))
 
-  private def tooManyRequests(retryAfterSeconds: Long): Problem =
-    Problem.of(
-      429,
-      "Too Many Requests",
-      Some(s"rate limit exceeded; retry after ${retryAfterSeconds}s"),
-    )
-
   private def limited(decision: RateLimitDecision): Option[Problem] =
     decision match
       case RateLimitDecision.Allowed => None
-      case RateLimitDecision.Retry(after) => Some(tooManyRequests(after.toSeconds))
+      case RateLimitDecision.Retry(after) => Some(Problem.tooManyRequests(after))
 
   private def sendAllowed(userId: Option[String]): IO[Option[Problem]] =
     userId match

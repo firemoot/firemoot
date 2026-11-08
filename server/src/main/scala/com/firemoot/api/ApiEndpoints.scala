@@ -23,10 +23,14 @@ object ApiEndpoints:
 
   /**
    * Error output: a single `Problem` as `application/problem+json` (RFC 9457),
-   * with the HTTP status derived from `Problem.status`.
+   * with the HTTP status derived from `Problem.status` and, on a 429, the
+   * `Retry-After` header from `Problem.retryAfter`.
    */
   private val problemOut: EndpointOutput[Problem] =
-    statusCode.and(problemBody).map(_._2)(p => (StatusCode(p.status), p))
+    statusCode
+      .and(header[Option[Long]]("Retry-After"))
+      .and(problemBody)
+      .map(_._3)(p => (StatusCode(p.status), p.retryAfter, p))
 
   private val base = endpoint.errorOut(problemOut).in("v1")
 

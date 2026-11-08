@@ -1,6 +1,10 @@
 package com.firemoot.ratelimit
 
 import cats.effect.{IO, Resource}
+import cats.syntax.all.*
+import com.firemoot.Application
+import com.firemoot.auth.JwtAuth
+import com.firemoot.ws.ConnectionRegistry
 import ciris.Secret
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
@@ -15,7 +19,9 @@ import io.circe.Encoder
 import munit.CatsEffectSuite
 import org.http4s.Method.*
 import org.http4s.implicits.*
-import org.http4s.{HttpApp, Status, Uri}
+import org.http4s.server.websocket.WebSocketBuilder2
+import org.http4s.{HttpApp, Request, Status, Uri}
+import org.typelevel.ci.CIString
 import org.testcontainers.utility.DockerImageName
 import skunk.Session
 
@@ -87,6 +93,11 @@ class RateLimitSuite extends CatsEffectSuite, TestContainerForAll:
                 Status.TooManyRequests,
                 "the second exceeds the key budget",
               )
+              assertEquals(
+                second.headers.get(CIString("Retry-After")).map(_.head.value),
+                Some("1000"),
+                "one token per 1000s, sent as a header",
+              )
           }
         }
       }
@@ -127,6 +138,76 @@ class RateLimitSuite extends CatsEffectSuite, TestContainerForAll:
                 "u1's send budget is exhausted",
               )
               assertEquals(otherUser.status, Status.Created, "u2 has an independent budget")
+              assert(
+                second.headers.get(CIString("Retry-After")).isDefined,
+                "a route-level 429 carries Retry-After too",
+              )
+          }
+        }
+      }
+    }
+  }
+
+  test("a sub-second wait is sent as Retry-After: 1, never 0") {
+    withContainers { pg =>
+      val cfg = dbConfig(pg)
+      val limits =
+        RateLimits(
+          apiKey = Some(RateLimitConfig(1, 2.0)),
+          send = generous,
+          connect = generous,
+          upload = generous,
+        )
+      Backplane.inProcess.flatMap { backplane =>
+        Migrations.run(cfg) >> Database.pool(cfg).use { pool =>
+          RateGuard.inMemory(limits).flatMap { rate =>
+            val httpApp = app(pool, backplane, rate)
+            for
+              _ <- httpApp.run(post("/v1/search", SearchRequest("hi", None, None)))
+              limited <- httpApp.run(post("/v1/search", SearchRequest("hi", None, None)))
+              body <- limited.as[String]
+            yield
+              assertEquals(limited.status, Status.TooManyRequests)
+              assertEquals(
+                limited.headers.get(CIString("Retry-After")).map(_.head.value),
+                Some("1"),
+              )
+              assert(body.contains("retry after 1s"), s"the detail keeps the wait: $body")
+              assert(body.contains("\"retryAfter\":1"), s"and the extension member: $body")
+          }
+        }
+      }
+    }
+  }
+
+  test("a WebSocket connect over budget is a 429 with Retry-After instead of an upgrade") {
+    withContainers { pg =>
+      val cfg = dbConfig(pg)
+      val limits =
+        RateLimits(
+          apiKey = generous,
+          send = generous,
+          connect = Some(RateLimitConfig(1, 0.5)),
+          upload = generous,
+        )
+      val token = JwtAuth.sign(secret, "ws-user", None, java.time.Instant.now.plusSeconds(60))
+      val connect = Request[IO](GET, Uri.unsafeFromString(s"/v1/ws?token=$token"))
+      (Backplane.inProcess, ConnectionRegistry.create).flatMapN { (backplane, registry) =>
+        Migrations.run(cfg) >> Database.pool(cfg).use { pool =>
+          (RateGuard.inMemory(limits), WebSocketBuilder2[IO]).flatMapN { (rate, wsb) =>
+            val ws = Application.httpApp(serverCfg, pool, backplane, registry, rate = rate)(wsb)
+            // Spend the one token through the guard rather than a real handshake,
+            // whose detached presence fiber would outlive this test's pool.
+            for
+              spent <- rate.connect("ws-user")
+              limited <- ws.run(connect)
+            yield
+              assertEquals(spent, RateLimitDecision.Allowed)
+              assertEquals(limited.status, Status.TooManyRequests, "no upgrade over budget")
+              assertEquals(
+                limited.headers.get(CIString("Retry-After")).map(_.head.value),
+                Some("2"),
+              )
           }
         }
       }

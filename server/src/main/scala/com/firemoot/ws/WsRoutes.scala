@@ -7,6 +7,7 @@ import scala.concurrent.duration.*
 import cats.effect.std.Queue
 import cats.effect.{IO, Ref, Resource}
 import cats.syntax.all.*
+import com.firemoot.api.Problem
 import com.firemoot.auth.JwtAuth
 import com.firemoot.backplane.Backplane
 import com.firemoot.db.SessionSyntax.*
@@ -73,10 +74,12 @@ final class WsRoutes(
       .withEntity("""{"type":"about:blank","title":"Unauthorized","status":401}""")
       .withContentType(`Content-Type`(MediaType.unsafeParse("application/problem+json")))
 
-  private val tooManyRequests: Response[IO] =
-    Response[IO](Status.TooManyRequests)
-      .withEntity("""{"type":"about:blank","title":"Too Many Requests","status":429}""")
+  private def tooManyRequests(after: FiniteDuration): Response[IO] =
+    val problem = Problem.tooManyRequests(after)
+    val response = Response[IO](Status.TooManyRequests)
+      .withEntity(problem.asJson.noSpaces)
       .withContentType(`Content-Type`(MediaType.unsafeParse("application/problem+json")))
+    problem.retryAfter.fold(response)(s => response.putHeaders("Retry-After" -> s.toString))
 
   private def text(json: Json): WebSocketFrame = WebSocketFrame.Text(json.noSpaces)
 
@@ -88,7 +91,7 @@ final class WsRoutes(
 
   private def open(wsb: WebSocketBuilder2[IO], userId: String): IO[Response[IO]] =
     rate.connect(userId).flatMap {
-      case RateLimitDecision.Retry(_) => IO.pure(tooManyRequests)
+      case RateLimitDecision.Retry(after) => IO.pure(tooManyRequests(after))
       case RateLimitDecision.Allowed => accept(wsb, userId)
     }
 

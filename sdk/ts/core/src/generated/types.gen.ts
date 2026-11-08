@@ -204,6 +204,7 @@ export type Problem = {
     title: string;
     status: number;
     detail?: string;
+    retryAfter?: number;
 };
 
 /**

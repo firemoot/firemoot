@@ -42,6 +42,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -73,6 +82,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -122,6 +140,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -168,6 +195,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -205,6 +241,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -269,6 +314,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -328,6 +382,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -375,6 +438,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -458,6 +530,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -522,6 +603,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -569,6 +659,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -641,6 +740,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -673,6 +781,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -747,6 +864,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -817,6 +943,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -883,6 +1018,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -931,6 +1075,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -980,6 +1133,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -1011,6 +1173,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -1058,6 +1229,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -1089,6 +1269,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -1146,6 +1335,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -1220,6 +1418,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -1261,6 +1468,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -1309,6 +1525,15 @@
           },
           "default" : {
             "description" : "",
+            "headers" : {
+              "Retry-After" : {
+                "required" : false,
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            },
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -1797,6 +2022,10 @@
           },
           "detail" : {
             "type" : "string"
+          },
+          "retryAfter" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },

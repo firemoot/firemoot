@@ -47,7 +47,7 @@ object ApiAuth:
               case Right(keyId) =>
                 OptionT.liftF(rate.apiKey(keyId)).flatMap {
                   case RateLimitDecision.Retry(after) =>
-                    OptionT.pure[IO](problemResponse(tooManyRequests(after.toSeconds)))
+                    OptionT.pure[IO](problemResponse(Problem.tooManyRequests(after)))
                   case RateLimitDecision.Allowed =>
                     routes(
                       req
@@ -111,14 +111,8 @@ object ApiAuth:
   private def unauthorized(detail: String): Problem =
     Problem.of(401, "Unauthorized", Some(detail))
 
-  private def tooManyRequests(retryAfterSeconds: Long): Problem =
-    Problem.of(
-      429,
-      "Too Many Requests",
-      Some(s"rate limit exceeded; retry after ${retryAfterSeconds}s"),
-    )
-
   private def problemResponse(problem: Problem): Response[IO] =
-    Response[IO](Status.fromInt(problem.status).getOrElse(Status.Unauthorized))
+    val response = Response[IO](Status.fromInt(problem.status).getOrElse(Status.Unauthorized))
       .withEntity(problem.asJson.noSpaces)
       .withContentType(`Content-Type`(MediaType.unsafeParse("application/problem+json")))
+    problem.retryAfter.fold(response)(s => response.putHeaders("Retry-After" -> s.toString))
