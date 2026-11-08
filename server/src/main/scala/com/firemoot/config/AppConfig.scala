@@ -5,7 +5,7 @@ import scala.concurrent.duration.*
 import cats.effect.IO
 import cats.syntax.all.*
 import ciris.*
-import com.firemoot.ratelimit.{RateLimitConfig, RateLimits}
+import com.firemoot.ratelimit.{RateLimitConfig, RateLimits, ServerUserBucket}
 
 final case class HttpConfig(host: String, port: Int)
 
@@ -224,12 +224,21 @@ object AppConfig:
       case Some(raw) => validated(rateLimit(name, raw))
     }
 
+  /** Unset: server-key requests share the user's bucket; set: they get their own. */
+  private def serverUserBucket(name: String): ConfigValue[Effect, ServerUserBucket] =
+    env(name).option.map(blankToNone).flatMap {
+      case None => default(ServerUserBucket.SharedWithUser)
+      case Some(raw) => validated(rateLimit(name, raw).map(ServerUserBucket.Own(_)))
+    }
+
   private val rateLimits: ConfigValue[Effect, RateLimits] =
     (
       rateLimitBucket("FIREMOOT_RATE_LIMIT_API_KEY", RateLimits.default.apiKey),
       rateLimitBucket("FIREMOOT_RATE_LIMIT_SEND", RateLimits.default.send),
       rateLimitBucket("FIREMOOT_RATE_LIMIT_CONNECT", RateLimits.default.connect),
       rateLimitBucket("FIREMOOT_RATE_LIMIT_UPLOAD", RateLimits.default.upload),
+      serverUserBucket("FIREMOOT_RATE_LIMIT_SERVER_SEND"),
+      serverUserBucket("FIREMOOT_RATE_LIMIT_SERVER_UPLOAD"),
     ).parMapN(RateLimits.apply)
 
   val load: IO[AppConfig] =

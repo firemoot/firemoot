@@ -54,11 +54,15 @@ class RateLimiterSuite extends CatsEffectSuite:
   test("the defaults are unchanged and describe themselves for the startup log") {
     assertEquals(
       RateLimits.default.describe,
-      "apiKey 200/100.0, send 30/10.0, connect 10/1.0, upload 20/2.0",
+      "apiKey 200/100.0, send 30/10.0, connect 10/1.0, upload 20/2.0, " +
+        "serverSend shared, serverUpload shared",
     )
     assertEquals(
-      RateLimits.default.copy(apiKey = None).describe,
-      "apiKey off, send 30/10.0, connect 10/1.0, upload 20/2.0",
+      RateLimits.default
+        .copy(apiKey = None, serverSend = ServerUserBucket.Own(Some(RateLimitConfig(150, 60.0))))
+        .describe,
+      "apiKey off, send 30/10.0, connect 10/1.0, upload 20/2.0, " +
+        "serverSend 150/60.0, serverUpload shared",
     )
   }
 
@@ -68,4 +72,28 @@ class RateLimiterSuite extends CatsEffectSuite:
     assertEquals(RateLimitDecision.retryAfterSeconds(1000.millis), 1L)
     assertEquals(RateLimitDecision.retryAfterSeconds(1001.millis), 2L)
     assertEquals(RateLimitDecision.retryAfterSeconds(2500.millis), 3L)
+  }
+
+  test("server-key sends share the user's bucket by default, or get their own") {
+    val tight = Some(RateLimitConfig(capacity = 1, refillPerSecond = 0.001))
+    val base = RateLimits(apiKey = None, send = tight, connect = None, upload = tight)
+    for
+      shared <- RateGuard.inMemory(base)
+      own <- RateGuard.inMemory(
+        base.copy(
+          serverSend = ServerUserBucket.Own(Some(RateLimitConfig(3, 0.001))),
+          serverUpload = ServerUserBucket.Own(None),
+        )
+      )
+      sharedServer <- shared.serverSend("system")
+      sharedUser <- shared.send("system")
+      ownServer <- (1 to 4).toList.traverse(_ => own.serverSend("system"))
+      ownUser <- own.send("system")
+      ownUploads <- (1 to 5).toList.traverse(_ => own.serverUpload("system"))
+    yield
+      assert(allowed(sharedServer), "the server send spends the shared token")
+      assert(!allowed(sharedUser), "so the user's own send is limited")
+      assertEquals(ownServer.map(allowed), List(true, true, true, false), "its own burst of 3")
+      assert(allowed(ownUser), "end-user sends keep their own budget")
+      assert(ownUploads.forall(allowed), "a server bucket can be switched off")
   }

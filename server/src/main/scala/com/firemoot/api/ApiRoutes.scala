@@ -59,15 +59,23 @@ final class ApiRoutes(
       case RateLimitDecision.Allowed => None
       case RateLimitDecision.Retry(after) => Some(Problem.tooManyRequests(after))
 
-  private def sendAllowed(userId: Option[String]): IO[Option[Problem]] =
+  private def sendAllowed(principal: Principal, userId: Option[String]): IO[Option[Problem]] =
     userId match
       case None => IO.pure(None)
-      case Some(user) => rate.send(user).map(limited)
+      case Some(user) =>
+        (principal match
+          case Principal.Server(_) => rate.serverSend(user)
+          case _ => rate.send(user)
+        ).map(limited)
 
-  private def uploadAllowed(userId: Option[String]): IO[Option[Problem]] =
+  private def uploadAllowed(principal: Principal, userId: Option[String]): IO[Option[Problem]] =
     userId match
       case None => IO.pure(None)
-      case Some(user) => rate.upload(user).map(limited)
+      case Some(user) =>
+        (principal match
+          case Principal.Server(_) => rate.serverUpload(user)
+          case _ => rate.upload(user)
+        ).map(limited)
 
   private val validRoles = Set("owner", "moderator", "member")
   private val validMessageTypes = Set("regular", "system")
@@ -120,7 +128,11 @@ final class ApiRoutes(
 
   // --- operation bodies (shared by the server-key and end-user paths) ---
 
-  private def doSend(c: String, req: SendMessageRequest): IO[Either[Problem, Message]] =
+  private def doSend(
+      c: String,
+      req: SendMessageRequest,
+      principal: Principal,
+  ): IO[Either[Problem, Message]] =
     val messageType = req.`type`.getOrElse("regular")
     val idError = req.id.flatMap(messageIdError)
     if !validMessageTypes(messageType) then
@@ -128,7 +140,7 @@ final class ApiRoutes(
     else if idError.isDefined then
       IO.pure(Left(Problem.of(400, "Bad Request", idError)))
     else
-      sendAllowed(req.userId).flatMap {
+      sendAllowed(principal, req.userId).flatMap {
         case Some(problem) => IO.pure(Left(problem))
         case None =>
           messages
@@ -219,12 +231,15 @@ final class ApiRoutes(
         hydration.hydrate(List(channel), caller).map(states => Right(states.head))
     }
 
-  private def doUpload(req: CreateUploadRequest): IO[Either[Problem, UploadTicket]] =
+  private def doUpload(
+      req: CreateUploadRequest,
+      principal: Principal,
+  ): IO[Either[Problem, UploadTicket]] =
     media match
       case None =>
         IO.pure(Left(Problem.of(501, "Not Implemented", Some("media uploads are not configured"))))
       case Some(svc) =>
-        uploadAllowed(req.userId).flatMap {
+        uploadAllowed(principal, req.userId).flatMap {
           case Some(problem) => IO.pure(Left(problem))
           case None =>
             svc.presignUpload(req).map {
@@ -380,7 +395,10 @@ final class ApiRoutes(
     ApiEndpoints.sendMessage.in(principalInput).serverLogic {
       case (channelType, id, req, principal) =>
         val c = cid(channelType, id)
-        authed(principal, c)(doSend(c, req), (uid, _) => doSend(c, req.copy(userId = Some(uid))))
+        authed(principal, c)(
+          doSend(c, req, principal),
+          (uid, _) => doSend(c, req.copy(userId = Some(uid)), principal),
+        )
     }
 
   private val editMessageServer =
@@ -498,8 +516,8 @@ final class ApiRoutes(
   private val createUploadServer =
     ApiEndpoints.createUpload.in(principalInput).serverLogic { case (req, principal) =>
       principal match
-        case Principal.Server(_) => doUpload(req)
-        case Principal.User(uid, _) => doUpload(req.copy(userId = Some(uid)))
+        case Principal.Server(_) => doUpload(req, principal)
+        case Principal.User(uid, _) => doUpload(req.copy(userId = Some(uid)), principal)
         case Principal.Denied => IO.pure(Left(unauthenticated))
     }
 

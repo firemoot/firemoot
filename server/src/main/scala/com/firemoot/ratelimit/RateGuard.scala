@@ -2,20 +2,38 @@ package com.firemoot.ratelimit
 
 import cats.effect.IO
 
+/** How server-key requests made as a user (sends, uploads) are budgeted. */
+enum ServerUserBucket:
+  /** They share that user's own bucket with the user's end-user requests. */
+  case SharedWithUser
+
+  /** A per-user bucket of their own, apart from end-user traffic; `None` is off. */
+  case Own(bucket: Option[RateLimitConfig])
+
 /** Per-category bucket configs; `None` switches that bucket off. */
 final case class RateLimits(
     apiKey: Option[RateLimitConfig],
     send: Option[RateLimitConfig],
     connect: Option[RateLimitConfig],
     upload: Option[RateLimitConfig],
+    serverSend: ServerUserBucket = ServerUserBucket.SharedWithUser,
+    serverUpload: ServerUserBucket = ServerUserBucket.SharedWithUser,
 ):
-  /** One line per bucket for the startup log, e.g. `apiKey 200/100`. */
+  /** One entry per bucket for the startup log, e.g. `apiKey 200/100.0`. */
   def describe: String =
-    List("apiKey" -> apiKey, "send" -> send, "connect" -> connect, "upload" -> upload)
-      .map((name, bucket) =>
-        s"$name ${bucket.fold("off")(c => s"${c.capacity}/${c.refillPerSecond}")}"
-      )
-      .mkString(", ")
+    def show(bucket: Option[RateLimitConfig]) =
+      bucket.fold("off")(c => s"${c.capacity}/${c.refillPerSecond}")
+    def showServer(bucket: ServerUserBucket) = bucket match
+      case ServerUserBucket.SharedWithUser => "shared"
+      case ServerUserBucket.Own(own) => show(own)
+    List(
+      s"apiKey ${show(apiKey)}",
+      s"send ${show(send)}",
+      s"connect ${show(connect)}",
+      s"upload ${show(upload)}",
+      s"serverSend ${showServer(serverSend)}",
+      s"serverUpload ${showServer(serverUpload)}",
+    ).mkString(", ")
 
 object RateLimits:
   val default: RateLimits = RateLimits(
@@ -40,6 +58,18 @@ final class RateGuard(limiter: RateLimiter, limits: RateLimits):
   def send(userId: String): IO[RateLimitDecision] = check(limits.send, s"send:$userId")
   def connect(userId: String): IO[RateLimitDecision] = check(limits.connect, s"connect:$userId")
   def upload(userId: String): IO[RateLimitDecision] = check(limits.upload, s"upload:$userId")
+
+  /** A send a server key makes as `userId`. */
+  def serverSend(userId: String): IO[RateLimitDecision] =
+    limits.serverSend match
+      case ServerUserBucket.SharedWithUser => send(userId)
+      case ServerUserBucket.Own(bucket) => check(bucket, s"server-send:$userId")
+
+  /** An upload presign a server key makes for `userId`. */
+  def serverUpload(userId: String): IO[RateLimitDecision] =
+    limits.serverUpload match
+      case ServerUserBucket.SharedWithUser => upload(userId)
+      case ServerUserBucket.Own(bucket) => check(bucket, s"server-upload:$userId")
 
 object RateGuard:
 

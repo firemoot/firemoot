@@ -97,14 +97,19 @@ rate. Each takes `off`, or `<burst>/<per-second>`; unset keeps the default.
 | Variable | Default | What it limits |
 | --- | --- | --- |
 | `FIREMOOT_RATE_LIMIT_API_KEY` | `200/100` | All server REST per API key - the brake on a runaway backend. |
-| `FIREMOOT_RATE_LIMIT_SEND` | `30/10` | Message sends per user, including server-key sends made as that user. |
+| `FIREMOOT_RATE_LIMIT_SEND` | `30/10` | Message sends per user. |
 | `FIREMOOT_RATE_LIMIT_CONNECT` | `10/1` | WebSocket connects per user. |
-| `FIREMOOT_RATE_LIMIT_UPLOAD` | `20/2` | Upload presigns per user, including server-key ones. |
+| `FIREMOOT_RATE_LIMIT_UPLOAD` | `20/2` | Upload presigns per user. |
+| `FIREMOOT_RATE_LIMIT_SERVER_SEND` | *(unset)* | Sends a server key makes as a user. Unset, they spend that user's `SEND` bucket; set, they get a per-user bucket of their own. |
+| `FIREMOOT_RATE_LIMIT_SERVER_UPLOAD` | *(unset)* | The same split for server-key upload presigns. |
 
-A limited request gets a `429`. The defaults suit one app's production traffic;
-an instance shared by many test runs at once (one CI key, a few fixed system
-users) outgrows them, so raise or switch off the buckets there and size the box
-instead. The effective limits are logged at startup.
+A limited request gets a `429` with a `Retry-After` header. The defaults suit
+one app's production traffic. A backend that sends as a shared system user, or
+an instance serving many test runs at once through one key, outgrows them:
+give server-key traffic its own `SERVER_SEND`/`SERVER_UPLOAD` budget and size
+`API_KEY` to the box rather than switching limits off, so the limiter still
+sheds load before the box saturates. The effective limits are logged at
+startup.
 
 ## Unread reminders
 
