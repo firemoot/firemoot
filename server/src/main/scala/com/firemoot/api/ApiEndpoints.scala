@@ -183,12 +183,27 @@ object ApiEndpoints:
       .out(statusCode(StatusCode.Created))
       .out(jsonBody[WebhookCreated])
       .summary("Register a webhook endpoint (returns the signing secret once)")
+      .description(
+        "`format` picks the body shape: `stream` (the default) sends getstream.io's own " +
+          "webhook payloads; `firemoot` is the deprecated `{ type, cid, seq, data }` envelope."
+      )
 
   val listWebhooks =
     base.get
       .in("webhooks")
       .out(jsonBody[List[WebhookEndpoint]])
       .summary("List webhook endpoints")
+
+  val updateWebhook =
+    base.patch
+      .in("webhooks" / path[String]("id"))
+      .in(jsonBody[UpdateWebhookRequest])
+      .out(jsonBody[WebhookEndpoint])
+      .summary("Update a webhook endpoint (enabled, body format)")
+      .description(
+        "Flipping `format` from `firemoot` to `stream` migrates an endpoint without " +
+          "re-registering it, so its signing secret is kept."
+      )
 
   val deleteWebhook =
     base.delete
@@ -240,6 +255,7 @@ object ApiEndpoints:
     searchMessages,
     createWebhook,
     listWebhooks,
+    updateWebhook,
     deleteWebhook,
     flagMessage,
     listFlags,

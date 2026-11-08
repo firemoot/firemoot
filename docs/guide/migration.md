@@ -137,10 +137,9 @@ must reconfigure. `X-Signature` carries the bare hex digest Stream's helper
 expects; `X-Firemoot-Signature` is the same digest with a `sha256=` prefix. The
 [webhooks guide](./webhooks) has the hand-rolled verification code.
 
-The body is Firemoot's envelope (`{ type, cid, seq, data }`, camelCase) rather
-than Stream's; the adapter ships `normalizeWebhookEvent()` if your handler reads
-Stream's shape. It covers `message.new`, `message.read` and
-`user.unread_message_reminder`.
+The body is Stream's own payload too, so the handler itself does not change.
+Endpoints default to the `stream` format; the older `firemoot` envelope is
+deprecated (see [body format](./webhooks#body-format)).
 
 Note also that there is no per-endpoint event subscription in v1 - every enabled
 endpoint gets every deliverable event and filters on `type` at your end.

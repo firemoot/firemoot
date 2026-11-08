@@ -3,6 +3,7 @@ package com.firemoot.db
 import java.time.OffsetDateTime
 import java.util.UUID
 
+import com.firemoot.domain.WebhookFormat
 import io.circe.Json
 import skunk.*
 import skunk.circe.codec.all.jsonb
@@ -18,15 +19,35 @@ import skunk.implicits.*
  */
 object WebhookRepo:
 
-  val insertEndpoint: Command[(String, String, String, Boolean)] =
+  private val format: Codec[WebhookFormat] =
+    text.eimap(WebhookFormat.fromWire)(_.wire)
+
+  val insertEndpoint: Command[(String, String, String, Boolean, WebhookFormat)] =
     sql"""
-      insert into webhook_endpoints (id, url, secret, enabled)
-      values ($text, $text, $text, $bool)
+      insert into webhook_endpoints (id, url, secret, enabled, format)
+      values ($text, $text, $text, $bool, $format)
     """.command
 
-  val listEndpoints: Query[Void, (String, String, Boolean, OffsetDateTime)] =
-    sql"select id, url, enabled, created_at from webhook_endpoints order by created_at"
-      .query(text *: text *: bool *: timestamptz)
+  val listEndpoints: Query[Void, (String, String, Boolean, WebhookFormat, OffsetDateTime)] =
+    sql"select id, url, enabled, format, created_at from webhook_endpoints order by created_at"
+      .query(text *: text *: bool *: format *: timestamptz)
+
+  /** Absent values keep the current setting. Params: enabled, format, id. */
+  val updateEndpoint
+      : Query[
+        (Option[Boolean], Option[WebhookFormat], String),
+        (String, String, Boolean, WebhookFormat, OffsetDateTime),
+      ] =
+    sql"""
+      update webhook_endpoints
+      set enabled = coalesce(${bool.opt}, enabled), format = coalesce(${format.opt}, format)
+      where id = $text
+      returning id, url, enabled, format, created_at
+    """.query(text *: text *: bool *: format *: timestamptz)
+
+  /** The formats some enabled endpoint wants, so unused bodies are never built. */
+  val enabledFormats: Query[Void, WebhookFormat] =
+    sql"select distinct format from webhook_endpoints where enabled".query(format)
 
   val deleteEndpoint: Query[String, String] =
     sql"delete from webhook_endpoints where id = $text returning id".query(text)
@@ -35,11 +56,12 @@ object WebhookRepo:
     sql"select url, secret, enabled from webhook_endpoints where id = $text"
       .query(text *: text *: bool)
 
-  /** Fan-out: one pending delivery per enabled endpoint carrying this payload. */
-  val enqueue: Command[Json] =
+  /** Fan-out: one pending delivery per enabled endpoint of the given format. */
+  val enqueue: Command[(Json, WebhookFormat)] =
     sql"""
       insert into webhook_deliveries (endpoint_id, event)
-      select e.id, ${jsonb[Json]} from webhook_endpoints e where e.enabled
+      select e.id, ${jsonb[Json]} from webhook_endpoints e
+      where e.enabled and e.format = $format
     """.command
 
   /** Returns rows abandoned mid-flight (still `processing` past their deadline). */

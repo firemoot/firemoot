@@ -593,6 +593,15 @@ soak regressions.
       carries the user and each channel's members and newest five messages;
       `normalizeWebhookEvent` rebuilds Stream's shape. `UnreadReminderSuite` drives
       `sweepAt(now)` with backdated messages - no sleeps. See SPEC §2.
+- [x] **M4.13 Stream-format webhook bodies** (added 08/11/2026): per-endpoint
+      `format` (V009; `stream` default, `firemoot` deprecated, existing rows kept
+      on `firemoot`), `PATCH /v1/webhooks/{id}` to migrate without a new secret.
+      `StreamFormat` renders Stream's payload for every delivered event and the
+      reminder, at enqueue time and only when a `stream` endpoint is enabled.
+      `normalizeWebhookEvent` passes Stream payloads through and is deprecated.
+      `StreamFormatSuite` drives every event type against a `stream` and a
+      `firemoot` endpoint side by side. Next: remove the `firemoot` format once
+      consumers have flipped.
 
 ---
 

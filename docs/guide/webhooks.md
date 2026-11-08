@@ -1,9 +1,11 @@
 # Webhooks
 
-Firemoot pushes every persisted channel event to your HTTP endpoints. The queue
-is a Postgres table, not a broker: deliveries are retried on a fixed backoff
-ladder and, when they run out of attempts, dead-lettered rather than dropped so
-you can requeue them from the [admin dashboard](./admin).
+Firemoot pushes every persisted channel event to your HTTP endpoints, as
+[getstream.io](https://getstream.io)'s own webhook payloads - a handler written
+against Stream reads them unchanged. The queue is a Postgres table, not a broker:
+deliveries are retried on a fixed backoff ladder and, when they run out of
+attempts, dead-lettered rather than dropped so you can requeue them from the
+[admin dashboard](./admin).
 
 ## Registering an endpoint
 
@@ -18,7 +20,7 @@ curl -X POST http://localhost:6668/v1/webhooks \
 ```
 
 ```json
-{ "id": "0197…", "url": "https://example.com/hooks/firemoot", "secret": "…", "enabled": true }
+{ "id": "0197…", "url": "https://example.com/hooks/firemoot", "secret": "…", "enabled": true, "format": "stream" }
 ```
 
 `secret` is generated for you if you do not supply one, and this `201` response
@@ -28,6 +30,29 @@ cascades away its pending deliveries).
 
 There is no per-endpoint event filter in v1: every enabled endpoint receives
 every deliverable event, and you filter on `type` at your end.
+
+### Body format
+
+Each endpoint has a `format`:
+
+| Format | Body | Status |
+| --- | --- | --- |
+| `stream` | Stream's webhook payload (`message.new` with `message.user`, `channel_id`, …) | The default |
+| `firemoot` | The `{ type, cid, seq, data }` envelope the WebSocket carries | **Deprecated** - will be removed |
+
+`firemoot` exists only so endpoints registered before `stream` arrived can
+migrate. To move one, deploy a handler that accepts Stream's payload (or run the
+body through [`normalizeWebhookEvent`](./stream-compat#webhooks), which passes
+Stream payloads through untouched), then flip the endpoint - its secret is kept:
+
+```sh
+curl -X PATCH http://localhost:6668/v1/webhooks/0197… \
+  -H 'content-type: application/json' \
+  -d '{"format": "stream"}'
+```
+
+`PATCH` also takes `enabled`. Deliveries already queued keep the body they were
+rendered with.
 
 ## The delivery
 
@@ -48,18 +73,27 @@ same delivery, so a handler written against Stream keeps working unchanged - see
 [migrating from Stream](./migration). Prefer the `X-Firemoot-*` headers in new
 code; the aliases exist for compatibility and carry no extra information.
 
-The body is the same envelope the WebSocket carries:
+The body is Stream's payload for that event:
 
 ```json
-{ "type": "message.new", "cid": "messaging:general", "seq": 42, "data": { … } }
+{
+  "type": "message.new",
+  "cid": "messaging:general",
+  "channel_id": "general",
+  "channel_type": "messaging",
+  "message": { "id": "…", "text": "hi", "type": "regular", "user": { "id": "alice", … }, … },
+  "user": { "id": "alice", … },
+  "members": [{ "user_id": "alice", "user": { … }, "role": "owner", … }, …],
+  "created_at": "2026-11-08T10:00:00Z"
+}
 ```
 
 Delivery is **at-least-once and unordered** - rows are claimed with
 `for update skip locked` and processed eight at a time, so a retry can land after
 a newer event. `X-Firemoot-Delivery` (and its alias `X-Webhook-Id`) is stable
 across retries of the same event; dedupe on it. `X-Webhook-Attempt` counts from
-`1`, so a value above `1` tells you this event has been tried before. Within a
-channel, `seq` gives you the true ordering.
+`1`, so a value above `1` tells you this event has been tried before. Order by
+the payload's timestamps (`message.created_at`, `updated_at`) where it matters.
 
 ### Verifying the signature
 
@@ -97,13 +131,31 @@ with.
 
 ## Which events are delivered
 
-Everything persisted and broadcast to a whole channel:
+Everything persisted and broadcast to a whole channel, under Stream's names:
 
-`message.new`, `message.updated`, `message.deleted`, `reaction.new`,
-`reaction.deleted`, `channel.updated`, `channel.deleted`, `member.added`,
-`member.removed`, `read.updated` - plus `user.flagged`, which is enqueued
-directly by moderation with `data` of `{ messageId, flaggedUser, flaggedBy,
-reason }`.
+`message.new`, `message.updated`, `message.deleted`, `message.read`,
+`reaction.new`, `reaction.deleted`, `channel.updated`, `channel.deleted`,
+`member.added`, `member.removed` - plus `message.flagged` from moderation and
+`user.unread_message_reminder` (below).
+
+Payloads follow Stream's documented shapes, with what Firemoot can truthfully
+fill in:
+
+- Users carry `id`, `name`, `image`, `role`, timestamps, `last_active` and their
+  custom fields spread at the top level, as Stream does. `banned` is always
+  `false` (Firemoot has no bans) and there is no `online`.
+- Messages carry `reaction_counts`, the ten `latest_reactions`, `reply_count`,
+  `parent_id` and custom fields spread at the top level. There is no `html` and
+  `mentioned_users` is always empty.
+- `message.new` lists the channel's `members` only for channels of up to 100
+  members.
+- `message.deleted` has `deleted_at` but no `text`: Firemoot's soft delete
+  scrubs it.
+- `message.updated` has no `message_update.old_text`, channels have no
+  `config`, and no event carries `request_info`.
+
+A `firemoot`-format endpoint gets the same events under their envelope names
+(`read.updated`, `user.flagged`) with camelCase `data`.
 
 Ephemeral and user-directed events are **not** delivered: `typing.start`,
 `typing.stop`, `presence.changed`, and the per-user unread notifications. The
@@ -128,28 +180,30 @@ batched into one event (more spill into a second), and channels with more than
 busy group channel cannot turn into a reminder per member. A sweep runs every
 15 seconds, so a reminder lands up to that long after it falls due.
 
-The event is user-level, so the envelope has no `cid` or `seq`:
+The body is Stream's: `channels` keyed by cid, members nested in each `channel`:
 
 ```json
 {
   "type": "user.unread_message_reminder",
-  "data": {
-    "user": { "id": "bob", "name": "Bob", … },
-    "channels": [
-      {
-        "channel": { "cid": "messaging:dm", "type": "messaging", "id": "dm", … },
-        "members": [{ "userId": "alice", "role": "owner", "lastReadSeq": 7 }, …],
-        "messages": [{ "id": "…", "userId": "alice", "type": "regular", "text": "…", … }]
-      }
-    ]
+  "created_at": "2026-11-08T10:05:00Z",
+  "user": { "id": "bob", "name": "Bob", … },
+  "channels": {
+    "messaging:dm": {
+      "channel": {
+        "cid": "messaging:dm", "type": "messaging", "id": "dm", "member_count": 2,
+        "members": [{ "user_id": "alice", "user": { … }, "role": "owner" }, …],
+        …
+      },
+      "messages": [{ "id": "…", "text": "…", "type": "regular", "user": { "id": "alice", … }, … }]
+    }
   }
 }
 ```
 
 `messages` is the channel's newest five live messages, newest first - including
 the recipient's own and system messages, so you can see the conversation as it
-stands. Check `messages[0].userId` if you only want to notify when the other side
-spoke last.
+stands. Check `messages[0].user.id` if you only want to notify when the other
+side spoke last.
 
 Reminders only look back an hour past due. Turning the feature on does not
 remind everyone about their old unread history, and after an outage longer than

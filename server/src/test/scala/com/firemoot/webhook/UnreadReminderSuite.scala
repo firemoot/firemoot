@@ -14,7 +14,7 @@ import com.firemoot.backplane.Backplane
 import com.firemoot.config.{DbConfig, UnreadReminderConfig}
 import com.firemoot.db.SessionSyntax.*
 import com.firemoot.db.{Database, Migrations}
-import com.firemoot.domain.Message
+import com.firemoot.domain.{Message, WebhookFormat}
 import com.firemoot.service.{
   ChannelService,
   MessageService,
@@ -55,7 +55,10 @@ class UnreadReminderSuite extends CatsEffectSuite, TestContainerForEach:
       .command
 
   private val queuedEvents =
-    sql"select event from webhook_deliveries order by created_at, id".query(jsonb[Json])
+    sql"""select d.event from webhook_deliveries d
+          join webhook_endpoints e on e.id = d.endpoint_id
+          where e.format = $text
+          order by d.created_at, d.id""".query(jsonb[Json])
 
   private val clearQueue = sql"delete from webhook_deliveries".command
 
@@ -70,8 +73,20 @@ class UnreadReminderSuite extends CatsEffectSuite, TestContainerForEach:
 
     def setup(userIds: String*): IO[Unit] =
       userIds.toList.traverse_(users.upsert(_, None, None, "user", Json.obj())) >>
+        WebhookService(pool).register(CreateWebhookRequest(
+          "http://s.test/hook",
+          None,
+          Some(true),
+        )) >>
         WebhookService(pool)
-          .register(CreateWebhookRequest("http://127.0.0.1:1/hook", None, Some(true)))
+          .register(
+            CreateWebhookRequest(
+              "http://f.test/hook",
+              None,
+              Some(true),
+              Some(WebhookFormat.Firemoot),
+            )
+          )
           .void
 
     def channel(id: String, owner: String, members: String*): IO[String] =
@@ -87,7 +102,11 @@ class UnreadReminderSuite extends CatsEffectSuite, TestContainerForEach:
     def backdate(message: Message, minutes: Int): IO[Unit] =
       pool.use(_.run(backdateMessage, (minutes, message.id)))
 
-    def queued: IO[List[Json]] = pool.use(_.runList(queuedEvents, Void))
+    /** Bodies queued for the firemoot-format endpoint; `queuedAs` picks a format. */
+    def queued: IO[List[Json]] = queuedAs(WebhookFormat.Firemoot)
+
+    def queuedAs(format: WebhookFormat): IO[List[Json]] =
+      pool.use(_.runList(queuedEvents, format.wire))
 
     def drain: IO[List[Json]] = queued <* pool.use(_.run(clearQueue, Void))
 
@@ -123,6 +142,7 @@ class UnreadReminderSuite extends CatsEffectSuite, TestContainerForEach:
 
         _ <- f.backdate(first, 6)
         sent <- now.flatMap(f.worker().sweepAt)
+        streamEvents <- f.queuedAs(WebhookFormat.Stream)
         events <- f.drain
 
         again <- now.flatMap(f.worker().sweepAt)
@@ -149,6 +169,22 @@ class UnreadReminderSuite extends CatsEffectSuite, TestContainerForEach:
           .map(_.flatMap(_.hcursor.get[Long]("seq").toOption))
         val newestFive = (fromAlice :+ fromBob).map(_.seq).sorted.reverse.take(5)
         assertEquals(seqs, Right(newestFive), "the newest five, newest first, bob's own included")
+
+        assertEquals(streamEvents.size, 1, "the stream endpoint gets the same reminder")
+        val streamEvent = streamEvents.head
+        assertEquals(str(streamEvent, "type"), Some(UnreadReminder.EventType))
+        assertEquals(str(streamEvent, "user", "id"), Some("bob"))
+        assertEquals(streamEvent.hcursor.downField("data").focus, None, "no Firemoot envelope")
+        val streamChannel = streamEvent.hcursor.downField("channels").downField(cid)
+        assertEquals(streamChannel.downField("channel").get[String]("cid").toOption, Some(cid))
+        assertEquals(
+          streamChannel.downField("channel").downField("members").as[List[Json]]
+            .map(_.flatMap(str(_, "user_id"))),
+          Right(List("alice", "bob")),
+        )
+        val latest = streamChannel.downField("messages").downN(0)
+        assertEquals(latest.get[String]("id").toOption, Some(fromBob.id))
+        assertEquals(latest.downField("user").get[String]("id").toOption, Some("bob"))
         assertEquals(again, 0, "an unread burst is reminded once")
         assertEquals(rearmed, 1, "a new message re-arms the reminder")
         assertEquals(rearmedEvents.flatMap(userOf), List("bob"))

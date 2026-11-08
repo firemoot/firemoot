@@ -183,6 +183,18 @@ describe("normalizeWebhookEvent", () => {
     });
   });
 
+  test("a stream-format body is already Stream's payload and comes back unchanged", () => {
+    const streamBody = {
+      type: "message.new",
+      cid: "messaging:general",
+      channel_id: "general",
+      channel_type: "messaging",
+      message: { id: "m1", text: "hello", user: { id: "bob", name: "Bob" } },
+      user: { id: "bob" },
+    };
+    expect(normalizeWebhookEvent(streamBody)).toBe(streamBody);
+  });
+
   test("any other event passes through under its own type", () => {
     expect(
       normalizeWebhookEvent({ type: "member.added", cid: "messaging:general", data: {} }),

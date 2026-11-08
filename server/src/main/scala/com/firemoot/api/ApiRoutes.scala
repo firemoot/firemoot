@@ -352,6 +352,11 @@ final class ApiRoutes(
       serverOnly(principal)(webhooks.list.map(Right(_)))
     }
 
+  private val updateWebhookServer =
+    ApiEndpoints.updateWebhook.in(principalInput).serverLogic { case (id, req, principal) =>
+      serverOnly(principal)(webhooks.update(id, req).map(_.toRight(notFound(s"webhook '$id'"))))
+    }
+
   private val deleteWebhookServer =
     ApiEndpoints.deleteWebhook.in(principalInput).serverLogic { case (id, principal) =>
       serverOnly(principal) {
@@ -528,6 +533,7 @@ final class ApiRoutes(
         searchMessagesServer,
         createWebhookServer,
         listWebhooksServer,
+        updateWebhookServer,
         deleteWebhookServer,
         flagMessageServer,
         listFlagsServer,

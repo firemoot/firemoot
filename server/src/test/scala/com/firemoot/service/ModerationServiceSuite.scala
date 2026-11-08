@@ -5,6 +5,7 @@ import ciris.Secret
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import com.firemoot.api.CreateWebhookRequest
+import com.firemoot.domain.WebhookFormat
 import com.firemoot.backplane.Backplane
 import com.firemoot.config.DbConfig
 import com.firemoot.db.{Database, Migrations}
@@ -12,6 +13,7 @@ import io.circe.Json
 import munit.CatsEffectSuite
 import org.testcontainers.utility.DockerImageName
 import skunk.circe.codec.all.jsonb
+import skunk.codec.all.*
 import skunk.implicits.*
 
 class ModerationServiceSuite extends CatsEffectSuite, TestContainerForAll:
@@ -21,7 +23,9 @@ class ModerationServiceSuite extends CatsEffectSuite, TestContainerForAll:
 
   private val cid = "messaging:general"
 
-  private val deliveredEvents = sql"select event from webhook_deliveries".query(jsonb[Json])
+  private val deliveredEvents =
+    sql"""select e.format, d.event from webhook_deliveries d
+          join webhook_endpoints e on e.id = d.endpoint_id""".query(text *: jsonb[Json])
 
   private def dbConfig(pg: PostgreSQLContainer): DbConfig =
     DbConfig(
@@ -51,8 +55,15 @@ class ModerationServiceSuite extends CatsEffectSuite, TestContainerForAll:
             msg <- messages
               .send(cid, Some("alice"), Some("rude words"), Json.obj(), Json.arr(), None, "regular")
               .map(_.toOption.get)
-            _ <-
-              webhooks.register(CreateWebhookRequest("http://example.test/hook", None, Some(true)))
+            _ <- webhooks.register(CreateWebhookRequest("http://s.test/hook", None, Some(true)))
+            _ <- webhooks.register(
+              CreateWebhookRequest(
+                "http://f.test/hook",
+                None,
+                Some(true),
+                Some(WebhookFormat.Firemoot),
+              )
+            )
 
             flagged <- moderation.flag(cid, msg.id, "bob", Some("spam"))
             missing <- moderation.flag(cid, "no-such-message", "bob", None)
@@ -68,12 +79,27 @@ class ModerationServiceSuite extends CatsEffectSuite, TestContainerForAll:
             assertEquals(missing, None, "flagging an absent message is a 404")
             assertEquals(open.map(_.id), List(flag.id), "the open queue lists the flag")
 
-            val userFlagged =
-              events.filter(e => e.hcursor.get[String]("type").contains("user.flagged"))
+            def ofType(format: String, eventType: String) =
+              events.collect {
+                case (f, e) if f == format && e.hcursor.get[String]("type").contains(eventType) => e
+              }
+            val userFlagged = ofType("firemoot", "user.flagged")
             assertEquals(userFlagged.size, 1, "one user.flagged delivery was enqueued")
             val data = userFlagged.head.hcursor.downField("data")
             assertEquals(data.get[String]("flaggedUser").toOption, Some("alice"))
             assertEquals(data.get[String]("flaggedBy").toOption, Some("bob"))
+            val messageFlagged = ofType("stream", "message.flagged")
+            assertEquals(
+              messageFlagged.size,
+              1,
+              "the stream endpoint gets Stream's message.flagged",
+            )
+            val flaggedEvent = messageFlagged.head.hcursor
+            assertEquals(flaggedEvent.downField("user").get[String]("id").toOption, Some("bob"))
+            assertEquals(
+              flaggedEvent.downField("message").downField("user").get[String]("id").toOption,
+              Some("alice"),
+            )
         }
       }
     }

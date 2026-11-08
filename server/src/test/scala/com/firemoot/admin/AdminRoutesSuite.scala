@@ -8,7 +8,7 @@ import com.firemoot.api.CreateWebhookRequest
 import com.firemoot.auth.ApiKeyService
 import com.firemoot.config.DbConfig
 import com.firemoot.db.{Database, Migrations}
-import com.firemoot.domain.Event
+import com.firemoot.domain.{Event, WebhookFormat}
 import com.firemoot.metrics.MetricsService
 import com.firemoot.service.{DeadLetter, WebhookService}
 import io.circe.Json
@@ -111,7 +111,9 @@ class AdminRoutesSuite extends CatsEffectSuite, TestContainerForAll:
 
         for
           _ <- service.setPassword("pw")
-          _ <- webhooks.register(CreateWebhookRequest("http://x.test/h", None, Some(true)))
+          _ <- webhooks.register(
+            CreateWebhookRequest("http://x.test/h", None, Some(true), Some(WebhookFormat.Firemoot))
+          )
           _ <- webhooks.enqueue(Event("message.new", "messaging:general", 1, Json.obj()))
           _ <- pool.use(_.execute(markAllDead))
 

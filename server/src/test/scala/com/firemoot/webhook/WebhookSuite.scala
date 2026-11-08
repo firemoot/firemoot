@@ -13,7 +13,7 @@ import com.firemoot.backplane.Backplane
 import com.firemoot.config.{DbConfig, HttpConfig}
 import com.firemoot.db.SessionSyntax.*
 import com.firemoot.db.{Database, Migrations}
-import com.firemoot.domain.Event
+import com.firemoot.domain.{Event, WebhookFormat}
 import com.firemoot.http.HttpServer
 import com.firemoot.service.WebhookService
 import io.circe.Json
@@ -37,6 +37,9 @@ class WebhookSuite extends CatsEffectSuite, TestContainerForEach:
     def header(name: String): Option[String] = headers.get(CIString(name))
 
   private val secret = "top-secret"
+
+  // These tests drive synthetic events, so they pin the envelope format.
+  private val firemoot = Some(WebhookFormat.Firemoot)
 
   private val apiKeyId = "test-key"
 
@@ -89,8 +92,18 @@ class WebhookSuite extends CatsEffectSuite, TestContainerForEach:
                 val event =
                   Event("message.new", "messaging:general", 7, Json.obj("text" -> "hi".asJson))
                 for
-                  a <- webhooks.register(CreateWebhookRequest(hookUrl, Some(secret), Some(true)))
-                  b <- webhooks.register(CreateWebhookRequest(hookUrl, Some(secret), Some(true)))
+                  a <- webhooks.register(CreateWebhookRequest(
+                    hookUrl,
+                    Some(secret),
+                    Some(true),
+                    firemoot,
+                  ))
+                  b <- webhooks.register(CreateWebhookRequest(
+                    hookUrl,
+                    Some(secret),
+                    Some(true),
+                    firemoot,
+                  ))
                   listed <- webhooks.list
                   _ <- webhooks.enqueue(event)
                   _ <- dispatcher.pollOnce
@@ -145,7 +158,12 @@ class WebhookSuite extends CatsEffectSuite, TestContainerForEach:
               val hookUrl = (server.baseUri / "hook").renderString
               val event = Event("message.new", "messaging:general", 1, Json.obj())
               for
-                ep <- webhooks.register(CreateWebhookRequest(hookUrl, Some(secret), Some(true)))
+                ep <- webhooks.register(CreateWebhookRequest(
+                  hookUrl,
+                  Some(secret),
+                  Some(true),
+                  firemoot,
+                ))
                 _ <- webhooks.enqueue(event)
                 // backoff has length 2, so attempts 1 and 2 retry and attempt 3 dies.
                 _ <- dispatcher.pollOnce

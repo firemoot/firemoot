@@ -112,6 +112,7 @@ export type CreateWebhookRequest = {
     url: string;
     secret?: string;
     enabled?: boolean;
+    format?: WebhookFormat;
 };
 
 /**
@@ -269,6 +270,14 @@ export type UpdateChannelRequest = {
 };
 
 /**
+ * UpdateWebhookRequest
+ */
+export type UpdateWebhookRequest = {
+    enabled?: boolean;
+    format?: WebhookFormat;
+};
+
+/**
  * UploadTicket
  */
 export type UploadTicket = {
@@ -312,6 +321,7 @@ export type WebhookCreated = {
     url: string;
     secret: string;
     enabled: boolean;
+    format: WebhookFormat;
 };
 
 /**
@@ -321,8 +331,14 @@ export type WebhookEndpoint = {
     id: string;
     url: string;
     enabled: boolean;
+    format: WebhookFormat;
     createdAt: string;
 };
+
+/**
+ * WebhookFormat
+ */
+export type WebhookFormat = 'firemoot' | 'stream';
 
 export type PostV1UsersData = {
     body: UpsertUserRequest;
@@ -823,6 +839,31 @@ export type DeleteV1WebhooksIdResponses = {
 };
 
 export type DeleteV1WebhooksIdResponse = DeleteV1WebhooksIdResponses[keyof DeleteV1WebhooksIdResponses];
+
+export type PatchV1WebhooksIdData = {
+    body: UpdateWebhookRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/v1/webhooks/{id}';
+};
+
+export type PatchV1WebhooksIdErrors = {
+    /**
+     * Invalid value for: body
+     */
+    400: string;
+    default: Problem;
+};
+
+export type PatchV1WebhooksIdError = PatchV1WebhooksIdErrors[keyof PatchV1WebhooksIdErrors];
+
+export type PatchV1WebhooksIdResponses = {
+    200: WebhookEndpoint;
+};
+
+export type PatchV1WebhooksIdResponse = PatchV1WebhooksIdResponses[keyof PatchV1WebhooksIdResponses];
 
 export type PostV1ChannelsTypeIdMessagesMessageidFlagData = {
     body: FlagMessageRequest;

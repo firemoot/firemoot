@@ -281,22 +281,20 @@ Without it, `verifyWebhook` falls back to the API secret, which only works if yo
 deliberately configured the endpoint with that same value. If every delivery
 suddenly fails verification, this is why.
 
-The event body is Firemoot's envelope (`{ type, cid, seq, data }`, camelCase)
-rather than Stream's. If your handler reads `event.message.user.id`, normalise it
-first:
+The body is Stream's own payload for endpoints in the `stream` format, which is
+the default, so a ported handler reads it unchanged. `normalizeWebhookEvent()` is
+only for endpoints still on the deprecated `firemoot` envelope: it rebuilds
+`message.new`, `message.read` and `user.unread_message_reminder` in Stream's
+shape and returns a Stream payload untouched, so it is safe to keep in place
+while you [flip the endpoint](./webhooks#body-format).
 
 ```ts
 import { normalizeWebhookEvent } from "@firemoot/stream-compat";
 
 const event = normalizeWebhookEvent(JSON.parse(rawBody));
-// { type: "message.new", cid, message: { id, text, user: { id } } }
 ```
 
-`message.new` stays `message.new`, `read.updated` becomes Stream's
-`message.read`, and `user.unread_message_reminder` comes back in Stream's shape -
-`user`, plus `channels` keyed by cid with the member list inside each `channel`
-and `messages[n].user.id` - so a reminder handler ported from Stream reads it
-unchanged. Other events pass through under their own type. There is also a
+There is also a
 standalone `verifyWebhookSignature(secret, rawBody, header)` if you would rather
 not construct a client just to check a signature.
 

@@ -1023,6 +1023,7 @@
       },
       "post" : {
         "summary" : "Register a webhook endpoint (returns the signing secret once)",
+        "description" : "`format` picks the body shape: `stream` (the default) sends getstream.io's own webhook payloads; `firemoot` is the deprecated `{ type, cid, seq, data }` envelope.",
         "operationId" : "postV1Webhooks",
         "requestBody" : {
           "content" : {
@@ -1085,6 +1086,63 @@
         "responses" : {
           "204" : {
             "description" : ""
+          },
+          "default" : {
+            "description" : "",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch" : {
+        "summary" : "Update a webhook endpoint (enabled, body format)",
+        "description" : "Flipping `format` from `firemoot` to `stream` migrates an endpoint without re-registering it, so its signing secret is kept.",
+        "operationId" : "patchV1WebhooksId",
+        "parameters" : [
+          {
+            "name" : "id",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateWebhookRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WebhookEndpoint"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid value for: body",
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
           },
           "default" : {
             "description" : "",
@@ -1523,6 +1581,9 @@
           },
           "enabled" : {
             "type" : "boolean"
+          },
+          "format" : {
+            "$ref" : "#/components/schemas/WebhookFormat"
           }
         }
       },
@@ -1868,6 +1929,18 @@
           }
         }
       },
+      "UpdateWebhookRequest" : {
+        "title" : "UpdateWebhookRequest",
+        "type" : "object",
+        "properties" : {
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "format" : {
+            "$ref" : "#/components/schemas/WebhookFormat"
+          }
+        }
+      },
       "UploadTicket" : {
         "title" : "UploadTicket",
         "type" : "object",
@@ -1969,7 +2042,8 @@
           "id",
           "url",
           "secret",
-          "enabled"
+          "enabled",
+          "format"
         ],
         "properties" : {
           "id" : {
@@ -1983,6 +2057,9 @@
           },
           "enabled" : {
             "type" : "boolean"
+          },
+          "format" : {
+            "$ref" : "#/components/schemas/WebhookFormat"
           }
         }
       },
@@ -1993,6 +2070,7 @@
           "id",
           "url",
           "enabled",
+          "format",
           "createdAt"
         ],
         "properties" : {
@@ -2005,11 +2083,22 @@
           "enabled" : {
             "type" : "boolean"
           },
+          "format" : {
+            "$ref" : "#/components/schemas/WebhookFormat"
+          },
           "createdAt" : {
             "type" : "string",
             "format" : "date-time"
           }
         }
+      },
+      "WebhookFormat" : {
+        "title" : "WebhookFormat",
+        "type" : "string",
+        "enum" : [
+          "firemoot",
+          "stream"
+        ]
       }
     }
   }

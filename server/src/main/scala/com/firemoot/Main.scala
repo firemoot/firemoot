@@ -73,9 +73,16 @@ object Main extends IOApp.Simple:
             dispatcher =
               WebhookDispatcher(pool, httpClient, WebhookConfig.default, cfg.server.apiKeyId)
             // Persisted channel events fan out to registered webhook endpoints.
+            // Rendering a Stream-format body reads a few rows, and a slow subscriber
+            // backpressures every publisher on the topic, so enqueue concurrently
+            // (delivery is unordered anyway) and never let one failure end the stream.
             enqueue = backplane.subscribe
               .filter(WebhookService.isDeliverable)
-              .evalMap(webhooks.enqueue)
+              .parEvalMapUnordered(4) { event =>
+                webhooks.enqueue(event).handleErrorWith { e =>
+                  log.error(e)(s"webhook enqueue failed for ${event.`type`} on ${event.cid}")
+                }
+              }
               .drain
             app = Application.httpApp(
               cfg.server,

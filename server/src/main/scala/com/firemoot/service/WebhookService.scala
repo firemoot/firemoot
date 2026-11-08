@@ -1,14 +1,21 @@
 package com.firemoot.service
 
 import java.security.SecureRandom
-import java.time.OffsetDateTime
+import java.time.{OffsetDateTime, ZoneOffset}
 import java.util.UUID
 
 import cats.effect.{IO, Resource}
-import com.firemoot.api.{CreateWebhookRequest, WebhookCreated, WebhookEndpoint}
+import cats.syntax.all.*
+import com.firemoot.api.{
+  CreateWebhookRequest,
+  UpdateWebhookRequest,
+  WebhookCreated,
+  WebhookEndpoint,
+}
 import com.firemoot.db.SessionSyntax.*
 import com.firemoot.db.WebhookRepo
-import com.firemoot.domain.{Event, UuidV7}
+import com.firemoot.domain.{Event, UuidV7, WebhookFormat}
+import com.firemoot.webhook.StreamFormat
 import io.circe.Codec
 import io.circe.generic.semiauto.deriveCodec
 import skunk.Session
@@ -29,8 +36,9 @@ object DeadLetter:
 /**
  * Webhook endpoint registry and event enqueueing (SPEC.md §3, M1.10). Persisted
  * channel events are fanned out (one delivery row per enabled endpoint) into the
- * queue that [[com.firemoot.webhook.WebhookDispatcher]] drains. The signing
- * secret is generated on registration and returned only once.
+ * queue that [[com.firemoot.webhook.WebhookDispatcher]] drains, rendered in each
+ * endpoint's body format. The signing secret is generated on registration and
+ * returned only once.
  */
 final class WebhookService(pool: Resource[IO, Session[IO]]):
 
@@ -39,20 +47,42 @@ final class WebhookService(pool: Resource[IO, Session[IO]]):
       id <- UuidV7.next.map(_.toString)
       secret <- req.secret.fold(WebhookService.randomSecret)(IO.pure)
       enabled = req.enabled.getOrElse(true)
-      _ <- pool.use(_.run(WebhookRepo.insertEndpoint, (id, req.url, secret, enabled)))
-    yield WebhookCreated(id, req.url, secret, enabled)
+      format = req.format.getOrElse(WebhookFormat.Stream)
+      _ <- pool.use(_.run(WebhookRepo.insertEndpoint, (id, req.url, secret, enabled, format)))
+    yield WebhookCreated(id, req.url, secret, enabled, format)
 
   def list: IO[List[WebhookEndpoint]] =
-    pool.use(_.execute(WebhookRepo.listEndpoints)).map(_.map { (id, url, enabled, createdAt) =>
-      WebhookEndpoint(id, url, enabled, createdAt)
-    })
+    pool.use(_.execute(WebhookRepo.listEndpoints)).map(_.map(WebhookEndpoint.apply.tupled))
+
+  /** None if no endpoint has this id. */
+  def update(id: String, req: UpdateWebhookRequest): IO[Option[WebhookEndpoint]] =
+    pool
+      .use(_.runOption(WebhookRepo.updateEndpoint, (req.enabled, req.format, id)))
+      .map(_.map(WebhookEndpoint.apply.tupled))
 
   def delete(id: String): IO[Boolean] =
     pool.use(_.runOption(WebhookRepo.deleteEndpoint, id)).map(_.isDefined)
 
-  /** Fans the event out to a pending delivery per enabled endpoint. */
+  /**
+   * Fans the event out to a pending delivery per enabled endpoint, rendering
+   * only the body formats some endpoint wants - with no Stream-format endpoint,
+   * no Stream body (and none of its lookups) is built.
+   */
   def enqueue(event: Event): IO[Unit] =
-    pool.use(_.run(WebhookRepo.enqueue, event.wire))
+    pool.use { s =>
+      (s.execute(WebhookRepo.enabledFormats), IO.realTimeInstant).flatMapN { (formats, now) =>
+        formats.traverse_ {
+          case WebhookFormat.Firemoot =>
+            s.run(WebhookRepo.enqueue, (event.wire, WebhookFormat.Firemoot))
+          case WebhookFormat.Stream =>
+            StreamFormat
+              .render(s, event, now.atOffset(ZoneOffset.UTC))
+              .flatMap(_.traverse_(body =>
+                s.run(WebhookRepo.enqueue, (body, WebhookFormat.Stream))
+              ))
+        }
+      }
+    }
 
   def deadLetters: IO[List[DeadLetter]] =
     pool.use(_.execute(WebhookRepo.deadLetters)).map(_.map {

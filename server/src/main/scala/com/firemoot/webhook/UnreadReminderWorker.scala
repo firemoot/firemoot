@@ -11,12 +11,11 @@ import cats.syntax.all.*
 import com.firemoot.api.MemberState
 import com.firemoot.config.UnreadReminderConfig
 import com.firemoot.db.SessionSyntax.*
-import com.firemoot.db.{ReminderRepo, WebhookRepo}
-import com.firemoot.domain.{Channel, Message, User}
+import com.firemoot.db.{LookupRepo, MemberRow, ReminderRepo, WebhookRepo}
+import com.firemoot.domain.{Channel, Message, User, WebhookFormat}
 import fs2.Stream
-import io.circe.generic.semiauto.deriveEncoder
 import io.circe.syntax.*
-import io.circe.{Encoder, Json}
+import io.circe.Json
 import org.typelevel.log4cats.Logger
 import skunk.Session
 import skunk.data.Arr
@@ -24,30 +23,45 @@ import skunk.data.Arr
 /** One channel in a reminder: the channel, its members and its newest messages. */
 final case class ReminderChannel(
     channel: Channel,
-    members: List[MemberState],
+    members: List[MemberRow],
     messages: List[Message],
 )
 
-object ReminderChannel:
-  given Encoder[ReminderChannel] = deriveEncoder
+/** One `user.unread_message_reminder`: a user and up to ten of their channels. */
+final case class Reminder(user: User, channels: List[ReminderChannel])
 
 /**
  * The `user.unread_message_reminder` webhook event, getstream.io's equivalent.
- * It is user-level rather than channel-level, so the envelope carries no `cid`
- * or `seq`: `data` holds the `user` and up to ten `channels`, each with its
- * members and newest five live messages (newest first), mirroring what Stream
- * puts in its event so a handler needs no follow-up API calls.
+ * Each carries the user and up to ten channels, each with its members and newest
+ * five live messages (newest first), so a handler needs no follow-up API calls.
  */
 object UnreadReminder:
   val EventType = "user.unread_message_reminder"
   val MaxChannelsPerEvent = 10
   val MessagesPerChannel = 5
 
-  def event(user: User, channels: List[ReminderChannel]): Json =
+  /** The deprecated Firemoot envelope: user-level, so no `cid` or `seq`. */
+  def firemoot(reminder: Reminder): Json =
     Json.obj(
       "type" -> EventType.asJson,
-      "data" -> Json.obj("user" -> user.asJson, "channels" -> channels.asJson),
+      "data" -> Json.obj(
+        "user" -> reminder.user.asJson,
+        "channels" -> reminder.channels.map { rc =>
+          Json.obj(
+            "channel" -> rc.channel.asJson,
+            "members" -> rc.members.map(m => MemberState(m.userId, m.role, m.lastReadSeq)).asJson,
+            "messages" -> rc.messages.asJson,
+          )
+        }.asJson,
+      ),
     )
+
+  /** Every user a Stream-format body embeds: members and message authors. */
+  def embeddedUserIds(reminders: List[Reminder]): List[String] =
+    reminders
+      .flatMap(_.channels)
+      .flatMap(rc => rc.members.map(_.userId) ++ rc.messages.flatMap(_.userId))
+      .distinct
 
 /**
  * Sweep tuning. `lookback` bounds how far past due a reminder may still be sent:
@@ -68,9 +82,9 @@ object ReminderTuning:
  * Sends `user.unread_message_reminder` when a member leaves a message unread for
  * the configured interval. Each sweep claims due members (see
  * [[com.firemoot.db.ReminderRepo.claimDue]]) and enqueues one event per user
- * per ten channels into the webhook queue, in the same transaction, so the
- * dispatcher handles signing, retries and dead-lettering and a crash between
- * claim and enqueue loses nothing.
+ * per ten channels into the webhook queue, rendered in each endpoint format, in
+ * the same transaction, so the dispatcher handles signing, retries and
+ * dead-lettering and a crash between claim and enqueue loses nothing.
  */
 final class UnreadReminderWorker(
     pool: Resource[IO, Session[IO]],
@@ -102,10 +116,14 @@ final class UnreadReminderWorker(
       pool.use { s =>
         s.transaction.use { _ =>
           for
+            formats <- s.execute(WebhookRepo.enabledFormats)
             claimed <- s.runList(ReminderRepo.claimDue, claimArgs)
-            events <- NonEmptyList.fromList(claimed).fold(IO.pure(List.empty[Json]))(events(s, _))
-            _ <- events.traverse_(s.run(WebhookRepo.enqueue, _))
-          yield (claimed.size, events.size)
+            reminders <- NonEmptyList
+              .fromList(claimed)
+              .filter(_ => formats.nonEmpty)
+              .fold(IO.pure(List.empty[Reminder]))(reminders(s, _))
+            _ <- formats.traverse_(enqueue(s, _, reminders, now))
+          yield (claimed.size, reminders.size)
         }
       }
 
@@ -116,20 +134,44 @@ final class UnreadReminderWorker(
 
     loop(0).flatTap(n => logger.info(s"enqueued $n unread reminder(s)").whenA(n > 0))
 
-  private def events(s: Session[IO], claimed: NonEmptyList[(String, String)]): IO[List[Json]] =
+  private def enqueue(
+      s: Session[IO],
+      format: WebhookFormat,
+      reminders: List[Reminder],
+      now: OffsetDateTime,
+  ): IO[Unit] =
+    format match
+      case WebhookFormat.Firemoot =>
+        reminders.traverse_(r => s.run(WebhookRepo.enqueue, (UnreadReminder.firemoot(r), format)))
+      case WebhookFormat.Stream =>
+        NonEmptyList.fromList(UnreadReminder.embeddedUserIds(reminders)).traverse_ { ids =>
+          s.runList(LookupRepo.users, Arr(ids.toList*)).flatMap { users =>
+            val byId = users.map(u => u.id -> u).toMap
+            reminders.traverse_ { r =>
+              val channels = r.channels.map(rc => (rc.channel, rc.members, rc.messages))
+              s.run(
+                WebhookRepo.enqueue,
+                (StreamFormat.reminder(r.user, channels, byId, now), format),
+              )
+            }
+          }
+        }
+
+  private def reminders(
+      s: Session[IO],
+      claimed: NonEmptyList[(String, String)],
+  ): IO[List[Reminder]] =
     val userIds = Arr(claimed.toList.map(_._1).distinct*)
     val cids = Arr(claimed.toList.map(_._2).distinct*)
     (
-      s.runList(ReminderRepo.users, userIds),
-      s.runList(ReminderRepo.channels, cids),
-      s.runList(ReminderRepo.members, cids),
-      s.runList(ReminderRepo.recentMessages, (cids, UnreadReminder.MessagesPerChannel)),
+      s.runList(LookupRepo.users, userIds),
+      s.runList(LookupRepo.channels, cids),
+      s.runList(LookupRepo.members, cids),
+      s.runList(LookupRepo.recentMessages, (cids, UnreadReminder.MessagesPerChannel)),
     ).mapN { (users, channels, members, messages) =>
       val userById = users.map(u => u.id -> u).toMap
       val channelByCid = channels.map(c => c.cid -> c).toMap
-      val membersByCid = members.groupMap(_._1) { (_, userId, role, lastReadSeq) =>
-        MemberState(userId, role, lastReadSeq)
-      }
+      val membersByCid = members.groupBy(_.cid)
       val messagesByCid = messages.groupBy(_.cid)
       claimed.toList.groupMap(_._1)(_._2).toList.flatMap { (userId, userCids) =>
         userById.get(userId).toList.flatMap { user =>
@@ -144,7 +186,7 @@ final class UnreadReminderWorker(
               }
             )
             .grouped(UnreadReminder.MaxChannelsPerEvent)
-            .map(UnreadReminder.event(user, _))
+            .map(Reminder(user, _))
             .toList
         }
       }

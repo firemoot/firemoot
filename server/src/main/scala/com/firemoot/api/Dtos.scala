@@ -3,7 +3,7 @@ package com.firemoot.api
 import java.time.OffsetDateTime
 import java.util.UUID
 
-import com.firemoot.domain.{Channel, Message}
+import com.firemoot.domain.{Channel, Message, WebhookFormat}
 import io.circe.generic.semiauto.deriveCodec
 import io.circe.{Codec, Json}
 import sttp.tapir.Schema
@@ -188,10 +188,12 @@ object SearchPage:
   given Codec[SearchPage] = deriveCodec
   given Schema[SearchPage] = Schema.derived
 
+/** `format` defaults to `stream`; `firemoot` is deprecated. */
 final case class CreateWebhookRequest(
     url: String,
     secret: Option[String],
     enabled: Option[Boolean],
+    format: Option[WebhookFormat] = None,
 )
 
 object CreateWebhookRequest:
@@ -199,7 +201,13 @@ object CreateWebhookRequest:
   given Schema[CreateWebhookRequest] = Schema.derived
 
 /** The created endpoint, including the signing secret (returned only here). */
-final case class WebhookCreated(id: String, url: String, secret: String, enabled: Boolean)
+final case class WebhookCreated(
+    id: String,
+    url: String,
+    secret: String,
+    enabled: Boolean,
+    format: WebhookFormat,
+)
 
 object WebhookCreated:
   given Codec[WebhookCreated] = deriveCodec
@@ -209,12 +217,20 @@ final case class WebhookEndpoint(
     id: String,
     url: String,
     enabled: Boolean,
+    format: WebhookFormat,
     createdAt: OffsetDateTime,
 )
 
 object WebhookEndpoint:
   given Codec[WebhookEndpoint] = deriveCodec
   given Schema[WebhookEndpoint] = Schema.derived
+
+/** Absent fields are left unchanged. Flipping `format` is how an endpoint migrates. */
+final case class UpdateWebhookRequest(enabled: Option[Boolean], format: Option[WebhookFormat])
+
+object UpdateWebhookRequest:
+  given Codec[UpdateWebhookRequest] = deriveCodec
+  given Schema[UpdateWebhookRequest] = Schema.derived
 
 final case class FlagMessageRequest(userId: String, reason: Option[String])
 

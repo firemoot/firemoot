@@ -21,19 +21,25 @@ export function verifyWebhookSignature(
 }
 
 /**
- * Reshapes a Firemoot wire event (`{ type, cid, seq, data }`, camelCase) into the
- * Stream-shaped event object a webhook handler written against Stream consumes
- * (`type`, `cid`, `message.text`, `message.user.id`, `user.id`).
+ * Reshapes a body from a webhook endpoint registered with the deprecated
+ * `firemoot` format (`{ type, cid, seq, data }`, camelCase) into the
+ * Stream-shaped event a handler written against Stream consumes. A body from a
+ * `stream`-format endpoint (the default) is already Stream's payload and is
+ * returned unchanged, so this is safe to leave in place while endpoints migrate.
  *
- * `message.new` stays `message.new`, `read.updated` becomes Stream's
- * `message.read`, and `user.unread_message_reminder` is rebuilt in Stream's
- * shape (`user`, plus `channels` keyed by cid); anything else passes through
- * under its own type, which a Stream-shaped handler will simply not match. The
- * cid format (`type:id`) already matches Stream's.
+ * For `firemoot` bodies: `message.new` stays `message.new`, `read.updated`
+ * becomes Stream's `message.read`, and `user.unread_message_reminder` is rebuilt
+ * in Stream's shape (`user`, plus `channels` keyed by cid); anything else passes
+ * through under its own type, which a Stream-shaped handler will simply not
+ * match.
+ *
+ * @deprecated Register endpoints with `format: "stream"` (the default) and read
+ * the body directly; the `firemoot` format will be removed.
  */
 export function normalizeWebhookEvent(parsed: unknown): Record<string, unknown> {
   const event = asRecord(parsed);
   if (Object.keys(event).length === 0) return {};
+  if (!isFiremootEnvelope(event)) return event;
   const type = typeof event["type"] === "string" ? event["type"] : "";
   const cid = typeof event["cid"] === "string" ? event["cid"] : undefined;
   const data = asRecord(event["data"]);
@@ -57,6 +63,12 @@ export function normalizeWebhookEvent(parsed: unknown): Record<string, unknown> 
     return { type, ...toStreamReminder(data) };
   }
   return { type, ...(cid ? { cid } : {}) };
+}
+
+/** Only the deprecated `firemoot` format wraps its payload in `data`; Stream's never does. */
+function isFiremootEnvelope(event: Record<string, unknown>): boolean {
+  const data = event["data"];
+  return data !== null && typeof data === "object" && !Array.isArray(data);
 }
 
 function asArray(value: unknown): unknown[] {
