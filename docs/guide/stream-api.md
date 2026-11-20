@@ -90,7 +90,9 @@ rather than as a silent no-op.
   report an already-completed task.
 - **Uploads need media.** Image and file uploads need
   [media configured](./configuration#media-s3).
-- **No mutes, bans, pins, polls, drafts, reminders or watcher lists.**
+- **No mutes, bans, pins, polls, drafts or reminders.** Watching is announced
+  with `user.watching.start` / `stop` and counted in `watcher_count`, but channel
+  state carries no `watchers` list.
 
 ## Webhooks
 

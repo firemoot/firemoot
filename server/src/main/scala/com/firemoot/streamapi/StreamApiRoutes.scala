@@ -334,11 +334,15 @@ final class StreamApiRoutes(
       body: ACursor,
       cids: List[String],
       default: Boolean,
-  )
-      : IO[Unit] =
+  ): IO[Unit] =
     (userOnly(p), req.params.get("connection_id")) match
       case (Some(u), Some(conn)) if bool(body, "watch").getOrElse(default) =>
-        cids.traverse_(connections.watch(conn, u, _))
+        cids.traverse_ { cid =>
+          connections.watch(conn, u, cid).flatMap {
+            case Some(true) => StreamWatching.announce(pool, connections, cid, u, start = true)
+            case _ => IO.unit
+          }
+        }
       case _ => IO.unit
 
   /** Stream's distinct channels: an id derived from the sorted member set. */
@@ -475,17 +479,34 @@ final class StreamApiRoutes(
             StreamApiError.notFound(op, s"message with id $mid doesn't exist"),
           )
       }
-      _ <- EitherT.fromOptionF(
+      read <- EitherT.fromOptionF(
         reads.markRead(cid, userId, upTo),
         StreamApiError.notAllowed(op, s"user $userId is not a member of channel $cid"),
       )
-    yield Json.obj()
+      event <- EitherT.liftF(pool.use { s =>
+        (
+          s.runList(
+            StreamStateRepo.before,
+            (cid, read.lastReadSeq + 1, 1),
+          ).map(_.headOption.map(_.id)),
+          state.users(s, List(userId)),
+          IO.realTimeInstant.map(_.atOffset(java.time.ZoneOffset.UTC)),
+        ).mapN { (lastReadId, us, at) =>
+          StreamEvents.base("message.read", cid, at).deepMerge(Json.obj(
+            "user" -> us(userId),
+            "last_read_message_id" -> lastReadId.asJson,
+          )).dropNullValues
+        }
+      })
+    yield Json.obj("event" -> event)
 
   private def stopWatching(req: Request[IO], cid: String): Result =
-    EitherT.liftF(req.params.get("connection_id").traverse_(connections.unwatch(
-      _,
-      cid,
-    )).as(Json.obj()))
+    EitherT.liftF(req.params.get("connection_id").traverse_(conn =>
+      connections.unwatch(
+        conn,
+        cid,
+      ).flatMap(_.traverse_(StreamWatching.announce(pool, connections, cid, _, start = false)))
+    ).as(Json.obj()))
 
   private def sendEvent(p: StreamPrincipal, body: ACursor, cid: String): Result =
     val op = "SendEvent"

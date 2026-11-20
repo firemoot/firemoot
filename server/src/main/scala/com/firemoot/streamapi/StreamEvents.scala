@@ -354,3 +354,27 @@ object StreamEvents:
       "created_at" -> V2Json.ns(at),
       "custom" -> Json.obj(),
     )
+
+/** `user.watching.start` / `stop`, sent to a channel's watchers with the new `watcher_count`. */
+object StreamWatching:
+
+  def announce(
+      pool: Resource[IO, Session[IO]],
+      connections: StreamConnections,
+      cid: String,
+      userId: String,
+      start: Boolean,
+  ): IO[Unit] =
+    for
+      user <- pool.use(_.runOption(com.firemoot.db.UserRepo.byId, userId))
+      watchers <- connections.watching(cid)
+      at <- IO.realTimeInstant.map(_.atOffset(ZoneOffset.UTC))
+      json = StreamEvents
+        .base(if start then "user.watching.start" else "user.watching.stop", cid, at)
+        .deepMerge(Json.obj(
+          "user" -> user.fold(V2Json.missingUser(userId))(V2Json.user(_, online = true)),
+          "watcher_count" -> watchers.map(_.userId).distinct.size.asJson,
+        ))
+      frame = WebSocketFrame.Text(json.noSpaces)
+      _ <- watchers.traverse_(_.outbound.offer(Some(frame)))
+    yield ()

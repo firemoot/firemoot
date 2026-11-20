@@ -100,7 +100,11 @@ final class StreamWsRoutes(
     val cleanup: IO[Unit] =
       authed.tryGet.flatMap {
         case Some(Some(userId)) =>
-          connections.remove(connectionId) >>
+          connections.close(connectionId).flatMap(
+            _.traverse_(cid =>
+              StreamWatching.announce(pool, connections, cid, userId, start = false).attempt.void
+            )
+          ) >>
             connections.ofUser(userId).flatMap(rest =>
               presence.offline(userId).attempt.void.whenA(rest.isEmpty)
             )

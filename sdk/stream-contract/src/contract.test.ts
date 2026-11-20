@@ -123,6 +123,29 @@ describe.runIf(RUN)("contract: getstream.io's own SDKs against Firemoot's v2 API
     expect(event.user?.id).toBe("bob");
   });
 
+  test("markRead answers with the message.read event", async () => {
+    const bob = await connect("bob");
+    const channel = bob.channel("messaging", "general");
+    await channel.watch();
+    const response = await channel.markRead();
+    expect(response.event?.type).toBe("message.read");
+  });
+
+  test("watching announces user.watching.start with the watcher count", async () => {
+    const alice = await connect("alice");
+    await alice.channel("messaging", "general").watch();
+    const started = next(
+      alice,
+      "user.watching.start",
+      (e) => inGeneral(e) && "user" in e && e.user?.id === "carol",
+    );
+    const carol = await connect("carol");
+    await carol.channel("messaging", "general").watch();
+    const event = await started;
+    if (event.type !== "user.watching.start") throw new Error(`unexpected ${event.type}`);
+    expect(event.watcher_count).toBeGreaterThanOrEqual(2);
+  });
+
   test("keystroke delivers typing.start to the other watchers", async () => {
     const alice = await connect("alice");
     const bob = await connect("bob");

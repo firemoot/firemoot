@@ -22,21 +22,43 @@ final class StreamConnections private (ref: Ref[IO, Map[String, StreamConnection
 
   def add(c: StreamConnection): IO[Unit] = ref.update(_ + (c.id -> c))
 
-  def remove(id: String): IO[Option[StreamConnection]] =
-    ref.modify(m => (m - id, m.get(id)))
-
-  /** Subscribes a socket to a cid; false unless the socket exists and is `userId`'s. */
-  def watch(connectionId: String, userId: String, cid: String): IO[Boolean] =
+  /**
+   * Subscribes a socket to a cid. None unless the socket exists and is
+   * `userId`'s; otherwise whether this is the user's first socket watching it
+   * (when Stream announces `user.watching.start`).
+   */
+  def watch(connectionId: String, userId: String, cid: String): IO[Option[Boolean]] =
     ref.modify { m =>
       m.get(connectionId).filter(_.userId == userId) match
-        case Some(c) => (m.updated(c.id, c.copy(watched = c.watched + cid)), true)
-        case None => (m, false)
+        case Some(c) =>
+          val already = m.values.exists(o => o.userId == userId && o.watched(cid))
+          (m.updated(c.id, c.copy(watched = c.watched + cid)), Some(!already))
+        case None => (m, None)
     }
 
-  def unwatch(connectionId: String, cid: String): IO[Unit] =
-    ref.update(m =>
-      m.get(connectionId).fold(m)(c => m.updated(c.id, c.copy(watched = c.watched - cid)))
-    )
+  /** Unsubscribes; the user's id when that was their last socket watching the cid. */
+  def unwatch(connectionId: String, cid: String): IO[Option[String]] =
+    ref.modify { m =>
+      m.get(connectionId).filter(_.watched(cid)) match
+        case Some(c) =>
+          val updated = m.updated(c.id, c.copy(watched = c.watched - cid))
+          val stillWatching = updated.values.exists(o => o.userId == c.userId && o.watched(cid))
+          (updated, Option.when(!stillWatching)(c.userId))
+        case None => (m, None)
+    }
+
+  /** Closes a socket; the cids its user no longer watches from any other socket. */
+  def close(id: String): IO[List[String]] =
+    ref.modify { m =>
+      m.get(id) match
+        case Some(c) =>
+          val rest = m - id
+          val stopped = c.watched.toList.filterNot(cid =>
+            rest.values.exists(o => o.userId == c.userId && o.watched(cid))
+          )
+          (rest, stopped)
+        case None => (m, Nil)
+    }
 
   def all: IO[List[StreamConnection]] = ref.get.map(_.values.toList)
 
