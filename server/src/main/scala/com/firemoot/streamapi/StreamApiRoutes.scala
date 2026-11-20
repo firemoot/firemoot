@@ -120,6 +120,14 @@ final class StreamApiRoutes(
       handle(req, Status.Ok)((_, _) => EitherT.rightT(Json.obj()))
     case req @ POST -> Root / "api" / "v2" / "moderation" / "flag" =>
       handle(req, Status.Created)(flag(_, _))
+    case req @ POST -> Root / "api" / "v2" / "users" / "delete" =>
+      handle(req, Status.Created)(deleteUsers(_, _))
+    case req @ POST -> Root / "api" / "v2" / "chat" / "channels" / "delete" =>
+      handle(req, Status.Created)(deleteChannels(_, _))
+    case req @ GET -> Root / "api" / "v2" / "tasks" / id =>
+      handle(req, Status.Ok)((_, _) => getTask(id))
+    case req @ GET -> Root / "api" / "v2" / "app" =>
+      handle(req, Status.Ok)((_, _) => EitherT.rightT(appSettings))
     case req @ POST -> Root / "api" / "v2" / "users" =>
       handle(req, Status.Created)(upsertUsers(_, _))
     case req @ GET -> Root / "api" / "v2" / "users" =>
@@ -935,3 +943,109 @@ final class StreamApiRoutes(
         StreamApiError.notFound(op, s"message with id $messageId doesn't exist"),
       )
     yield Json.obj("item_id" -> created.id.toString.asJson)
+
+  // --- server-side batch operations ---
+
+  /** A finished batch operation, as `GET /api/v2/tasks/{id}` reports it. */
+  final private case class StreamTask(id: String, at: java.time.OffsetDateTime, result: Json)
+
+  /**
+   * Stream runs batch deletes as async tasks; Firemoot completes them before
+   * answering, so every task is already `completed` when its id is returned.
+   */
+  private val tasks = cats.effect.Ref.unsafe[IO, Map[String, StreamTask]](Map.empty)
+
+  private def serverOnly(
+      op: String,
+      p: StreamPrincipal,
+      action: String,
+  ): EitherT[IO, StreamApiError, Unit] =
+    p match
+      case StreamPrincipal.Server => EitherT.rightT(())
+      case StreamPrincipal.User(id) =>
+        fail(StreamApiError.notAllowed(
+          op,
+          s"User '$id' with role 'user' is not allowed to perform action $action",
+        ))
+
+  private def recordTask(result: Json): IO[String] =
+    for
+      id <- com.firemoot.domain.UuidV7.next.map(_.toString)
+      at <- IO.realTimeInstant.map(_.atOffset(java.time.ZoneOffset.UTC))
+      _ <- tasks.update(_ + (id -> StreamTask(id, at, result)))
+    yield id
+
+  private def deleteUsers(p: StreamPrincipal, body: ACursor): Result =
+    val op = "DeleteUsers"
+    val ids = body.downField("user_ids").as[List[String]].toOption.getOrElse(Nil).distinct
+    for
+      _ <- serverOnly(op, p, "DeleteUser")
+      _ <-
+        EitherT.cond[IO](ids.nonEmpty, (), StreamApiError.input(op, "user_ids is a required field"))
+      deleted <- EitherT.liftF(ids.traverse(id => users.delete(id).map(id -> _)))
+      taskId <- EitherT.liftF(recordTask(Json.obj(
+        "deleted" -> deleted.collect { case (id, true) => id }.asJson,
+        "missing" -> deleted.collect { case (id, false) => id }.asJson,
+      )))
+    yield Json.obj("task_id" -> taskId.asJson)
+
+  private def deleteChannels(p: StreamPrincipal, body: ACursor): Result =
+    val op = "DeleteChannels"
+    val cids = body.downField("cids").as[List[String]].toOption.getOrElse(Nil).distinct
+    for
+      _ <- serverOnly(op, p, "DeleteChannel")
+      _ <- EitherT.cond[IO](cids.nonEmpty, (), StreamApiError.input(op, "cids is a required field"))
+      outcomes <- EitherT.liftF(cids.traverse(cid => channels.softDelete(cid).map(cid -> _)))
+      result = Json.fromFields(outcomes.map { (cid, ok) =>
+        cid ->
+          (if ok then Json.obj("status" -> "ok".asJson)
+           else
+             Json.obj("status" -> "error".asJson, "error" -> s"channel $cid doesn't exist".asJson))
+      })
+      taskId <- EitherT.liftF(recordTask(result))
+    yield Json.obj("task_id" -> taskId.asJson, "result" -> result)
+
+  private def getTask(id: String): Result =
+    EitherT.fromOptionF(
+      tasks.get.map(_.get(id)),
+      StreamApiError.notFound("GetTask", s"task $id doesn't exist"),
+    )
+      .map { t =>
+        Json.obj(
+          "task_id" -> t.id.asJson,
+          "status" -> "completed".asJson,
+          "created_at" -> V2Json.ns(t.at),
+          "updated_at" -> V2Json.ns(t.at),
+          "result" -> t.result,
+        )
+      }
+
+  /** The app settings the SDKs read (upload rules, chiefly). */
+  private def appSettings: Json =
+    val (mimes, imageCap, fileCap) = uploads.fold((Set.empty[String], 0L, 0L))(_.limits)
+    def uploadConfig(prefix: Option[String], cap: Long) =
+      Json.obj(
+        "allowed_mime_types" -> mimes.filter(m => prefix.forall(m.startsWith)).toList.sorted.asJson,
+        "allowed_file_extensions" -> Json.arr(),
+        "blocked_mime_types" -> Json.arr(),
+        "blocked_file_extensions" -> Json.arr(),
+        "size_limit" -> cap.asJson,
+      )
+    Json.obj(
+      "app" -> Json.obj(
+        "name" -> "firemoot".asJson,
+        "file_upload_config" -> uploadConfig(None, fileCap),
+        "image_upload_config" -> uploadConfig(Some("image/"), imageCap),
+        "async_url_enrich_enabled" -> false.asJson,
+        "auto_translation_enabled" -> false.asJson,
+        "disable_auth_checks" -> false.asJson,
+        "disable_permissions_checks" -> false.asJson,
+        "multi_tenant_enabled" -> false.asJson,
+        "permission_version" -> "v2".asJson,
+        "policies" -> Json.obj(),
+        "push_notifications" -> Json.obj("version" -> "v3".asJson, "providers" -> Json.arr()),
+        "call_types" -> Json.obj(),
+        "channel_configs" -> Json.obj("messaging" -> V2Json.messagingConfig),
+        "grants" -> Json.obj(),
+      )
+    )

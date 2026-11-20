@@ -243,6 +243,24 @@ describe.runIf(RUN)("contract: getstream.io's own SDKs against Firemoot's v2 API
     expect(flagged.item_id).toBeTruthy();
   });
 
+  test("the server SDK batch-deletes channels and users as completed tasks", async () => {
+    await server.upsertUsers([{ id: "temp-user" }]);
+    await server.chat.channel("messaging", "temp").getOrCreate({
+      data: { created_by_id: "alice", members: [{ user_id: "alice" }] },
+    });
+
+    const channels = await server.chat.deleteChannels({ cids: ["messaging:temp"] });
+    expect(channels.result?.["messaging:temp"]?.status).toBe("ok");
+    const users = await server.deleteUsers({ user_ids: ["temp-user"] });
+    const task = await server.getTask({ id: users.task_id });
+    expect(task.status).toBe("completed");
+
+    const remaining = await server.queryUsers({
+      payload: { filter_conditions: { id: { $in: ["temp-user"] } } },
+    });
+    expect(remaining.users).toEqual([]);
+  });
+
   test("a non-member is refused with Stream's not-allowed error", async () => {
     const mallory = await connect("mallory");
     await expect(mallory.channel("messaging", "general").watch()).rejects.toMatchObject({

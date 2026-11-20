@@ -617,7 +617,9 @@ soak regressions.
         list), search (`query` or `message_filter_conditions.text`), multipart
         uploads written straight to S3 (channel and client endpoints), and
         message flagging. Contract suite at 14 tests.
-  - [ ] **M5.3** Server-side remainder: user delete, batch channel delete, tasks.
+  - [x] **M5.3 Server-side remainder**: batch user delete and batch channel
+        delete as already-completed tasks, `GET /api/v2/tasks/{id}`, and
+        `GET /api/v2/app` (upload rules from the media config). 15 contract tests.
 
 ---
 

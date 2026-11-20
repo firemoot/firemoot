@@ -15,6 +15,9 @@ import skunk.Session
  */
 final class DirectUploads(cfg: MediaConfig, pool: Resource[IO, Session[IO]], objects: ObjectStore):
 
+  /** `(allowed MIME types, image byte cap, file byte cap)`, for Stream's app settings. */
+  def limits: (Set[String], Long, Long) = (cfg.allowedMime, cfg.maxImageBytes, cfg.maxFileBytes)
+
   /** The object's public URL. */
   def store(userId: Option[String], filename: String, mime: String, bytes: Array[Byte])
       : IO[Either[UploadError, String]] =
