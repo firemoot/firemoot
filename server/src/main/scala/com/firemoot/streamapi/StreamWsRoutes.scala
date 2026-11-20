@@ -46,14 +46,22 @@ final class StreamWsRoutes(
 
   private val authDeadline = 10.seconds
 
+  /**
+   * The client pings every 25s (at most), so a minute without any frame means it
+   * vanished without a close. Closing with 1001 rather than 1000 tells a client
+   * that is in fact alive to reconnect, as it does after a network blip.
+   */
+  private val silenceLimit = 60.seconds
+
   def routes(wsb: WebSocketBuilder2[IO]): HttpRoutes[IO] = HttpRoutes.of[IO] {
     case req @ GET -> Root / "api" / "v2" / "connect" =>
       for
         outbound <- Queue.unbounded[IO, Option[WebSocketFrame]]
         connectionId <- UuidV7.next.map(_.toString)
         authed <- Deferred[IO, Option[String]]
+        lastFrame <- IO.monotonic.flatMap(cats.effect.Ref[IO].of)
         apiKey = auth.apiKeyOf(req)
-        response <- build(wsb, apiKey, connectionId, outbound, authed)
+        response <- build(wsb, apiKey, connectionId, outbound, authed, lastFrame)
       yield response
   }
 
@@ -87,6 +95,7 @@ final class StreamWsRoutes(
       connectionId: String,
       outbound: Queue[IO, Option[WebSocketFrame]],
       authed: Deferred[IO, Option[String]],
+      lastFrame: cats.effect.Ref[IO, FiniteDuration],
   ): IO[org.http4s.Response[IO]] =
     val cleanup: IO[Unit] =
       authed.tryGet.flatMap {
@@ -113,17 +122,31 @@ final class StreamWsRoutes(
         }
       }.drain
 
-    val receive: Pipe[IO, WebSocketFrame, Unit] = _.evalMap {
-      case WebSocketFrame.Text(body, _) =>
-        authed.tryGet.flatMap {
-          case None => authenticate(body, apiKey, connectionId, outbound, authed)
-          case Some(Some(_)) => onFrame(body, connectionId, outbound)
-          case Some(None) => IO.unit
+    val watchdog: Stream[IO, Nothing] =
+      Stream.awakeEvery[IO](15.seconds).evalMap { _ =>
+        (IO.monotonic, lastFrame.get).flatMapN { (now, last) =>
+          IO.whenA(now - last > silenceLimit) {
+            WebSocketFrame.Close(1001, "no health check received").fold(
+              _ => IO.unit,
+              close =>
+                outbound.offer(Some(close)) >> outbound.offer(None),
+            )
+          }
         }
-      case _ => IO.unit
-    }
+      }.drain
 
-    wsb.build(send.concurrently(deadline), receive)
+    val receive: Pipe[IO, WebSocketFrame, Unit] =
+      _.evalTap(_ => IO.monotonic.flatMap(lastFrame.set)).evalMap {
+        case WebSocketFrame.Text(body, _) =>
+          authed.tryGet.flatMap {
+            case None => authenticate(body, apiKey, connectionId, outbound, authed)
+            case Some(Some(_)) => onFrame(body, connectionId, outbound)
+            case Some(None) => IO.unit
+          }
+        case _ => IO.unit
+      }
+
+    wsb.build(send.concurrently(deadline).concurrently(watchdog), receive)
 
   private def authenticate(
       body: String,

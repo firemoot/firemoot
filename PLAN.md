@@ -602,7 +602,7 @@ soak regressions.
       `StreamFormatSuite` drives every event type against a `stream` and a
       `firemoot` endpoint side by side. Next: remove the `firemoot` format once
       consumers have flipped.
-- [ ] **M5 Stream v2 wire API** (added 20/11/2026, SPEC §2): getstream.io's v2 REST
+- [x] **M5 Stream v2 wire API** (added 20/11/2026, SPEC §2): getstream.io's v2 REST
       and `/api/v2/connect` socket so `stream-chat` v10 and `@stream-io/node-sdk`
       run against Firemoot unmodified.
   - [x] **M5.1 Messaging core**: Stream JWT auth, the connect handshake and
@@ -619,7 +619,11 @@ soak regressions.
         message flagging. Contract suite at 14 tests.
   - [x] **M5.3 Server-side remainder**: batch user delete and batch channel
         delete as already-completed tasks, `GET /api/v2/tasks/{id}`, and
-        `GET /api/v2/app` (upload rules from the media config). 15 contract tests.
+        `GET /api/v2/app` (upload rules from the media config).
+  - [x] **M5.4 Hardening**: server tokens spend the per-key rate budget, silent
+        sockets close after 60s with 1001, event dispatch skips rendering with no
+        v2 sockets and runs concurrently, unimplemented `/api/v2` paths return a
+        Stream-shaped 501. Contract suite at 16 tests, including reconnect.
 
 ---
 

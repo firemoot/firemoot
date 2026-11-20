@@ -1,4 +1,4 @@
-import { type FiremootInstance, startFiremoot } from "@firemoot/test";
+import { type FiremootInstance, TcpProxy, startFiremoot } from "@firemoot/test";
 import { StreamClient } from "@stream-io/node-sdk";
 import { type Event, type EventType, StreamChat } from "stream-chat";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
@@ -276,6 +276,37 @@ describe.runIf(RUN)("contract: getstream.io's own SDKs against Firemoot's v2 API
       client.connectUser({ id: "alice" }, () => Promise.resolve(token)),
     ).rejects.toBeDefined();
   });
+
+  test("after the socket drops, the SDK reconnects, recovers and keeps receiving the channel", async () => {
+    const target = new URL(fm.baseUrl);
+    const proxy = new TcpProxy(target.hostname, Number(target.port));
+    const port = await proxy.start();
+    try {
+      const watcher = new StreamChat(fm.apiKey, {
+        client: { baseURL: `http://127.0.0.1:${port}` },
+      });
+      const token = server.generateUserToken({ user_id: "bob" });
+      await watcher.connectUser({ id: "bob" }, () => Promise.resolve(token));
+      clients.push(watcher);
+      const channel = watcher.channel("messaging", "general");
+      await channel.watch();
+      channel.activate();
+
+      const recovered = next(watcher, "connection.recovered");
+      proxy.drop();
+      await recovered;
+      const sender = await connect("alice");
+      const received = next(watcher, "message.new", inGeneral);
+      await sender
+        .channel("messaging", "general")
+        .sendMessage({ message: { text: "after the drop" } });
+      const event = await received;
+      if (event.type !== "message.new") throw new Error(`unexpected ${event.type}`);
+      expect(event.message.text).toBe("after the drop");
+    } finally {
+      await proxy.stop();
+    }
+  }, 30_000);
 
   test("health checks keep an idle socket open", async () => {
     const alice = await connect("alice", 1_000);

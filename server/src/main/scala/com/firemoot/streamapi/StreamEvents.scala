@@ -42,9 +42,12 @@ final class StreamEvents(
     logger: Logger[IO],
 ):
 
+  // Rendering reads a few rows, and a slow subscriber backpressures every
+  // publisher on the topic, so dispatch concurrently (Stream delivery is
+  // unordered across channels anyway) and never let one failure end the stream.
   def stream: Stream[IO, Nothing] =
     backplane.subscribe
-      .evalMap(event =>
+      .parEvalMapUnordered(4)(event =>
         dispatch(event).handleErrorWith(e =>
           logger.error(e)(s"stream event dispatch failed for ${event.`type`} on ${event.cid}")
         )
@@ -69,7 +72,7 @@ final class StreamEvents(
       case None =>
         connections.all.flatMap { all =>
           val watchers = all.filter(_.watched(event.cid))
-          val needsRender = watchers.nonEmpty || event.`type` == "message.new"
+          val needsRender = watchers.nonEmpty || (event.`type` == "message.new" && all.nonEmpty)
           IO.whenA(needsRender) {
             now.flatMap(at =>
               pool.use(s =>

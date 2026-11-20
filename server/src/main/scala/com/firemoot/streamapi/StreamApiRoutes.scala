@@ -157,6 +157,7 @@ final class StreamApiRoutes(
         )
     (for
       principal <- EitherT(auth.authenticate(req))
+      _ <- serverBudget(req, principal)
       json <- EitherT.liftF(body)
       _ <- EitherT.cond[IO](json.isObject, (), StreamApiError.input("Request", "invalid JSON body"))
       result <- op(principal, json.hcursor)
@@ -169,6 +170,16 @@ final class StreamApiRoutes(
     }
 
   private def fail[A](error: StreamApiError): EitherT[IO, StreamApiError, A] = EitherT.leftT(error)
+
+  /** Server tokens spend the same per-API-key budget as Firemoot's own HMAC API. */
+  private def serverBudget(
+      req: Request[IO],
+      p: StreamPrincipal,
+  ): EitherT[IO, StreamApiError, Unit] =
+    (p, auth.apiKeyOf(req)) match
+      case (StreamPrincipal.Server, Some(key)) =>
+        EitherT.liftF(rate.apiKey(key)).flatMap(limited(req.uri.path.renderString, _))
+      case _ => EitherT.rightT(())
 
   private def str(c: ACursor, field: String): Option[String] =
     c.downField(field).as[String].toOption.filter(_.nonEmpty)
@@ -883,6 +894,7 @@ final class StreamApiRoutes(
     val op = "UploadFile"
     (for
       principal <- EitherT(auth.authenticate(req))
+      _ <- serverBudget(req, principal)
       store <- EitherT.fromOption[IO](
         uploads,
         StreamApiError(501, 19, s"$op failed with error: \"file uploads are not configured\""),
