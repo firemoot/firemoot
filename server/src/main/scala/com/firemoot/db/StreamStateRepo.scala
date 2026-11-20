@@ -152,3 +152,12 @@ object StreamStateRepo:
       select id, name, image, role, custom, created_at, updated_at, last_active_at, deleted_at
       from users order by created_at asc, id limit $int4 offset $int4
     """.query(Codecs.user)
+
+  /** A thread's newest `limit` replies, newest first. Params: parent id, limit. */
+  val replies: Query[(String, Int), Message] =
+    sql"""
+      select $columns from messages m
+      where m.parent_message_id = $text
+      order by m.seq desc
+      limit $int4
+    """.query(Codecs.message)

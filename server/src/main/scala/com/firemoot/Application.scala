@@ -11,7 +11,7 @@ import com.firemoot.auth.{ApiAuth, ApiKeys, ApiKeyService}
 import com.firemoot.backplane.Backplane
 import com.firemoot.config.ServerConfig
 import com.firemoot.http.{AdminSpaRoutes, DemoRoutes, HealthRoutes}
-import com.firemoot.media.MediaService
+import com.firemoot.media.{DirectUploads, MediaService}
 import com.firemoot.metrics.{MetricsRoutes, MetricsService}
 import com.firemoot.ratelimit.RateGuard
 import com.firemoot.service.{
@@ -57,6 +57,7 @@ object Application:
       rate: RateGuard = RateGuard.unlimited,
       media: Option[MediaService] = None,
       streamConnections: StreamConnections = StreamConnections.unsafe(),
+      directUploads: Option[DirectUploads] = None,
   ): WebSocketBuilder2[IO] => HttpApp[IO] =
     val webhooks = WebhookService(pool)
     val userService = UserService(pool)
@@ -65,6 +66,8 @@ object Application:
     val readService = ReadService(pool, backplane)
     val queryService = QueryService(pool)
     val presence = PresenceService(pool, backplane)
+    val reactionService = ReactionService(pool, backplane)
+    val moderation = ModerationService(pool, webhooks)
     val streamAuth = StreamApiAuth(ApiKeys.fromConfigAndDb(cfg, pool))
     // getstream.io's v2 wire API, so the real stream-chat v10 / node-sdk run unmodified.
     val streamApi = StreamApiRoutes(
@@ -77,6 +80,9 @@ object Application:
       messageService,
       readService,
       queryService,
+      reactionService,
+      moderation,
+      directUploads,
       rate,
       backplane,
     ).routes
@@ -86,11 +92,11 @@ object Application:
       userService,
       channelService,
       messageService,
-      ReactionService(pool, backplane),
+      reactionService,
       readService,
       queryService,
       webhooks,
-      ModerationService(pool, webhooks),
+      moderation,
       HydrationService(pool),
       rate,
       media,

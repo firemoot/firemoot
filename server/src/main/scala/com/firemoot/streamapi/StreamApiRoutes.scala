@@ -11,10 +11,14 @@ import com.firemoot.db.SessionSyntax.*
 import com.firemoot.db.{ChannelRepo, LookupRepo, StreamStateRepo}
 import com.firemoot.domain.{Channel, Event, Message}
 import com.firemoot.ratelimit.{RateGuard, RateLimitDecision}
+import com.firemoot.api.SearchRequest
+import com.firemoot.media.{DirectUploads, UploadError}
 import com.firemoot.service.{
   ChannelService,
   MessageService,
+  ModerationService,
   QueryService,
+  ReactionService,
   ReadService,
   SendError,
   UserService,
@@ -23,7 +27,7 @@ import io.circe.syntax.*
 import io.circe.{ACursor, Json, JsonObject}
 import org.http4s.circe.*
 import org.http4s.dsl.io.*
-import org.http4s.{HttpRoutes, Request, Response, Status}
+import org.http4s.{EntityDecoder, HttpRoutes, Request, Response, Status}
 import skunk.Session
 import skunk.data.Arr
 
@@ -45,6 +49,9 @@ final class StreamApiRoutes(
     messages: MessageService,
     reads: ReadService,
     query: QueryService,
+    reactions: ReactionService,
+    moderation: ModerationService,
+    uploads: Option[DirectUploads],
     rate: RateGuard,
     backplane: Backplane,
 ):
@@ -79,6 +86,40 @@ final class StreamApiRoutes(
       handle(req, Status.Created)(update(_, _, s"$t:$id"))
     case req @ DELETE -> Root / "api" / "v2" / "chat" / "channels" / t / id =>
       handle(req, Status.Ok)((p, _) => deleteChannel(p, s"$t:$id"))
+    case req @ GET -> Root / "api" / "v2" / "chat" / "messages" / id / "replies" =>
+      handle(req, Status.Ok)((p, _) => replies(req, p, id))
+    case req @ GET -> Root / "api" / "v2" / "chat" / "messages" / id / "reactions" =>
+      handle(req, Status.Ok)((p, _) => listReactions(req, p, id))
+    case req @ POST -> Root / "api" / "v2" / "chat" / "messages" / id / "reaction" =>
+      handle(req, Status.Created)(sendReaction(_, _, id))
+    case req @ DELETE -> Root / "api" / "v2" / "chat" / "messages" / id / "reaction" / t =>
+      handle(req, Status.Ok)((p, _) => deleteReaction(req, p, id, t))
+    case req @ GET -> Root / "api" / "v2" / "chat" / "messages" / id =>
+      handle(req, Status.Ok)((p, _) => getMessage(p, id))
+    case req @ POST -> Root / "api" / "v2" / "chat" / "messages" / id =>
+      handle(req, Status.Created)(updateMessage(_, _, id))
+    case req @ PUT -> Root / "api" / "v2" / "chat" / "messages" / id =>
+      handle(req, Status.Created)(updateMessagePartial(_, _, id))
+    case req @ DELETE -> Root / "api" / "v2" / "chat" / "messages" / id =>
+      handle(req, Status.Ok)((p, _) => deleteMessage(p, id))
+    case req @ GET -> Root / "api" / "v2" / "chat" / "channels" / t / id / "messages" =>
+      handle(req, Status.Ok)((p, _) => getManyMessages(req, p, s"$t:$id"))
+    case req @ GET -> Root / "api" / "v2" / "chat" / "search" =>
+      handle(req, Status.Ok)((p, _) => search(req, p))
+    case req @ POST -> Root / "api" / "v2" / "chat" / "channels" / t / id / kind
+        if kind == "image" || kind == "file" =>
+      upload(req, Some(s"$t:$id"))
+    case req @ POST -> Root / "api" / "v2" / "uploads" / kind
+        if kind == "image" || kind == "file" =>
+      upload(req, None)
+    case req @ DELETE -> Root / "api" / "v2" / "chat" / "channels" / _ / _ / kind
+        if kind == "image" || kind == "file" =>
+      handle(req, Status.Ok)((_, _) => EitherT.rightT(Json.obj()))
+    case req @ DELETE -> Root / "api" / "v2" / "uploads" / kind
+        if kind == "image" || kind == "file" =>
+      handle(req, Status.Ok)((_, _) => EitherT.rightT(Json.obj()))
+    case req @ POST -> Root / "api" / "v2" / "moderation" / "flag" =>
+      handle(req, Status.Created)(flag(_, _))
     case req @ POST -> Root / "api" / "v2" / "users" =>
       handle(req, Status.Created)(upsertUsers(_, _))
     case req @ GET -> Root / "api" / "v2" / "users" =>
@@ -594,3 +635,303 @@ final class StreamApiRoutes(
       ))
       online <- EitherT.liftF(state.online)
     yield Json.obj("users" -> found.map(u => V2Json.user(u, online(u.id))).asJson)
+
+  // --- messages ---
+
+  private def message(op: String, id: String): EitherT[IO, StreamApiError, Message] =
+    EitherT.fromOptionF(
+      pool.use(_.runOption(LookupRepo.message, id)),
+      StreamApiError.notFound(op, s"message with id $id doesn't exist"),
+    )
+
+  private def messageJson(m: Message, caller: Option[String]): IO[Json] =
+    pool.use { s =>
+      state.reactions(s, List(m.id), caller).flatMap { reacts =>
+        val r = reacts.getOrElse(m.id, MessageReactions.empty)
+        state.users(s, m.userId.toList ++ (r.latest ++ r.own).map(_.userId))
+          .map(us => V2Json.message(m, us, r))
+      }
+    }
+
+  /** The author, or a channel owner/moderator; server tokens always pass. */
+  private def mayModify(op: String, action: String, p: StreamPrincipal, m: Message)
+      : EitherT[IO, StreamApiError, Unit] =
+    p match
+      case StreamPrincipal.Server => EitherT.rightT(())
+      case StreamPrincipal.User(id) if m.userId.contains(id) => permitted(op, action, p, m.cid).void
+      case StreamPrincipal.User(_) => permitted(op, action, p, m.cid, moderators).void
+
+  private def getMessage(p: StreamPrincipal, id: String): Result =
+    val op = "GetMessage"
+    for
+      m <- message(op, id)
+      _ <- permitted(op, "ReadChannel", p, m.cid)
+      json <- EitherT.liftF(messageJson(m, userOnly(p)))
+    yield Json.obj("message" -> json)
+
+  private def getManyMessages(req: Request[IO], p: StreamPrincipal, cid: String): Result =
+    val op = "GetManyMessages"
+    val ids = req.params.get("ids").toList.flatMap(_.split(",")).map(_.trim).filter(_.nonEmpty)
+    for
+      _ <- existing(op, cid)
+      _ <- permitted(op, "ReadChannel", p, cid)
+      found <- EitherT.liftF(ids.traverse(id => pool.use(_.runOption(LookupRepo.message, id))))
+      json <-
+        EitherT.liftF(found.flatten.filter(_.cid == cid).traverse(messageJson(_, userOnly(p))))
+    yield Json.obj("messages" -> json.asJson)
+
+  private def updateMessage(p: StreamPrincipal, body: ACursor, id: String): Result =
+    val op = "UpdateMessage"
+    val msg = body.downField("message")
+    for
+      current <- message(op, id)
+      _ <- mayModify(op, "UpdateMessage", p, current)
+      updated <- EitherT.fromOptionF(
+        messages.edit(
+          current.cid,
+          id,
+          Some(msg.downField("text").as[String].toOption.getOrElse("")),
+          Some(msg.downField("custom").focus.filter(_.isObject).getOrElse(Json.obj())),
+          Some(msg.downField("attachments").focus.filter(_.isArray).getOrElse(Json.arr())),
+        ),
+        StreamApiError.notFound(op, s"message with id $id doesn't exist"),
+      )
+      json <- EitherT.liftF(messageJson(updated, userOnly(p)))
+    yield Json.obj("message" -> json)
+
+  private val builtInMessageFields =
+    Set("text", "attachments", "pinned", "pin_expires", "silent", "mml")
+
+  private def updateMessagePartial(p: StreamPrincipal, body: ACursor, id: String): Result =
+    val op = "UpdateMessagePartial"
+    val set = body.downField("set").focus.flatMap(_.asObject).getOrElse(JsonObject.empty)
+    val unset = body.downField("unset").as[List[String]].toOption.getOrElse(Nil)
+    for
+      current <- message(op, id)
+      _ <- mayModify(op, "UpdateMessage", p, current)
+      custom = current.custom.asObject.getOrElse(JsonObject.empty)
+      withSet = set.filterKeys(k => !builtInMessageFields(k)).toList.foldLeft(custom)((o, kv) =>
+        o.add(kv._1, kv._2)
+      )
+      merged = unset.foldLeft(withSet)(_.remove(_))
+      text = set("text").flatMap(_.asString).orElse(Option.when(unset.contains("text"))(""))
+      attachments = set("attachments").filter(_.isArray)
+        .orElse(Option.when(unset.contains("attachments"))(Json.arr()))
+      updated <- EitherT.fromOptionF(
+        messages.edit(current.cid, id, text, Some(Json.fromJsonObject(merged)), attachments),
+        StreamApiError.notFound(op, s"message with id $id doesn't exist"),
+      )
+      json <- EitherT.liftF(messageJson(updated, userOnly(p)))
+    yield Json.obj("message" -> json)
+
+  private def deleteMessage(p: StreamPrincipal, id: String): Result =
+    val op = "DeleteMessage"
+    for
+      current <- message(op, id)
+      _ <- mayModify(op, "DeleteMessage", p, current)
+      _ <- EitherT.liftF(messages.delete(current.cid, id).void)
+      deleted <- message(op, id)
+      json <- EitherT.liftF(messageJson(deleted, userOnly(p)))
+    yield Json.obj("message" -> json)
+
+  private def replies(req: Request[IO], p: StreamPrincipal, parentId: String): Result =
+    val op = "GetReplies"
+    val limit = req.params.get("limit").flatMap(_.toIntOption).getOrElse(DefaultMessageLimit)
+      .max(1).min(MessagePaging.MaxLimit)
+    for
+      parent <- message(op, parentId)
+      _ <- permitted(op, "ReadChannel", p, parent.cid)
+      rows <- EitherT.liftF(pool.use(_.runList(StreamStateRepo.replies, (parentId, limit))))
+      json <- EitherT.liftF(rows.reverse.traverse(messageJson(_, userOnly(p))))
+    yield Json.obj("messages" -> json.asJson)
+
+  // --- reactions ---
+
+  private def reactionResult(m: Message, userId: String, reactionType: String): IO[Json] =
+    for
+      json <- messageJson(m, Some(userId))
+      at <- IO.realTimeInstant.map(_.atOffset(java.time.ZoneOffset.UTC))
+      reactor <- pool.use(s => state.users(s, List(userId)))
+    yield Json.obj(
+      "message" -> json,
+      "reaction" ->
+        V2Json.reaction(com.firemoot.db.ReactionRow(m.id, userId, reactionType, at), reactor),
+    )
+
+  private def sendReaction(p: StreamPrincipal, body: ACursor, id: String): Result =
+    val op = "SendReaction"
+    val reaction = body.downField("reaction")
+    for
+      reactionType <- EitherT.fromOption[IO](
+        str(reaction, "type"),
+        StreamApiError.input(op, "reaction.type is a required field"),
+      )
+      userId <- actor(op, p, str(reaction, "user_id"), str(reaction.downField("user"), "id"))
+      m <- message(op, id)
+      _ <- permitted(op, "CreateReaction", p, m.cid)
+      _ <- EitherT.liftF(
+        if bool(body, "enforce_unique").contains(true) then
+          pool.use(_.runList(StreamStateRepo.ownReactions, (Arr(id), userId))).flatMap(
+            _.filter(_.`type` != reactionType).traverse_(r =>
+              reactions.remove(m.cid, id, userId, r.`type`)
+            )
+          )
+        else IO.unit
+      )
+      _ <- EitherT.liftF(reactions.add(m.cid, id, userId, reactionType))
+      json <- EitherT.liftF(reactionResult(m, userId, reactionType))
+    yield json
+
+  private def deleteReaction(
+      req: Request[IO],
+      p: StreamPrincipal,
+      id: String,
+      reactionType: String,
+  ): Result =
+    val op = "DeleteReaction"
+    for
+      userId <- actor(op, p, req.params.get("user_id"))
+      m <- message(op, id)
+      _ <- permitted(op, "DeleteReaction", p, m.cid)
+      _ <- EitherT.liftF(reactions.remove(m.cid, id, userId, reactionType))
+      json <- EitherT.liftF(reactionResult(m, userId, reactionType))
+    yield json
+
+  private def listReactions(req: Request[IO], p: StreamPrincipal, id: String): Result =
+    val op = "GetReactions"
+    val limit = req.params.get("limit").flatMap(_.toIntOption).getOrElse(10).max(1).min(300)
+    for
+      m <- message(op, id)
+      _ <- permitted(op, "ReadChannel", p, m.cid)
+      rows <- EitherT.liftF(pool.use(_.runList(StreamStateRepo.latestReactions, (Arr(id), limit))))
+      us <- EitherT.liftF(pool.use(s => state.users(s, rows.map(_.userId))))
+    yield Json.obj("reactions" -> rows.map(V2Json.reaction(_, us)).asJson)
+
+  // --- search ---
+
+  private def search(req: Request[IO], p: StreamPrincipal): Result =
+    val op = "Search"
+    val payload =
+      req.params.get(
+        "payload"
+      ).flatMap(io.circe.parser.parse(_).toOption).getOrElse(Json.obj()).hcursor
+    val limit = payload.downField("limit").as[Int].toOption.getOrElse(20).max(1).min(100)
+    val text = payload.downField("query").as[String].toOption.orElse(
+      payload.downField("message_filter_conditions").downField("text").focus.flatMap(t =>
+        t.asString
+          .orElse(t.hcursor.get[String]("$autocomplete").toOption)
+          .orElse(t.hcursor.get[String]("$q").toOption)
+      )
+    )
+    for
+      q <- EitherT.fromOption[IO](
+        text.filter(_.nonEmpty),
+        StreamApiError.input(op, "either query or message_filter_conditions.text must be set"),
+      )
+      filter <- EitherT.fromEither[IO](StreamFilters.channelQuery(
+        payload.downField("filter_conditions").focus,
+        op,
+      ))
+      cid = filter.cids.flatMap(_.headOption)
+      page <- EitherT.liftF(userOnly(p) match
+        case Some(u) => query.searchAsMember(SearchRequest(q, cid, Some(limit)), u)
+        case None => query.search(SearchRequest(q, cid, Some(limit))))
+      json <- EitherT.liftF(page.hits.traverse(h => messageJson(h.message, userOnly(p))))
+    yield Json.obj("results" -> json.map(m => Json.obj("message" -> m)).asJson)
+
+  // --- uploads ---
+
+  final private case class UploadPart(
+      name: Option[String],
+      filename: Option[String],
+      mime: String,
+      bytes: Array[Byte],
+  )
+
+  private def multipartParts(req: Request[IO]): IO[Option[List[UploadPart]]] =
+    EntityDecoder.mixedMultipartResource[IO]().use(decoder =>
+      decoder.decode(req, strict = false).value.flatMap {
+        case Left(_) => IO.pure(None)
+        case Right(multipart) =>
+          multipart.parts.toList.traverse { part =>
+            val mime = part.headers.get[org.http4s.headers.`Content-Type`]
+              .map(ct => s"${ct.mediaType.mainType}/${ct.mediaType.subType}")
+              .getOrElse("application/octet-stream")
+            part.body.compile.to(Array).map(UploadPart(part.name, part.filename, mime, _))
+          }.map(Some(_))
+      }
+    )
+
+  private def upload(req: Request[IO], cid: Option[String]): IO[Response[IO]] =
+    val op = "UploadFile"
+    (for
+      principal <- EitherT(auth.authenticate(req))
+      store <- EitherT.fromOption[IO](
+        uploads,
+        StreamApiError(501, 19, s"$op failed with error: \"file uploads are not configured\""),
+      )
+      parts <- EitherT.fromOptionF(
+        multipartParts(req),
+        StreamApiError.input(op, "request is not multipart/form-data"),
+      )
+      file <- EitherT.fromOption[IO](
+        parts.find(_.name.contains("file")),
+        StreamApiError.input(op, "file is a required field"),
+      )
+      userField = parts.find(_.name.contains("user")).flatMap(u =>
+        io.circe.parser.parse(new String(u.bytes, "UTF-8")).toOption
+      )
+      userId <- actor(op, principal, userField.flatMap(_.hcursor.get[String]("id").toOption))
+      _ <- cid.fold(EitherT.rightT[IO, StreamApiError](())) { c =>
+        existing(op, c) >> permitted(op, "UploadAttachment", principal, c).void
+      }
+      decision <- EitherT.liftF(principal match
+        case StreamPrincipal.Server => rate.serverUpload(userId)
+        case StreamPrincipal.User(_) => rate.upload(userId))
+      _ <- limited(op, decision)
+      url <- EitherT(store.store(
+        Some(userId),
+        file.filename.getOrElse("file"),
+        file.mime,
+        file.bytes,
+      ).map(_.leftMap {
+        case UploadError.UnsupportedType(m) =>
+          StreamApiError.input(op, s"file type $m is not allowed")
+        case UploadError.TooLarge(max) =>
+          StreamApiError(
+            413,
+            22,
+            s"$op failed with error: \"file is larger than the $max byte limit\"",
+          )
+      }))
+    yield Json.obj("file" -> url.asJson, "duration" -> "0.00ms".asJson)).value.map {
+      case Left(error) => error.response
+      case Right(json) => Response[IO](Status.Created).withEntity(json)
+    }
+
+  // --- moderation ---
+
+  private def flag(p: StreamPrincipal, body: ACursor): Result =
+    val op = "Flag"
+    for
+      entityType <- EitherT.fromOption[IO](
+        str(body, "entity_type"),
+        StreamApiError.input(op, "entity_type is a required field"),
+      )
+      _ <- EitherT.cond[IO](
+        entityType == "stream:chat:v1:message",
+        (),
+        StreamApiError.input(op, s"flagging $entityType is not supported"),
+      )
+      messageId <- EitherT.fromOption[IO](
+        str(body, "entity_id"),
+        StreamApiError.input(op, "entity_id is a required field"),
+      )
+      userId <- actor(op, p, str(body, "user_id"), str(body.downField("user"), "id"))
+      m <- message(op, messageId)
+      _ <- permitted(op, "FlagMessage", p, m.cid)
+      created <- EitherT.fromOptionF(
+        moderation.flag(m.cid, messageId, userId, str(body, "reason")),
+        StreamApiError.notFound(op, s"message with id $messageId doesn't exist"),
+      )
+    yield Json.obj("item_id" -> created.id.toString.asJson)

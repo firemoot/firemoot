@@ -10,7 +10,7 @@ import com.firemoot.config.AppConfig
 import com.firemoot.db.SessionSyntax.*
 import com.firemoot.db.{Database, Migrations, UserRepo}
 import com.firemoot.http.HttpServer
-import com.firemoot.media.{MediaService, ObjectStore, ThumbnailWorker}
+import com.firemoot.media.{DirectUploads, MediaService, ObjectStore, ThumbnailWorker}
 import com.firemoot.metrics.{CcuSampler, MetricsService, RollupWorker}
 import com.firemoot.ratelimit.RateGuard
 import com.firemoot.service.{LastActiveTracker, MessageService, WebhookService}
@@ -36,7 +36,7 @@ object Main extends IOApp.Simple:
       _ <- Database.pool(cfg.db).use { pool =>
         // When media is configured, build the presigner (for uploads) and an
         // object store + thumbnail worker (for the write-back loop).
-        val media: Resource[IO, Option[(MediaService, ThumbnailWorker)]] =
+        val media: Resource[IO, Option[(MediaService, ThumbnailWorker, DirectUploads)]] =
           cfg.media match
             case None => Resource.pure(None)
             case Some(mc) =>
@@ -44,6 +44,7 @@ object Main extends IOApp.Simple:
                 Some((
                   new MediaService(mc, pool, presigner),
                   ThumbnailWorker(mc, pool, store, MessageService(pool, backplane), log),
+                  DirectUploads(mc, pool, store),
                 ))
               }
         (EmberClientBuilder.default[IO].build, media).tupled.use { (httpClient, mediaParts) =>
@@ -97,6 +98,7 @@ object Main extends IOApp.Simple:
               rate,
               mediaService,
               streamConnections,
+              mediaParts.map(_._3),
             )
             streamEvents = StreamEvents(
               pool,

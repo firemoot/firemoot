@@ -165,6 +165,84 @@ describe.runIf(RUN)("contract: getstream.io's own SDKs against Firemoot's v2 API
     expect(event.message.user?.id).toBe("alice");
   });
 
+  test("reactions round-trip as reaction.new and reaction.deleted with counts", async () => {
+    const alice = await connect("alice");
+    const bob = await connect("bob");
+    const aliceChannel = alice.channel("messaging", "general");
+    await aliceChannel.watch();
+    await bob.channel("messaging", "general").watch();
+    const { message } = await aliceChannel.sendMessage({ message: { text: "react to me" } });
+
+    const added = next(bob, "reaction.new", inGeneral);
+    const response = await alice.sendReaction({ id: message.id }, { reaction: { type: "like" } });
+    expect(response.reaction.type).toBe("like");
+    expect(response.message.own_reactions.map((r) => r.type)).toEqual(["like"]);
+    const event = await added;
+    if (event.type !== "reaction.new") throw new Error(`unexpected ${event.type}`);
+    expect(event.reaction?.user?.id).toBe("alice");
+    expect(event.message?.reaction_counts?.["like"]).toBe(1);
+
+    const removed = next(bob, "reaction.deleted", inGeneral);
+    await alice.deleteReaction({ id: message.id, type: "like" });
+    const gone = await removed;
+    if (gone.type !== "reaction.deleted") throw new Error(`unexpected ${gone.type}`);
+    expect(gone.message?.reaction_counts?.["like"] ?? 0).toBe(0);
+  });
+
+  test("edits and deletes reach watchers as message.updated and message.deleted", async () => {
+    const alice = await connect("alice");
+    const bob = await connect("bob");
+    const aliceChannel = alice.channel("messaging", "general");
+    await aliceChannel.watch();
+    await bob.channel("messaging", "general").watch();
+    const { message } = await aliceChannel.sendMessage({ message: { text: "first draft" } });
+
+    const updated = next(bob, "message.updated", inGeneral);
+    await alice.updateMessage({ id: message.id }, { message: { text: "final draft" } });
+    const edit = await updated;
+    if (edit.type !== "message.updated") throw new Error(`unexpected ${edit.type}`);
+    expect(edit.message.text).toBe("final draft");
+
+    const deleted = next(bob, "message.deleted", inGeneral);
+    await alice.deleteMessage({ id: message.id });
+    const del = await deleted;
+    if (del.type !== "message.deleted") throw new Error(`unexpected ${del.type}`);
+    expect(del.message.id).toBe(message.id);
+    expect(del.message.type).toBe("deleted");
+  });
+
+  test("thread replies are listed by getReplies and search finds message text", async () => {
+    const alice = await connect("alice");
+    const channel = alice.channel("messaging", "general");
+    await channel.watch();
+    const { message: parent } = await channel.sendMessage({
+      message: { text: "parent of a thread" },
+    });
+    await channel.sendMessage({ message: { text: "a reply with a needle", parent_id: parent.id } });
+
+    const replies = await alice.getReplies({ parent_id: parent.id });
+    expect(replies.messages.map((m) => m.text)).toContain("a reply with a needle");
+
+    const found = await alice.search({
+      payload: { filter_conditions: { cid: "messaging:general" }, query: "needle" },
+    });
+    expect(found.results.map((r) => r.message?.text)).toContain("a reply with a needle");
+  });
+
+  test("the server SDK flags a message", async () => {
+    const alice = await connect("alice");
+    const { message } = await alice
+      .channel("messaging", "general")
+      .sendMessage({ message: { text: "flag me" } });
+    const flagged = await server.moderation.flag({
+      entity_type: "stream:chat:v1:message",
+      entity_id: message.id,
+      user_id: "bob",
+      reason: "spam",
+    });
+    expect(flagged.item_id).toBeTruthy();
+  });
+
   test("a non-member is refused with Stream's not-allowed error", async () => {
     const mallory = await connect("mallory");
     await expect(mallory.channel("messaging", "general").watch()).rejects.toMatchObject({

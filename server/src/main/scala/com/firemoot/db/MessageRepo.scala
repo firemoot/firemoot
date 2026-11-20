@@ -32,14 +32,16 @@ object MessageRepo:
     sql"select $columns from messages where id = $text".query(Codecs.message)
 
   /**
-   * Edits text/custom (COALESCE keeps unspecified fields). Scoped by cid; returns
-   * none if the message is missing, in another channel, or already deleted.
+   * Edits text/custom/attachments (COALESCE keeps unspecified fields). Scoped by
+   * cid; returns none if the message is missing, in another channel, or already
+   * deleted.
    */
-  val update: Query[(Option[String], Option[Json], String, String), Message] =
+  val update: Query[(Option[String], Option[Json], Option[Json], String, String), Message] =
     sql"""
       update messages set
         text = coalesce(${text.opt}, text),
         custom = coalesce(${jsonb[Json].opt}, custom),
+        attachments = coalesce(${jsonb[Json].opt}, attachments),
         updated_at = now()
       where id = $text and cid = $text and deleted_at is null
       returning $columns

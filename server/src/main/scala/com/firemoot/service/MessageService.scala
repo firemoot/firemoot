@@ -89,11 +89,15 @@ final class MessageService(pool: Resource[IO, Session[IO]], backplane: Backplane
       messageId: String,
       text: Option[String],
       custom: Option[Json],
+      attachments: Option[Json] = None,
   ): IO[Option[Message]] =
     pool
       .use { session =>
         session.transaction.use { _ =>
-          session.runOption(MessageRepo.update, (text, custom, messageId, cid)).flatMap {
+          session.runOption(
+            MessageRepo.update,
+            (text, custom, attachments, messageId, cid),
+          ).flatMap {
             case None => IO.pure((Option.empty[Message], Option.empty[Event]))
             case Some(message) =>
               ChannelEvents

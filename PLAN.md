@@ -612,7 +612,11 @@ soak regressions.
         stop-watching, typing and custom events, user upsert/query, and event
         routing (message, read, member, channel, typing, notification events).
         `sdk/stream-contract` (10 tests) runs the real SDKs against the image.
-  - [ ] **M5.2** Reactions, message update/delete, uploads, search, flagging.
+  - [x] **M5.2 Messages and moderation**: get/get-many, update, partial
+        update, delete, replies, reactions (add with `enforce_unique`, delete,
+        list), search (`query` or `message_filter_conditions.text`), multipart
+        uploads written straight to S3 (channel and client endpoints), and
+        message flagging. Contract suite at 14 tests.
   - [ ] **M5.3** Server-side remainder: user delete, batch channel delete, tasks.
 
 ---
