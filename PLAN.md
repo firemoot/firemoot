@@ -623,7 +623,9 @@ soak regressions.
   - [x] **M5.4 Hardening**: server tokens spend the per-key rate budget, silent
         sockets close after 60s with 1001, event dispatch skips rendering with no
         v2 sockets and runs concurrently, unimplemented `/api/v2` paths return a
-        Stream-shaped 501. Contract suite at 16 tests, including reconnect.
+        Stream-shaped 501, `connection.ok` is always the first frame (pinned by
+        `StreamWsHandshakeSuite`), `markRead` returns the read event and watching
+        is announced. Contract suite at 18 tests, including reconnect.
 
 ---
 
