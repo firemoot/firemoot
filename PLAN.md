@@ -602,6 +602,18 @@ soak regressions.
       `StreamFormatSuite` drives every event type against a `stream` and a
       `firemoot` endpoint side by side. Next: remove the `firemoot` format once
       consumers have flipped.
+- [ ] **M5 Stream v2 wire API** (added 20/11/2026, SPEC §2): getstream.io's v2 REST
+      and `/api/v2/connect` socket so `stream-chat` v10 and `@stream-io/node-sdk`
+      run against Firemoot unmodified.
+  - [x] **M5.1 Messaging core**: Stream JWT auth, the connect handshake and
+        health checks, queryChannels (+hydrate), get-or-create/watch/query with
+        message paging (`id_lt`/`id_gt`/`id_around`/`created_at_around`),
+        distinct channels, send, mark read, update, partial update, delete,
+        stop-watching, typing and custom events, user upsert/query, and event
+        routing (message, read, member, channel, typing, notification events).
+        `sdk/stream-contract` (10 tests) runs the real SDKs against the image.
+  - [ ] **M5.2** Reactions, message update/delete, uploads, search, flagging.
+  - [ ] **M5.3** Server-side remainder: user delete, batch channel delete, tasks.
 
 ---
 

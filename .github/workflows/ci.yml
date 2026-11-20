@@ -218,3 +218,10 @@ jobs:
         env:
           FIREMOOT_DOGFOOD: "1"
         run: pnpm --filter @firemoot/test test
+
+      # getstream.io's own stream-chat v10 and @stream-io/node-sdk, unmodified,
+      # against the same image's v2 wire API (SPEC.md §2, Stream v2 wire API).
+      - name: Run the Stream SDK contract suite against a real Firemoot
+        env:
+          FIREMOOT_DOGFOOD: "1"
+        run: pnpm --filter @firemoot/stream-contract test

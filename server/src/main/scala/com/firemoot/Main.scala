@@ -14,6 +14,7 @@ import com.firemoot.media.{MediaService, ObjectStore, ThumbnailWorker}
 import com.firemoot.metrics.{CcuSampler, MetricsService, RollupWorker}
 import com.firemoot.ratelimit.RateGuard
 import com.firemoot.service.{LastActiveTracker, MessageService, WebhookService}
+import com.firemoot.streamapi.{StreamConnections, StreamEvents, StreamStateService}
 import com.firemoot.webhook.{UnreadReminderWorker, WebhookConfig, WebhookDispatcher}
 import com.firemoot.ws.ConnectionRegistry
 import fs2.Stream
@@ -31,6 +32,7 @@ object Main extends IOApp.Simple:
       _ <- log.info(s"Flyway applied $applied migration(s)")
       backplane <- Backplane.inProcess
       registry <- ConnectionRegistry.create
+      streamConnections <- StreamConnections.create
       _ <- Database.pool(cfg.db).use { pool =>
         // When media is configured, build the presigner (for uploads) and an
         // object store + thumbnail worker (for the write-back loop).
@@ -94,6 +96,14 @@ object Main extends IOApp.Simple:
               onActive,
               rate,
               mediaService,
+              streamConnections,
+            )
+            streamEvents = StreamEvents(
+              pool,
+              backplane,
+              streamConnections,
+              StreamStateService(streamConnections, registry),
+              log,
             )
             reminders = cfg.unreadReminders.fold(Stream.empty.covary[IO]) { rc =>
               UnreadReminderWorker(pool, rc, log).stream
@@ -101,6 +111,7 @@ object Main extends IOApp.Simple:
             workers = dispatcher.stream
               .merge(enqueue)
               .merge(reminders)
+              .merge(streamEvents.stream)
               .merge(thumbnails)
               .merge(ccuSampler.stream)
               .merge(rollup.stream)

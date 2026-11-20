@@ -1,6 +1,7 @@
 packages:
   - "sdk/ts/*"
   - "sdk/test"
+  - "sdk/stream-contract"
   - "admin"
   - "docs"
 # testcontainers' transitive native deps. We talk to a local Docker socket, so
@@ -15,3 +16,7 @@ allowBuilds:
   cpu-features: false
   protobufjs: false
   ssh2: false
+  # stream-chat and @stream-io/node-sdk (contract tests only): their postinstalls
+  # just install husky git hooks for Stream's own repo; the published dist is used.
+  "@stream-io/node-sdk": false
+  stream-chat: false

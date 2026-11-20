@@ -26,6 +26,13 @@ import com.firemoot.service.{
   UserService,
   WebhookService,
 }
+import com.firemoot.streamapi.{
+  StreamApiAuth,
+  StreamApiRoutes,
+  StreamConnections,
+  StreamStateService,
+  StreamWsRoutes,
+}
 import com.firemoot.ws.{ConnectionRegistry, EventReplay, WsRoutes}
 import org.http4s.dsl.io.*
 import org.http4s.headers.`Content-Type`
@@ -49,15 +56,39 @@ object Application:
       onUserActive: String => IO[Unit] = _ => IO.unit,
       rate: RateGuard = RateGuard.unlimited,
       media: Option[MediaService] = None,
+      streamConnections: StreamConnections = StreamConnections.unsafe(),
   ): WebSocketBuilder2[IO] => HttpApp[IO] =
     val webhooks = WebhookService(pool)
+    val userService = UserService(pool)
+    val channelService = ChannelService(pool, backplane)
+    val messageService = MessageService(pool, backplane)
+    val readService = ReadService(pool, backplane)
+    val queryService = QueryService(pool)
+    val presence = PresenceService(pool, backplane)
+    val streamAuth = StreamApiAuth(ApiKeys.fromConfigAndDb(cfg, pool))
+    // getstream.io's v2 wire API, so the real stream-chat v10 / node-sdk run unmodified.
+    val streamApi = StreamApiRoutes(
+      pool,
+      streamAuth,
+      streamConnections,
+      StreamStateService(streamConnections, registry),
+      userService,
+      channelService,
+      messageService,
+      readService,
+      queryService,
+      rate,
+      backplane,
+    ).routes
+    val streamWs =
+      StreamWsRoutes(pool, streamAuth, streamConnections, userService, presence, onUserActive)
     val api = ApiRoutes(
-      UserService(pool),
-      ChannelService(pool, backplane),
-      MessageService(pool, backplane),
+      userService,
+      channelService,
+      messageService,
       ReactionService(pool, backplane),
-      ReadService(pool, backplane),
-      QueryService(pool),
+      readService,
+      queryService,
       webhooks,
       ModerationService(pool, webhooks),
       HydrationService(pool),
@@ -74,7 +105,7 @@ object Application:
         registry,
         EventReplay(pool),
         pool,
-        PresenceService(pool, backplane),
+        presence,
         cfg.apiSecret.value,
         devDemo,
         onUserActive,
@@ -134,7 +165,7 @@ object Application:
     wsb =>
       val httpRoutes =
         HealthRoutes(pool).routes <+> metrics <+> admin <+> AdminSpaRoutes.routes <+>
-          openApi <+> demo <+> securedApi
+          openApi <+> demo <+> streamApi <+> securedApi
       val wrapped =
         cors(Logger.httpRoutes(logHeaders = true, logBody = false)(logUnhandled(httpRoutes)))
-      (ws.routes(wsb) <+> wrapped).orNotFound
+      (ws.routes(wsb) <+> streamWs.routes(wsb) <+> wrapped).orNotFound
