@@ -59,6 +59,7 @@ export default defineConfig({
       {
         text: "Migration",
         items: [
+          { text: "Stream's own SDKs, unmodified", link: "/guide/stream-api" },
           { text: "Drop-in Stream compatibility", link: "/guide/stream-compat" },
           { text: "Migrating from Stream", link: "/guide/migration" },
         ],

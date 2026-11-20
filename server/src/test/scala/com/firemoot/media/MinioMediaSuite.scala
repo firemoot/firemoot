@@ -15,22 +15,27 @@ import ciris.Secret
 import com.dimafeng.testcontainers.{GenericContainer, PostgreSQLContainer}
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import com.firemoot.api.CreateUploadRequest
+import com.firemoot.Application
 import com.firemoot.backplane.Backplane
-import com.firemoot.config.{DbConfig, MediaConfig}
+import com.firemoot.config.{DbConfig, MediaConfig, ServerConfig}
 import com.firemoot.db.SessionSyntax.*
 import com.firemoot.db.{Database, Migrations, UploadRepo}
 import com.firemoot.domain.Event
 import com.firemoot.service.{ChannelService, MessageService, UserService}
+import com.firemoot.ws.ConnectionRegistry
 import io.circe.Json
 import io.circe.syntax.*
 import munit.CatsEffectSuite
-import org.http4s.Method.PUT
+import org.http4s.Method.{POST, PUT}
 import org.http4s.headers.`Content-Type`
 import org.http4s.jdkhttpclient.JdkHttpClient
+import org.http4s.multipart.{Multiparts, Part}
+import org.http4s.server.websocket.WebSocketBuilder2
 import org.http4s.{MediaType, Request, Uri}
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.utility.DockerImageName
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import pdi.jwt.{JwtAlgorithm, JwtCirce, JwtClaim}
 import skunk.codec.all.*
 import skunk.implicits.*
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
@@ -191,6 +196,87 @@ class MinioMediaSuite extends CatsEffectSuite, TestContainerForAll:
                   events.exists(e => e.`type` == "message.updated"),
                   "the attachment patch re-emitted message.updated",
                 )
+            }
+          }
+        }
+      }
+    }
+  }
+
+  test("a Stream v2 multipart upload stores the bytes in S3 and returns their URL") {
+    withContainers { pg =>
+      val cfg = dbConfig(pg)
+      minioResource.use { minio =>
+        val endpoint = s"http://${minio.containerIpAddress}:${minio.mappedPort(9000)}"
+        val mediaCfg = mediaConfig(endpoint)
+        val serverCfg = ServerConfig("stream-key", Secret("stream-secret"))
+        val token = JwtCirce.encode(
+          JwtClaim(content = """{"user_id":"ann"}"""),
+          "stream-secret",
+          JwtAlgorithm.HS256,
+        )
+        val image = png(40, 20)
+        Backplane.inProcess.flatMap { backplane =>
+          Migrations.run(cfg) >> createBucket(mediaCfg) >> Database.pool(cfg).use { pool =>
+            (ObjectStore.s3(mediaCfg), Resource.eval(ConnectionRegistry.create)).tupled.use {
+              (store, registry) =>
+                for
+                  _ <- UserService(pool).upsert("ann", None, None, "user", Json.obj())
+                  _ <- ChannelService(
+                    pool,
+                    backplane,
+                  ).create("messaging", "pics", Some("ann"), Json.obj())
+                  wsb <- WebSocketBuilder2[IO]
+                  app = Application.httpApp(
+                    serverCfg,
+                    pool,
+                    backplane,
+                    registry,
+                    directUploads = Some(DirectUploads(mediaCfg, pool, store)),
+                  )(wsb)
+                  multipart <- Multiparts.forSync[IO].flatMap(_.multipart(Vector(
+                    Part.fileData[IO](
+                      "file",
+                      "pic.png",
+                      fs2.Stream.emits(image),
+                      `Content-Type`(MediaType.image.png),
+                    )
+                  )))
+                  response <- app.run(
+                    Request[IO](
+                      POST,
+                      Uri.unsafeFromString(
+                        "/api/v2/chat/channels/messaging/pics/image?api_key=stream-key"
+                      ),
+                    )
+                      .withEntity(multipart)
+                      .putHeaders(multipart.headers)
+                      .putHeaders("Authorization" -> token, "stream-auth-type" -> "jwt")
+                  )
+                  body <- response.as[String]
+                  url = io.circe.parser.parse(
+                    body
+                  ).toOption.flatMap(_.hcursor.get[String]("file").toOption)
+                  key = url.map(_.stripPrefix(s"$endpoint/${mediaCfg.bucket}/"))
+                  stored <- key.traverse(store.get)
+                  refused <- app.run(
+                    Request[IO](
+                      POST,
+                      Uri.unsafeFromString(
+                        "/api/v2/chat/channels/messaging/pics/file?api_key=stream-key"
+                      ),
+                    )
+                      .withEntity(multipart)
+                      .putHeaders(multipart.headers)
+                  )
+                yield
+                  assertEquals(response.status.code, 201, body)
+                  assert(
+                    url.exists(_.startsWith(s"$endpoint/${mediaCfg.bucket}/uploads/")),
+                    s"object url: $url",
+                  )
+                  assertEquals(stored.map(_.toSeq), Some(image.toSeq), "the bytes landed in S3")
+                  assertEquals(refused.status.code, 401, "no token, no upload")
             }
           }
         }

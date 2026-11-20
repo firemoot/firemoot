@@ -132,6 +132,15 @@ final class StreamApiRoutes(
       handle(req, Status.Created)(upsertUsers(_, _))
     case req @ GET -> Root / "api" / "v2" / "users" =>
       handle(req, Status.Ok)((_, _) => queryUsers(req))
+    // Loud failure for the rest of Stream's API: a Stream-shaped error (numeric
+    // `code`, so the SDK wraps it) naming the endpoint, never a silent no-op or a
+    // Firemoot-shaped 401 from the routes behind.
+    case req if req.uri.path.renderString.startsWith("/api/v2/") =>
+      IO.pure(StreamApiError(
+        501,
+        4,
+        s"Firemoot does not implement ${req.method.name} ${req.uri.path.renderString} of the Stream API",
+      ).response)
   }
 
   // --- plumbing ---

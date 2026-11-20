@@ -6,6 +6,9 @@ with the same constructors, the same method names and the same return shapes, so
 an app written against Stream can switch chat backends by **changing
 configuration only** - the API key, the secret, and a base URL.
 
+It mirrors `stream-chat` v9. For v10, point Stream's own SDKs at Firemoot
+instead: see [Stream's own SDKs, unmodified](./stream-api).
+
 This is the fastest path off Stream. It is not the only one: if you would rather
 own the seam, [migrating from Stream](./migration) describes porting your adapter
 modules onto `@firemoot/client` directly, which is more work up front and leaves
