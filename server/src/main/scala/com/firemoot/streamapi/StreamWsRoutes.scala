@@ -202,11 +202,12 @@ final class StreamWsRoutes(
       outbound: Queue[IO, Option[WebSocketFrame]],
       authed: Deferred[IO, Option[String]],
   ): IO[Unit] =
+    // `connection.ok` must be the socket's first frame: the SDK takes whatever
+    // arrives first as the handshake and reads `connection_id` from it, so an
+    // event that slipped in ahead would leave it with no connection id. So the
+    // socket joins event fan-out only after `connection.ok` is queued.
     for
       user <- upsertFromDetails(userId, details)
-      firstSocket <- connections.ofUser(userId).map(_.isEmpty)
-      _ <- connections.add(StreamConnection(connectionId, userId, outbound, Set.empty))
-      _ <- authed.complete(Some(userId))
       unread <- pool.use(s =>
         (
           s.runUnique(ReadRepo.totalUnread, (userId, ReadRepo.TotalUnreadCap)),
@@ -220,8 +221,15 @@ final class StreamWsRoutes(
         "created_at" -> V2Json.ns(at),
         "me" -> V2Json.ownUser(user, unread._1, unread._2),
       ))))
-      _ <- onUserActive(userId).attempt.void
-      _ <- presence.online(userId).attempt.void.start.whenA(firstSocket)
+      firstSocket <- connections.ofUser(userId).map(_.isEmpty)
+      _ <- connections.add(StreamConnection(connectionId, userId, outbound, Set.empty))
+      // A socket that closed during the handshake has already run its cleanup.
+      live <- authed.complete(Some(userId))
+      _ <-
+        if live then
+          onUserActive(userId).attempt.void >>
+            presence.online(userId).attempt.void.start.void.whenA(firstSocket)
+        else connections.close(connectionId).void
     yield ()
 
   /** Creates the user on first connect; afterwards applies the fields `user_details` carries. */

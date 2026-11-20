@@ -331,6 +331,29 @@ describe.runIf(RUN)("contract: getstream.io's own SDKs against Firemoot's v2 API
     }
   }, 30_000);
 
+  test("connecting while messages flow still hands the SDK a connection id", async () => {
+    let pumping = true;
+    const pump = (async () => {
+      while (pumping) {
+        await server.chat
+          .channel("messaging", "general")
+          .sendMessage({ message: { text: "pump", user_id: "alice" } })
+          .catch(() => undefined);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+    })();
+    try {
+      for (let i = 0; i < 8; i++) {
+        const carol = await connect("carol");
+        await carol.channel("messaging", "general").watch();
+        await carol.disconnectUser();
+      }
+    } finally {
+      pumping = false;
+      await pump;
+    }
+  }, 60_000);
+
   test("health checks keep an idle socket open", async () => {
     const alice = await connect("alice", 1_000);
     const bob = await connect("bob");
