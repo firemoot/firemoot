@@ -53,6 +53,11 @@ After editing `mise.toml`, run `mise trust && mise install`.
   virtual time (`TestControl.executeEmbed { ... }` - deterministic and instant).
   Integration suites may still sleep, but only in the generous direction
   ("wait, then assert something arrived"), never "assert it hasn't happened yet".
+- **Regression tests must fail first:** before committing one, run it against the
+  pre-fix code and see it fail. Races rarely reproduce on the small local test DB
+  (the v2 handshake race didn't in `stream-contract`), so recreate the production
+  data shape in a server-side suite (`StreamWsHandshakeSuite` seeds 20k
+  memberships with SQL to widen the window).
 - **CI verification:** `gh run watch` exit codes lie when chained with other
   commands; always read per-job conclusions:
   `gh run view <id> --json conclusion,jobs`. The Cold-boot gate and sdk jobs have
