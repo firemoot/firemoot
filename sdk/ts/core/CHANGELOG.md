@@ -1,5 +1,11 @@
 # @firemoot/core
 
+## 1.1.1
+
+### Patch Changes
+
+- e3fff80: `Problem` gains an optional `retryAfter` (whole seconds), set on `429` responses alongside the new `Retry-After` header.
+
 ## 1.1.0
 
 ### Minor Changes
