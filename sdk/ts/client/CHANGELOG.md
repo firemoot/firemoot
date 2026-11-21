@@ -1,5 +1,12 @@
 # @firemoot/client
 
+## 1.0.4
+
+### Patch Changes
+
+- Updated dependencies [e3fff80]
+  - @firemoot/core@1.1.1
+
 ## 1.0.3
 
 ### Patch Changes
