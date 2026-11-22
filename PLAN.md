@@ -36,7 +36,7 @@ during that task and recorded in SPEC.md's Decisions Log.
 | Admin SPA | Vite + TS | Chart lib decided in M3 (uPlot vs Chart.js) |
 | Config | ciris 3.15.0 | Typelevel-native, no reflection (GraalVM-friendly) |
 | Logging | log4cats-slf4j + logback + logstash-encoder | JSON structured logs (M0.2 decision settled: log4cats over scribe for cats-effect integration) |
-| Docker base | eclipse-temurin:25-jre | via sbt-native-packager; runtime flags `-XX:+UseCompactObjectHeaders -XX:+UseG1GC -XX:MaxRAMPercentage=75` |
+| Docker base | eclipse-temurin:25-jre | via sbt-native-packager; runtime flags `-XX:+UseCompactObjectHeaders -XX:+UseG1GC -XX:MaxRAMPercentage=60` (was 75 until 22/11/2026, SPEC §2) |
 
 ---
 

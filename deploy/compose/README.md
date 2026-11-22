@@ -23,7 +23,7 @@ $7 Hetzner-class VPS.
    ```
 
 The JVM runs with `-XX:+UseCompactObjectHeaders -XX:+UseG1GC
--XX:MaxRAMPercentage=75` (baked into the image) - the RSS/$7-VPS envelope. 2GB
+-XX:MaxRAMPercentage=60` (baked into the image) - the RSS/$7-VPS envelope. 2GB
 RAM is comfortable.
 
 ## TLS + WebSockets with Caddy

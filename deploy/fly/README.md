@@ -112,5 +112,5 @@ WebSockets transparently over the `force_https` listener.
 - Single region, single machine is the v1 story (the backplane is in-process).
   Multi-node needs the Postgres `LISTEN`/`NOTIFY` backplane (post-v1, SPEC §2).
 - To grow vertically, raise `[[vm]] memory`; the JVM tracks it via
-  `-XX:MaxRAMPercentage=75` (baked into the image). Watch RSS the way the nightly
+  `-XX:MaxRAMPercentage=60` (baked into the image). Watch RSS the way the nightly
   soak does.

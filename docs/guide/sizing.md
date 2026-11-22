@@ -8,14 +8,18 @@ capped and the GC chosen for low resident memory.
 The image runs the JVM with:
 
 ```
--XX:+UseCompactObjectHeaders -XX:+UseG1GC -XX:MaxRAMPercentage=75
+-XX:+UseCompactObjectHeaders -XX:+UseG1GC -XX:MaxRAMPercentage=60
 ```
 
 Compact object headers (JDK 25) trim heap by roughly 10-22%; G1 keeps RSS
 predictable, and ZGC is not an option here because it is incompatible with
-compact headers. `MaxRAMPercentage=75` caps the heap at three-quarters of the
-container's memory limit, so a 1GB container yields a ~768MB heap ceiling with
-headroom for the rest of the process. You should not need to set `-Xmx`.
+compact headers. `MaxRAMPercentage=60` caps the heap at 60% of the container's
+memory limit, so a 1GB container yields a ~614MB heap ceiling and leaves ~400MB
+for the rest of the process: metaspace, code cache, thread stacks, direct
+buffers and the GC's own structures. That remainder is not small. At 75%, a 1GB
+container running sustained CI traffic was OOM-killed once the heap had grown
+to its ceiling. You should not need to set `-Xmx`; `/metrics` shows where the
+memory goes (see [configuration](./configuration#operational-endpoints)).
 
 ## What the nightly soak measures
 

@@ -130,7 +130,7 @@ for what they send and when.
 ## JVM flags
 
 The published image already runs with
-`-XX:+UseCompactObjectHeaders -XX:+UseG1GC -XX:MaxRAMPercentage=75`, so the heap
+`-XX:+UseCompactObjectHeaders -XX:+UseG1GC -XX:MaxRAMPercentage=60`, so the heap
 tracks whatever memory limit you give the container. You do not need to set
 `-Xmx`. See [sizing](./sizing) for what those flags buy.
 
@@ -146,6 +146,15 @@ tracks whatever memory limit you give the container. You do not need to set
 `/metrics` is deliberately unauthenticated so a scraper needs no credential, and
 it is deliberately cheap - the gauges (`firemoot_ccu`, `firemoot_dau`,
 `firemoot_wau`, `firemoot_mau`, `firemoot_messages{channel_type=…}`,
-`firemoot_media_bytes`, `firemoot_db_size_bytes`) are computed on demand. It does
+`firemoot_media_bytes`, `firemoot_db_size_bytes`, and the memory gauges below)
+are computed on demand. It does
 leak usage volumes, so firewall it or restrict it at your reverse proxy if the
 box is public.
+
+The memory gauges show how the container's limit is being spent:
+`firemoot_process_rss_bytes` (what the kernel's OOM killer compares with the
+limit; Linux only), `firemoot_jvm_heap_max_bytes` / `_committed_bytes` /
+`_used_bytes`, `firemoot_jvm_heap_after_gc_bytes` (heap still in use after the
+last collection, roughly the live set: if it climbs steadily across scrapes,
+something is leaking), `firemoot_jvm_nonheap_used_bytes` (metaspace and code
+cache) and `firemoot_jvm_direct_buffer_bytes`.

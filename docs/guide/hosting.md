@@ -32,7 +32,7 @@ them, so **set `FIREMOOT_API_SECRET` before you expose the box** - the fallback 
 locked.
 
 The image bakes in `-XX:+UseCompactObjectHeaders -XX:+UseG1GC
--XX:MaxRAMPercentage=75`, so the heap follows whatever memory limit you give the
+-XX:MaxRAMPercentage=60`, so the heap follows whatever memory limit you give the
 container. 1GB is the tested envelope; 2GB is comfortable. See
 [sizing](./sizing).
 

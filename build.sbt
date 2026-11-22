@@ -42,7 +42,7 @@ lazy val server = project
     Universal / javaOptions ++= Seq(
       "-J-XX:+UseG1GC",
       "-J-XX:+UseCompactObjectHeaders",
-      "-J-XX:MaxRAMPercentage=75",
+      "-J-XX:MaxRAMPercentage=60",
     ),
   )
 
