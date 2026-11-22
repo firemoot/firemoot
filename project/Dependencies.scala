@@ -58,8 +58,10 @@ object Dependencies {
   )
 
   val persistence: Seq[ModuleID] = Seq(
-    "org.tpolecat" %% "skunk-core" % V.skunk,
-    "org.tpolecat" %% "skunk-circe" % V.skunk,
+    // twiddles-core (via skunk) publishes munit as a compile dependency, which
+    // would put munit/junit on the runtime classpath and into the image.
+    ("org.tpolecat" %% "skunk-core" % V.skunk).exclude("org.scalameta", "munit_3"),
+    ("org.tpolecat" %% "skunk-circe" % V.skunk).exclude("org.scalameta", "munit_3"),
     "org.flywaydb" % "flyway-core" % V.flyway,
     "org.flywaydb" % "flyway-database-postgresql" % V.flyway,
     "org.postgresql" % "postgresql" % V.postgres % Runtime,
