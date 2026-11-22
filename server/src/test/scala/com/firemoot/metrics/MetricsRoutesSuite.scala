@@ -43,6 +43,13 @@ class MetricsRoutesSuite extends CatsEffectSuite, TestContainerForAll:
           assert(body.contains("firemoot_ccu 7.0"), body)
           assert(body.contains("firemoot_dau 1.0"), body)
           assert(body.contains("firemoot_db_size_bytes"), body)
+          assert(body.contains("# TYPE firemoot_jvm_heap_after_gc_bytes gauge"), body)
+          assert(body.contains("firemoot_jvm_heap_max_bytes"), body)
+          assert(body.contains("firemoot_jvm_nonheap_used_bytes"), body)
+          assertEquals(
+            body.contains("firemoot_process_rss_bytes"),
+            java.nio.file.Files.isReadable(java.nio.file.Path.of("/proc/self/status")),
+          )
       }
     }
   }
